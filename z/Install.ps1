@@ -294,9 +294,9 @@ if @@trancount > 0
         
         $this.CheckHashInternal = $true
         
-        $this.PrintHighlight("Deploying tables...")
-        $this.ExecuteFolder($(Join-Path -Path $this.SystemPath -ChildPath "Tables"))
-        $this.PrintHighlight("Deploying tables...done.")
+        $this.PrintHighlight("Deploying Objects...")
+        $this.ExecuteFolder($(Join-Path -Path $this.SystemPath -ChildPath "Objects"))
+        $this.PrintHighlight("Deploying Objects...done.")
 
         $this.PrintHighlight("Deploying Version folders...")
         foreach($v in $this.VersionFolders){
