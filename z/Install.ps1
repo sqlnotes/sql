@@ -316,6 +316,10 @@ if @@trancount > 0
         $this.WriteHashToDB()
         
         $this.PrintHighlight("Deployment to code base $($this.SystemName) is completed ")
+
+        $this.PrintHighlight("Start testing...")
+        $this.ExecuteFolder($(Join-Path -Path $this.SystemPath -ChildPath "Tests"))
+        $this.PrintHighlight("Testing...done.")
     }
 }
 
