@@ -11,6 +11,11 @@ begin
 	if @TableName is not null 
 	begin
 		select @ObjectID = object_id(@TableName)
+		if @ObjectID is null
+		begin
+			raiserror('Could not find object %s in current database, ForceNamingConvention failed.', 16, 1, @TableName)
+			return
+		end
 		if not exists(select * from sys.tables where object_id = @ObjectID)
 			and not exists(select * from sys.views where object_id = @ObjectID)
 		begin
@@ -63,3 +68,4 @@ begin
 	close c
 	deallocate c
 end
+
