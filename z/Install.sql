@@ -23,7 +23,7 @@ begin
 		Name nvarchar(128) not null,
 		Version varchar(100) not null,
 		Date datetime not null,
-		constraint PK_z_SystemVersion primary key(Name, Version)
+		constraint PK_z_System primary key(Name, Version)
 	)
 end
 --drop table z.SystemUpdateBatch

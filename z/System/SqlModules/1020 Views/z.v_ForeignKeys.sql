@@ -3,8 +3,8 @@ as
 	select 
 			fk.object_id as ObjectID,
 			object_schema_name(fk.object_id) SchemaName,
-			fk.name as ObjectName,
-			z.fn_GetExpectedName('ForeignKey',object_schema_name(fk.parent_object_id), object_name(fk.parent_object_id), p.ParentColumns, object_schema_name(fk.referenced_object_id), object_name(fk.referenced_object_id)) ExpectedObjectName,
+			fk.name as ForeignKeyName,
+			z.fn_GetExpectedName('ForeignKey',object_schema_name(fk.parent_object_id), object_name(fk.parent_object_id), p.ParentColumns, object_schema_name(fk.referenced_object_id), object_name(fk.referenced_object_id)) ExpectedForeignKeyName,
 			fk.parent_object_id ParentObjectID,
 			object_name(fk.parent_object_id) ParentTableName,
 			fk.referenced_object_id ReferenceObjectID,

@@ -11,49 +11,55 @@ begin
 	if @TableName is not null 
 	begin
 		select @ObjectID = object_id(@TableName)
-		if @ObjectID is null
-		raiserror('Could not find object %s.', 16, 1, @TableName)
-		return
+		if not exists(select * from sys.tables where object_id = @ObjectID)
+			and not exists(select * from sys.views where object_id = @ObjectID)
+		begin
+			raiserror('Could not find object %s.', 16, 1, @TableName)
+			return
+		end
 	end
-	
-	select 'exec sp_rename ' + quotename(quotename(SchemaName) + '.' + quotename(ObjectName) + '.' + quotename(IndexName), '''')+','+quotename(ExpectedIndexName, '''') + ',' + quotename('Index', '''') +';'
-			--, *
-	from maint.fn_GetIndexStructure(@TableName)
-		where SchemaName in (select SchemaName from maint.DatabaseSchemas)
+	declare c cursor local static for
+		select	case when IsPrimaryKey = 1 or IsUniqueConstraint = 1 then 
+						quotename(SchemaName) + '.' + quotename(IndexName) -- constraint
+					else
+						quotename(SchemaName) + '.' + quotename(ObjectName) + '.' + quotename(IndexName)-- indexes
+				end,
+				ExpectedIndexName, 
+				case when IsPrimaryKey = 1 or IsUniqueConstraint = 1 then 'Object' else 'Index'end 
+		from z.v_Indexes
+		where (@ObjectID is null or ObjectID = @ObjectID)
 			and ExpectedIndexName <> IndexName
-			and IsPrimaryKey = 0
-			and IsUniqueConstraint = 0
-
-
-
-	declare @SQL nvarchar(max)
-	create table #Query(ID int identity(1,1), SQL nvarchar(max))
-	--Indexes
-	insert into #Query(SQL)
-		
-	-- PK and UQ
-	insert into #Query(SQL)
-		select 'exec sp_rename ' + quotename(quotename(SchemaName) + '.' + quotename(IndexName), '''')+','+quotename(ExpectedIndexName, '''') + ',' + quotename('Object', '''') +';'
-			--, *
-		from maint.fn_GetIndexStructure(@TableName)
-		where SchemaName in (select SchemaName from maint.DatabaseSchemas)
-			and ExpectedIndexName <> IndexName
-			and (IsPrimaryKey = 1 or  IsUniqueConstraint = 1)
-	--Default
-	insert into #Query(SQL)
-		select 'exec sp_rename ' + quotename(quotename(SchemaName) + '.' + quotename(DefaultObjectName), '''')+','+quotename(ExpectedDefaultObjectName, '''') + ',' + quotename('Object', '''') +';'
-		from maint.fn_GetDefaultStructure(@TableName)
-		where SchemaName in (select SchemaName from maint.DatabaseSchemas)
-			and ExpectedDefaultObjectName <> DefaultObjectName
-	--FK
-	insert into #Query(SQL)
-		select 'exec sp_rename ' + quotename(quotename(SchemaName) + '.' + quotename(ObjectName), '''')+','+quotename(ExpectedObjectName, '''') + ',' + quotename('Object', '''') +';'
-		from maint.fn_GetForeignKeyStructure(@TableName, null)
-		where SchemaName in (select SchemaName from maint.DatabaseSchemas)
-			and ExpectedObjectName <> ObjectName
-	
-	exec maint.usp_RunOrShowQuery @RunQuery = @ExecuteDirectly,  @TempTable = '#Query', @IngoreError = @IgnoreError
+		union all
+		select	quotename(SchemaName) + '.' + quotename(DefaultName),
+				ExpectedDefaultName,
+				'Object'
+		from z.v_DefaultConstraints
+		where (@ObjectID is null or ParentObjectID = @ObjectID)
+			and ExpectedDefaultName <> DefaultName
+		union all
+		select quotename(SchemaName) + '.' + quotename(ForeignKeyName),
+				ExpectedForeignKeyName,
+				'Object' 
+		from z.v_ForeignKeys
+		where (@ObjectID is null or ParentObjectID = @ObjectID)
+			and ExpectedForeignKeyName <> ForeignKeyName
+	open c
+	fetch next from c into @ObjectName, @NewName, @ObjectType
+	while @@fetch_status = 0
+	begin
+		begin try
+			print 'Renaming ' + @ObjectName + ' --> ' + @NewName
+			exec sp_rename @objname = @ObjectName, @newname = @NewName, @objtype = @ObjectType
+		end try
+		begin catch
+			if @@trancount > 0
+				rollback;
+			if @IgnoreError = 1
+				print z.fn_GetFullErrorMessage();
+			throw;
+		end catch
+		fetch next from c into @ObjectName, @NewName, @ObjectType
+	end
+	close c
+	deallocate c
 end
-
-
-select * from z.v_Indexes
