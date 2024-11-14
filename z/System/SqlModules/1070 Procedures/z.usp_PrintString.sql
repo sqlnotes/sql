@@ -4,7 +4,7 @@ begin
 	declare @Line nvarchar(max)
 	declare c cursor local for
 		select l1.Value
-		from z.fn_ReadLineFromString(@str) l
+		from z.fn_ReadLinesFromString(@str) l
 			cross apply z.fn_SplitStringFixedLength(l.Value, 4000) l1
 		order by l.Ordinal, l1.Ordinal
 		option(maxrecursion 0)

@@ -1,6 +1,8 @@
 create or alter procedure z.usp_GetQueryResultToSQL
+(
 	@Query nvarchar(max),
 	@SQL nvarchar(max) output
+)
 as
 begin
 	set nocount on
@@ -73,10 +75,10 @@ from #t', '''','''''')+''')
 		from x0
 		order by ColumnID asc
 		for xml path(''), type).value('.', 'varchar(max)'),1,1,'') + ''' as nvarchar(max)) + ''
-		from (
-				values(''+stuff((select ''
-					,''+Data  from #Data order by ID for xml path(''''), type).value(''.'', ''varchar(max)''),1,8,'''')+''
-			) v('+stuff((select ','+quotename(ColumnName)
+from (
+		values(''+stuff((select ''
+			,''+Data  from #Data order by ID for xml path(''''), type).value(''.'', ''varchar(max)''),1,7,'''')+''
+	) v('+stuff((select ','+quotename(ColumnName)
 		from x0
 		order by ColumnID asc
 		for xml path(''), type).value('.', 'varchar(max)'),1,1,'') + ')''
@@ -100,4 +102,3 @@ from #t', '''','''''')+''')
 	--select @SQL	
 	exec sp_executesql @SQL, N'@Query nvarchar(max), @SQL nvarchar(max) output', @Query, @SQL output
 end
-go
