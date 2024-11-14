@@ -52,14 +52,10 @@ begin
 	end
 	drop procedure ' + @Proc + ';
 end'
-	if maint.fn_GetServiceJobID(@Proc) is null
+	if z.fn_GetServiceJobID(@Proc) is null
 	begin
 		exec (@SQL)
-		exec maint.usp_CreateServiceJob @Name = @Proc, @ProcedureName = @Proc, @Description = @Proc, @DeleteAfterRun = 3, @Interval = 3600, @DailyAt = null, @CheckRegistry = 0	
-		exec maint.usp_StartServiceJob @Name = @Proc
+		exec z.usp_CreateServiceJob @Name = @Proc, @ProcedureName = @Proc, @Description = @Proc, @DeleteAfterRun = 3, @Interval = 3600, @DailyAt = null, @CheckRegistry = 0	
+		exec z.usp_StartServiceJob @Name = @Proc
 	end
 end
-go
---select * from sys.dm_exec_requests where session_id = @@spid
---exec ##usp_RemoveBlocker_64
-

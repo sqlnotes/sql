@@ -1,4 +1,4 @@
-create or alter procedure z.usp_RemoveZSchema
+create or alter procedure z.usp_RemoveSchemaZ
 (
 	@Confirm bit = 0
 )
@@ -33,7 +33,7 @@ begin
 		print error_message()
 		end catch
 	end
-	drop procedure z.usp_RemoveZSchema;
+	drop procedure z.usp_RemoveSchemaZ;
 	if schema_id('z') is not null
 		exec('drop schema z;')
 end
