@@ -40,10 +40,14 @@ as
 			when type_name(c.user_type_id) in ('nvarchar') then '('+case when c.max_length = -1 then 'max' else cast(c.max_length/2 as varchar(20)) end+')'
 			when type_name(c.user_type_id) in ('varbinary') then '('+case when c.max_length = -1 then 'max' else cast(c.max_length as varchar(20)) end+')'
 			else ''
-		end DataTypeByUserType
+		end DataTypeByUserType,
+		id.seed_value IdentitySeedValue,
+		id.increment_value IdentityIncrementValue,
+		id.last_value IdentityCurrentValue
 	from sys.objects o
 		inner join sys.all_columns c on c.object_id = o.object_id
 		left outer join sys.indexes i on i.object_id = c.object_id and i.is_primary_key = 1
 		left outer join sys.index_columns ic on ic.object_id = c.object_id and ic.index_id = i.index_id and ic.column_id = c.column_id
 		left outer join sys.computed_columns cc on cc.object_id = c.object_id and cc.column_id = c.column_id
+		left outer join sys.identity_columns id on id.object_id = o.object_id and id.column_id = c.column_id
 go
