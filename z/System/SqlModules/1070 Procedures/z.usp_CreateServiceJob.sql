@@ -144,7 +144,7 @@ end
 	
 	if @job_id is null
 	begin
-		exec msdb.dbo.sp_add_job @job_name= @job_name, @enabled=1, @notify_level_eventlog=0, @notify_level_email=0, @notify_level_netsend=0, @notify_level_page=0, @delete_level=@DeleteAfterRun, @description=@Description, /*@category_name=N'z Jobs', @owner_login_name=N'admin_all', */ @job_id = @job_id output
+		exec msdb.dbo.sp_add_job @job_name= @job_name, @enabled=1, @notify_level_eventlog=0, @notify_level_email=0, @notify_level_netsend=0, @notify_level_page=0, @delete_level=@DeleteAfterRun, @description=@Description, /*@category_name=N'z Jobs',*/ @owner_login_name=null, @job_id = @job_id output
 		exec msdb.dbo.sp_add_jobstep @job_id=@job_id, @step_name = 'Check Database Status', @step_id=1, @cmdexec_success_code=0, @on_success_action=3, @on_success_step_id=0, @on_fail_action=1, @on_fail_step_id=0, @retry_attempts=0, @retry_interval=0, @os_run_priority=0, @subsystem=N'TSQL', @command=@FirstStep, @database_name=N'master', @flags=0
 		exec msdb.dbo.sp_add_jobstep @job_id=@job_id, @step_name = @StepName, @step_id=2, @cmdexec_success_code=0,  @on_success_action=1, @on_success_step_id=0, @on_fail_action=2, @on_fail_step_id=0, @retry_attempts=0, @retry_interval=0, @os_run_priority=0, @subsystem=N'TSQL', @command=@command, @database_name=@DatabaseName, @flags=0
 		exec msdb.dbo.sp_attach_schedule @job_id=@job_id,@schedule_id = @schedule_id
@@ -154,7 +154,7 @@ end
 	
 	if is_srvrolemember('sysadmin') = 1
 	begin
-		exec msdb.dbo.sp_update_job @job_name=@job_name, @owner_login_name=N'admin_all'
+		exec msdb.dbo.sp_update_job @job_name=@job_name, @owner_login_name=N'sa'
 	end
 	exec msdb.dbo.sp_attach_schedule @job_id=@job_id,@schedule_id = @schedule_id
 	if (

@@ -1,7 +1,7 @@
 create or alter procedure z.usp_CopyTableSchema
 (
-	@FullSourceTableName nvarchar(128),
-	@FullTargetTableName nvarchar(128),
+	@FullSourceTableName nvarchar(256),
+	@FullTargetTableName nvarchar(256),
 	@FileGroup nvarchar(128) = null,
 	@DropTargetTableIfExists bit = 1,
 	@CopyIdentity bit = 0,
