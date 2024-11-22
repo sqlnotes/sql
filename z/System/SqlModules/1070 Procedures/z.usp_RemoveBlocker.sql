@@ -7,10 +7,13 @@ begin
 		raiserror('z.usp_RemoveBlocker must not be executed within a transaction.', 16, 1)
 		return;
 	end
-	declare @SQL nvarchar(max), @Proc nvarchar(128), @ContextInfo varbinary(128)
+	if z.fn_IsSQLAgentRunning() = 0
+	begin
+		raiserror('SQL Agent is not running.', 16, 1)
+		return
+	end
+	declare @SQL nvarchar(max), @Proc nvarchar(128)
 	select @Proc = '##usp_RemoveBlocker_'+ cast(@@spid as nvarchar(20))
-	select @ContextInfo = cast(@Proc as varbinary(128))
-	set context_info @ContextInfo
 	select @SQL = cast('create or alter procedure ' + @Proc as nvarchar(max)) +'
 as
 begin
@@ -24,19 +27,18 @@ begin
 											inner join sys.dm_exec_sessions s on s.is_user_process = 1 and s.session_id = r.blocking_session_id
 										where r.session_id = @SessionID
 											and r.blocking_session_id <> @SessionID
-											and s.program_name not in (''OmegaInstaller'')
-											and isnull(cast(r.context_info as nvarchar(128)), '''') = @ContextInfo
 									)
-		if @BlockingSessionID is null --- no more active session, wait for 10 sec
+		if @BlockingSessionID is null --- no more active session, wait for 2 sec
 		begin
 			waitfor delay ''00:00:00.010''
 			if @StartDate is null
 			begin
 				select @StartDate = getdate()
 			end
-			else if dateadd(second, 10, @StartDate) < getdate()
+			else if dateadd(second, 2, @StartDate) < getdate()
 			begin
-				break
+				if not exists(select * from sys.dm_exec_requests r where r.session_id = @SessionID) -- last check, if no active session, quit and cleanup.
+					break;
 			end
 			continue;
 		end

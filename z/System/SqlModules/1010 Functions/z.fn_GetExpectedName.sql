@@ -20,6 +20,10 @@ begin
 													+ '_' + @ReferencedObjectName  
 													+ '_' + replace(translate(@ParentColumns, ', ]', '__['), '[', '')
 				when @Type in ('Default') then 'DF_' + @ParentSchemaName + '_' + @ParentObjectName + '_' + replace(translate(@ParentColumns, ', ]', '__['), '[', '')
+				when @Type in ('PRIMARY_XML') then 'IX_XML_PR_' + @ParentSchemaName + '_' + @ParentObjectName + '_' + replace(translate(@ParentColumns, ', ]', '__['), '[', '')
+				when @Type in ('SECONDARY_XML_PATH') then 'IX_XML_P_' + @ParentSchemaName + '_' + @ParentObjectName + '_' + replace(translate(@ParentColumns, ', ]', '__['), '[', '') + '_PATH'
+				when @Type in ('SECONDARY_XML_VALUE') then 'IX_XML_V_' + @ParentSchemaName + '_' + @ParentObjectName + '_' + replace(translate(@ParentColumns, ', ]', '__['), '[', '') + '_VALUE'
+				when @Type in ('SECONDARY_XML_PROPERTY') then 'IX_XML_R_' + @ParentSchemaName + '_' + @ParentObjectName + '_' + replace(translate(@ParentColumns, ', ]', '__['), '[', '') + '_PROPERTY'
 			end
 			
 end
