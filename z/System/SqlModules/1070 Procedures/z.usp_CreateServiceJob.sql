@@ -1,7 +1,7 @@
 create or alter procedure z.usp_CreateServiceJob 
 (
 	@Name nvarchar(255), 
-	@ProcedureName nvarchar(128), 
+	@ProcedureName nvarchar(max), 
 	@Description nvarchar(max), 
 	@DeleteAfterRun int = 0, -- 0, job will never be removed. 3, job will be removed after first run
 	@Interval int = 10, -- in second, if -1, no schedule
@@ -11,7 +11,7 @@ create or alter procedure z.usp_CreateServiceJob
 as
 begin
 	set nocount, xact_abort on
-	declare @IntervalLocal int = @Interval
+	declare @IntervalLocal int = @Interval, @CategoryName nvarchar(50) = 'Z Schema Jobs'
 	
 	begin try
 	if @DeleteAfterRun not in (0, 3)
@@ -136,11 +136,16 @@ end
 			exec msdb..sp_help_jobstep @job_name = @job_name
 	end
 	begin transaction
-	-- this step is skipped since aws does not support job categories.
-	--if not exists(select * from msdb.dbo.syscategories where name = 'z Jobs' AND category_class = 1)
-	--begin
-	--	exec msdb.dbo.sp_add_category @class=N'JOB', @type=N'LOCAL', @name=N'z Jobs'
-	--end
+	begin try
+	if not exists(select * from msdb.dbo.syscategories where name = @CategoryName AND category_class = 1)
+	begin
+		-- AWS RDS does not support this procedure
+		exec msdb.dbo.sp_add_category @class=N'JOB', @type=N'LOCAL', @name = @CategoryName
+	end
+	end try
+	begin catch
+		select @CategoryName = null
+	end catch
 	
 	if @job_id is null
 	begin
