@@ -1,12 +1,17 @@
 create or alter procedure z.usp_CreateServiceJob 
 (
 	@Name nvarchar(255), 
-	@ProcedureName nvarchar(max), 
+	@Command nvarchar(max), 
 	@Description nvarchar(max), 
-	@DeleteAfterRun int = 0, -- 0, job will never be removed. 3, job will be removed after first run
-	@Interval int = 10, -- in second, if -1, no schedule
-	@DailyAt int = null, --hhmmss
-	@CheckRegistry bit = 0
+	@DeleteAfterFirstExecution bit = 0, -- 0, job will never be removed. 3, job will be removed after first run
+	@Frequency varchar(20) = 'Daily', --Monthly, Weekly, Daily, Agent Start, idle, One time
+	@Interval int = 1, 
+	@ByDay varchar(1000) = null,--'[Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday] or First {...} or Second {...} or Thrid {...} or Forth {...} or Last {...}'
+	@ByDate int = null,
+	@SubDayFrequency varchar(20) = 'Second', -- hourly, minute, second, One time
+	@SubDayInterval int = null,
+	@StartDateTime datetime = null,
+	@EndDatetime datetime = null
 )
 as
 begin
@@ -14,19 +19,7 @@ begin
 	declare @IntervalLocal int = @Interval, @CategoryName nvarchar(50) = 'Z Schema Jobs'
 	
 	begin try
-	if @DeleteAfterRun not in (0, 3)
-	begin
-		raiserror('only 0 and 3 can be accepted. 0, job will never be removed. 3, job will be removed after first run', 16, 1)
-		return
-	end
-
-	if object_id('tempdb..#Steps') is not null
-		drop table #Steps
-	if object_id('tempdb..#Schedule') is not null
-		drop table #Schedule
-	if object_id('tempdb..#JobSchedule') is not null
-		drop table #JobSchedule
-
+	
 	create table #Steps
 	(
 		step_id int,step_name nvarchar(128), subsystem nvarchar(40), command nvarchar(max), flags int, 
@@ -54,10 +47,10 @@ begin
 	insert into #Schedule
 		exec msdb..sp_help_schedule
 	
-	declare @schedule_uid uniqueidentifier, @schedule_id int, @job_name nvarchar(128), @command nvarchar(128), @job_id uniqueidentifier = null, @ScheduleName nvarchar(128), @ScheduleType int, @FirstStep nvarchar(max), @DatabaseName nvarchar(128) = db_name(), @StepName nvarchar(128)
+	declare @schedule_uid uniqueidentifier, @schedule_id int, @job_name nvarchar(128), @cmd nvarchar(128), @job_id uniqueidentifier = null, @ScheduleName nvarchar(128), @ScheduleType int, @FirstStep nvarchar(max), @DatabaseName nvarchar(128) = db_name(), @StepName nvarchar(128)
 	
 	select	@job_name = z.fn_GetServiceJobName(@Name),
-			@command = 'exec ' + @ProcedureName,
+			@cmd = 'exec ' + @ProcedureName,
 			@StepName = 'Execute procedure ' + @ProcedureName + ' on ' + quotename(@DatabaseName),
 			@FirstStep = 'declare @DatabaseName nvarchar(128) = ' + quotename(@DatabaseName, '''')+ '
 if not (
@@ -151,7 +144,7 @@ end
 	begin
 		exec msdb.dbo.sp_add_job @job_name= @job_name, @enabled=1, @notify_level_eventlog=0, @notify_level_email=0, @notify_level_netsend=0, @notify_level_page=0, @delete_level=@DeleteAfterRun, @description=@Description, /*@category_name=N'z Jobs',*/ @owner_login_name=null, @job_id = @job_id output
 		exec msdb.dbo.sp_add_jobstep @job_id=@job_id, @step_name = 'Check Database Status', @step_id=1, @cmdexec_success_code=0, @on_success_action=3, @on_success_step_id=0, @on_fail_action=1, @on_fail_step_id=0, @retry_attempts=0, @retry_interval=0, @os_run_priority=0, @subsystem=N'TSQL', @command=@FirstStep, @database_name=N'master', @flags=0
-		exec msdb.dbo.sp_add_jobstep @job_id=@job_id, @step_name = @StepName, @step_id=2, @cmdexec_success_code=0,  @on_success_action=1, @on_success_step_id=0, @on_fail_action=2, @on_fail_step_id=0, @retry_attempts=0, @retry_interval=0, @os_run_priority=0, @subsystem=N'TSQL', @command=@command, @database_name=@DatabaseName, @flags=0
+		exec msdb.dbo.sp_add_jobstep @job_id=@job_id, @step_name = @StepName, @step_id=2, @cmdexec_success_code=0,  @on_success_action=1, @on_success_step_id=0, @on_fail_action=2, @on_fail_step_id=0, @retry_attempts=0, @retry_interval=0, @os_run_priority=0, @subsystem=N'TSQL', @command=@cmd, @database_name=@DatabaseName, @flags=0
 		exec msdb.dbo.sp_attach_schedule @job_id=@job_id,@schedule_id = @schedule_id
 		exec msdb.dbo.sp_update_job @job_id = @job_id, @start_step_id = 1
 		exec msdb.dbo.sp_add_jobserver @job_id = @job_id, @server_name = N'(local)'
