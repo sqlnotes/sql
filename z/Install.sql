@@ -6,6 +6,7 @@ go
 if db_id('$(DatabaseName)') is null
 begin
 	create database [$(DatabaseName)]
+	print 'Database [$(DatabaseName)] is created.'
 end
 go
 use [$(DatabaseName)]
@@ -13,7 +14,7 @@ go
 if schema_id('z') is null
 begin
 	exec('create schema z authorization dbo;')
-	print 'Database ' + db_name()+ ' is created'
+	print 'Schema z is created on database ' + quotename(db_name()) + '.'
 end
 go
 if object_id('z.Systems') is null
