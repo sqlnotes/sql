@@ -15,14 +15,20 @@ begin
 	begin
 		select top 1 @SQL =  'drop ' + '' +
 			case type_desc
-				when 'USER_TABLE' then 'table '
+				
+				when 'SEQUENCE_OBJECT' then 'sequence'
+				when 'SERVICE_QUEUE' then 'queue'
 				when 'SQL_STORED_PROCEDURE' then 'procedure '
 				when 'SQL_INLINE_TABLE_VALUED_FUNCTION' then 'function'
+				when 'SQL_TABLE_VALUED_FUNCTION' then 'function'
 				when 'SQL_SCALAR_FUNCTION' then 'function'
+				when 'TYPE_TABLE' then 'type'
+				when 'USER_TABLE' then 'table '
 				when 'VIEW' then 'view '
+				
 			end + ' z.'+  name + ';'
 		from sys.objects where schema_id = schema_id('z')
-			and  type_desc in ('USER_TABLE', 'SQL_STORED_PROCEDURE', 'SQL_INLINE_TABLE_VALUED_FUNCTION', 'VIEW', 'SQL_SCALAR_FUNCTION')
+			and  type_desc in ('USER_TABLE', 'SQL_STORED_PROCEDURE', 'SQL_INLINE_TABLE_VALUED_FUNCTION', 'VIEW', 'SQL_SCALAR_FUNCTION', 'SQL_TABLE_VALUED_FUNCTION', 'SEQUENCE_OBJECT', 'SERVICE_QUEUE', 'TYPE_TABLE')
 			and object_id not in (@@procid)
 		if @@rowcount = 0
 			break

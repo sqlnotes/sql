@@ -1,7 +1,7 @@
 create or alter procedure z.usp_AcquireSemaphore
 (
 	@Resource nvarchar(200), -- Name of the semaphore
-	@TotalCount int = 3, -- Size of the semaphore
+	@TotalCount int = 1, -- Size of the semaphore, default it's binary semaphore
 	@LockOwner varchar(32) = 'Transaction'
 )
 as
