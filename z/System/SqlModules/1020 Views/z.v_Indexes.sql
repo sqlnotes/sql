@@ -18,7 +18,7 @@ as
 				xi.xml_index_type_description + isnull('_' + xi.secondary_type_desc, '')
 			else i.type_desc
 		end IndexType,
-		i.is_primary_key IsPrimaryKey, i.is_unique_constraint IsUniqueConstraint, i.is_unique IsUnique, i.ignore_dup_key,
+		i.is_primary_key IsPrimaryKey, i.is_unique_constraint IsUniqueConstraint, i.is_unique IsUnique, i.ignore_dup_key IgnoreDuplicatedKey,
         ic.IndexColumns,
         icd.IndexColumnDefinition,
         iic.IncludedColumns,
@@ -30,7 +30,10 @@ as
 		i.fill_factor [FillFactor],
 		i.is_disabled IsDisabled,
 		i.is_hypothetical IsHypothetical,
-		xii.name UsingXMLIndexName
+		i.allow_row_locks AllowRowLocks,
+		i.allow_page_locks AllowPageLocks,
+		i.optimize_for_sequential_key OptimizeForSequentialKey,
+		xii.name PrimaryXMLIndexName
     from sys.indexes i
 		inner join sys.data_spaces fg on i.data_space_id = fg.data_space_id
 		left join sys.xml_indexes xi on xi.object_id = i.object_id and xi.index_id = i.index_id
