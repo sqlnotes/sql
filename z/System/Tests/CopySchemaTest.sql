@@ -10,7 +10,7 @@ create table z.TestSourceTable_usp_CopyTableSchema
 ID int identity(1,1) not null, F01 bigint, F02 binary(10), f03 bit not null, f04 char(20), f05 date, 
 F06 datetime constraint DF_z_TestSourceTable_usp_CopyTableSchema_F06 default(getdate()), 
 F07 datetime2(0), F08 datetime2(7), F09 datetime2, F10 datetimeoffset,
-F11 datetimeoffset(0), F12 datetimeoffset(6), F13 datetimeoffset(7), F14 decimal, F15 decimal(12), F16 decimal(38, 8), F17 float, F18 geography, F19 geometry, F20 hierarchyid,
+F11 datetimeoffset(0), F12 datetimeoffset(6), F13 datetimeoffset(7), F14 decimal not null, F15 decimal(12), F16 decimal(38, 8), F17 float, F18 geography, F19 geometry, F20 hierarchyid,
 F21 image, F22 int, 
 F23 money constraint DF_z_TestSourceTable_usp_CopyTableSchema_F23 default(0), 
 F24 nchar(30), F25 ntext, F26 numeric, F27 numeric(12), F28 numeric(38, 8), F29 nvarchar(60), F30 nvarchar(max),
@@ -21,7 +21,7 @@ alter table z.TestSourceTable_usp_CopyTableSchema add constraint PK_z_TestSource
 alter table z.TestSourceTable_usp_CopyTableSchema add constraint UQ_z_TestSourceTable_usp_CopyTableSchema_f04 unique(f04)
 create index IX_z_TestSourceTable_usp_CopyTableSchema_F36 on z.TestSourceTable_usp_CopyTableSchema(F36)
 create index IX_z_TestSourceTable_usp_CopyTableSchema_F43_F44 on z.TestSourceTable_usp_CopyTableSchema(F43, F44)
-create columnstore index IX_CS_z_TestSourceTable_usp_CopyTableSchema on z.TestSourceTable_usp_CopyTableSchema(F01,F31,F42)
+create columnstore index IX_NCI_z_TestSourceTable_usp_CopyTableSchema on z.TestSourceTable_usp_CopyTableSchema(F01,F31,F42)
 create index IX_z_TestSourceTable_usp_CopyTableSchema_F14 on z.TestSourceTable_usp_CopyTableSchema(F14) where (F28 =1)
 create index IX_z_TestSourceTable_usp_CopyTableSchema_F15 on z.TestSourceTable_usp_CopyTableSchema(F15) include(F16, F17) where (F28 =1)
 create unique index IX_z_TestSourceTable_usp_CopyTableSchema_F33 on z.TestSourceTable_usp_CopyTableSchema(F33) with (ignore_dup_key=on)

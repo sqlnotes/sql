@@ -10,7 +10,7 @@ as
                 z.fn_GetExpectedName('Index', object_schema_name(i.object_id), object_name(i.object_id), ic.IndexColumns, null, null)
             when i.is_primary_key = 1 then z.fn_GetExpectedName('PrimaryKey', object_schema_name(i.object_id), object_name(i.object_id), null, null, null)
             when i.is_unique_constraint = 1 then z.fn_GetExpectedName('UniqueKey', object_schema_name(i.object_id), object_name(i.object_id), ic.IndexColumns, null, null)
-            when i.type_desc like '%COLUMNSTORE%' then z.fn_GetExpectedName('ColumnStore', object_schema_name(i.object_id), object_name(i.object_id), null, null, null)
+            when i.type_desc like '%COLUMNSTORE%' then z.fn_GetExpectedName(i.type_desc, object_schema_name(i.object_id), object_name(i.object_id), null, null, null)
 			when i.type_desc = 'XML' then z.fn_GetExpectedName(xi.xml_index_type_description + isnull('_' + xi.secondary_type_desc, ''), object_schema_name(i.object_id), object_name(i.object_id), ic.IndexColumns, null, null)
 		end ExpectedIndexName,
         case 

@@ -14,7 +14,8 @@ begin
 				when @Type in ('Index') then 'IX_' + @ParentSchemaName + '_' + @ParentObjectName + '_' + replace(translate(@ParentColumns, ', ]', '__['), '[', '')
 				when @Type in ('UniqueKey') then 'UQ_' + @ParentSchemaName + '_' + @ParentObjectName + '_' + replace(translate(@ParentColumns, ', ]', '__['), '[', '')
 				when @Type in ('PrimaryKey') then 'PK_' + @ParentSchemaName + '_' + @ParentObjectName 
-				when @Type in ('ColumnStore') then 'IX_CS_' + @ParentSchemaName + '_' + @ParentObjectName 
+				when @Type in ('NONCLUSTERED COLUMNSTORE') then 'IX_NCI_' + @ParentSchemaName + '_' + @ParentObjectName 
+				when @Type in ('CLUSTERED COLUMNSTORE') then 'IX_CCI_' + @ParentSchemaName + '_' + @ParentObjectName 
 				when @Type in ('ForeignKey') then 'FK_' + @ParentSchemaName + '_' + @ParentObjectName
 													+ case when @ParentSchemaName = @ReferencedSchemaName then '' else '_' + @ReferencedSchemaName end
 													+ '_' + @ReferencedObjectName  
