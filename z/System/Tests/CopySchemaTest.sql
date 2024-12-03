@@ -31,10 +31,6 @@ create xml index IX_XML_P_z_TestSourceTable_usp_CopyTableSchema_F48_PATH on z.Te
 create xml index IX_XML_V_z_TestSourceTable_usp_CopyTableSchema_F48_VALUE on z.TestSourceTable_usp_CopyTableSchema(F48) using xml index IX_XML_PR_z_TestSourceTable_usp_CopyTableSchema_F48 for value;
 create xml index IX_XML_R_z_TestSourceTable_usp_CopyTableSchema_F48_PROPERTY on z.TestSourceTable_usp_CopyTableSchema(F48) using xml index IX_XML_PR_z_TestSourceTable_usp_CopyTableSchema_F48 for property;
 
---select * from z.v_Objects where ObjectID = object_id('z.TestSourceTable_usp_CopyTableSchema')
---select * from z.v_Indexes where ObjectID = object_id('z.TestSourceTable_usp_CopyTableSchema')
---select * from z.v_Objects where ObjectID = object_id('z.TestTargetTable_usp_CopyTableSchema')
---select * from z.v_Indexes where ObjectID = object_id('z.TestTargetTable_usp_CopyTableSchema')
 
 go
 exec z.usp_ForceNamingConvention 'z.TestSourceTable_usp_CopyTableSchema'
@@ -49,6 +45,39 @@ exec z.usp_CopyTableSchema	@FullSourceTableName = 'z.TestSourceTable_usp_CopyTab
 							@CopyXMLIndexes = 1,
 							@CopyDefault = 1,
 							@ScriptAfterTableCreation = null,
-							@PrintCode = 1,
-							@DataCompression = null
+							@DataCompression = null,
+							@PrintCode = 0
 
+go
+
+if exists(
+			select ObjectType, ColumnID, ColumnName, PrimaryKeyOrder, DataLength, DataType, IsNullable, ReadOnly, CollationName, IsIdentity, IsComputed, ComputedColumnDefinition, IsTimestamp, SystemType, UserType, MaxLength, DataTypeByUserType, IdentitySeedValue, IdentityIncrementValue, IdentityCurrentValue 
+			from z.v_Objects 
+			where ObjectID = object_id('z.TestSourceTable_usp_CopyTableSchema')
+			except
+			select ObjectType, ColumnID, ColumnName, PrimaryKeyOrder, DataLength, DataType, IsNullable, ReadOnly, CollationName, IsIdentity, IsComputed, ComputedColumnDefinition, IsTimestamp, SystemType, UserType, MaxLength, DataTypeByUserType, IdentitySeedValue, IdentityIncrementValue, IdentityCurrentValue 
+			from z.v_Objects
+			where ObjectID = object_id('z.TestTargetTable_usp_CopyTableSchema')
+		)
+begin
+	raiserror('Test usp_CopyTableSchema failed, columns do not match.', 16, 1);
+end
+go
+if exists(
+			select row_number() over(order by IndexName) as ID, IndexType, IsPrimaryKey, IsUniqueConstraint, IsUnique, IgnoreDuplicatedKey, IndexColumns, IndexColumnDefinition, IncludedColumns, FilterDefinition, Partition, PartitionColumn, Compression, IsPadded, [FillFactor], IsDisabled, IsHypothetical, AllowRowLocks, AllowPageLocks, OptimizeForSequentialKey--, PrimaryXMLIndexName 
+			from z.v_Indexes 
+			where ObjectID = object_id('z.TestSourceTable_usp_CopyTableSchema')
+			except
+			select row_number() over(order by IndexName) as ID, IndexType, IsPrimaryKey, IsUniqueConstraint, IsUnique, IgnoreDuplicatedKey, IndexColumns, IndexColumnDefinition, IncludedColumns, FilterDefinition, Partition, PartitionColumn, Compression, IsPadded, [FillFactor], IsDisabled, IsHypothetical, AllowRowLocks, AllowPageLocks, OptimizeForSequentialKey--, PrimaryXMLIndexName 
+			from z.v_Indexes where ObjectID = object_id('z.TestTargetTable_usp_CopyTableSchema')
+		)
+begin
+	raiserror('Test usp_CopyTableSchema failed, indexes do not match.', 16, 1);
+end
+go
+if object_id('z.TestSourceTable_usp_CopyTableSchema') is not null
+	drop table z.TestSourceTable_usp_CopyTableSchema
+go
+if object_id('z.TestTargetTable_usp_CopyTableSchema') is not null
+	drop table z.TestTargetTable_usp_CopyTableSchema
+go

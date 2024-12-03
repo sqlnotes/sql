@@ -10,8 +10,8 @@ create or alter procedure z.usp_CopyTableSchema
 	@CopyXMLIndexes bit = 0,
 	@CopyDefault bit = 1,
 	@ScriptAfterTableCreation nvarchar(max) = null,
-	@PrintCode bit = 0,
-	@DataCompression varchar(20) = null
+	@DataCompression varchar(20) = null,
+	@PrintCode bit = 0
 )
 as
 begin
@@ -53,7 +53,7 @@ begin
 		
 	if @FileGroupOrPartitionScheme is null
 	begin
-		select @FileGroupOrPartitionScheme = ds.name
+		select @FileGroupOrPartitionScheme = quotename(ds.name)
 		from sys.partitions p
 			inner join sys.allocation_units au on p.partition_id = au.container_id
 			inner join sys.data_spaces ds on ds.data_space_id = au.data_space_id
