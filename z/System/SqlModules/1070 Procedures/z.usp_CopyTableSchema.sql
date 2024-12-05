@@ -19,7 +19,7 @@ begin
 	declare @Ordinal int, @PartName varchar(30), @SQL nvarchar(max)
 
 	select Ordinal, PartName, Definition into #1
-	from z.fn_CopyTableSchema(@FullSourceTableName, @FullTargetTableName, @FileGroupOrPartitionScheme, @CopyIdentity, @DataCompression)
+	from z.fn_BuildQueryCopyTableSchema(@FullSourceTableName, @FullTargetTableName, @FileGroupOrPartitionScheme, @CopyIdentity, @DataCompression)
 	if @@rowcount = 0
 	begin
 		raiserror('Could not retrieve script.', 16, 1)
@@ -60,7 +60,6 @@ begin
 	fetch next from c into @Ordinal, @PartName, @SQL
 	while @@fetch_status = 0
 	begin
-		
 		if @PrintCode = 1
 			exec z.usp_PrintString @SQL
 		exec(@SQL)

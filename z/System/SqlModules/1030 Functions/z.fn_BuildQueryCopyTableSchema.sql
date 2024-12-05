@@ -1,4 +1,4 @@
-create or alter function z.fn_CopyTableSchema
+create or alter function z.fn_BuildQueryCopyTableSchema
 (
 	@FullSourceTableName nvarchar(256),
 	@FullTargetTableName nvarchar(256),
@@ -218,7 +218,3 @@ begin
 		where d.ParentObjectID = @ObjectID
 	return
 end
-go
-
---select * from  z.fn_CopyTableSchema('admin_all.account_tran_all', 'admin_all.abc', null, 1, null)
-
