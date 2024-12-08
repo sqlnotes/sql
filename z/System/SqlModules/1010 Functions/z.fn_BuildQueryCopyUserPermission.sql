@@ -13,11 +13,11 @@ begin
 	(
 		select	p.state_desc PermissionState, p.class_desc as ClassDesc, p.major_id MajorID, p.minor_id MinorID,
 				replace(lower(string_agg(cast(p.permission_name as nvarchar(max)), ',')), ',', ', ') PermissionType,
-				quotename(isnull(@TargetUser, user_name(p.grantee_principal_id))) TargetUser
+				quotename(isnull(@TargetUser, dp.name)) TargetUser
 		from sys.database_principals dp
 			inner join sys.database_permissions p on p.grantee_principal_id = dp.principal_id
 		where dp.name = @SourceUser
-		group by p.state_desc, p.class_desc, p.major_id, p.minor_id, quotename(isnull(@TargetUser, user_name(p.grantee_principal_id)))
+		group by p.state_desc, p.class_desc, p.major_id, p.minor_id, quotename(isnull(@TargetUser, dp.name))
 	),
 	x1 as
 	(
