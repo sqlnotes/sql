@@ -25,8 +25,3 @@ return(
 		and s.is_fixed_role = 0
 		and s.name not in ('public')
 )
-go
-
-
-
---drop server role aaa

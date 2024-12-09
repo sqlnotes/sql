@@ -53,7 +53,7 @@ begin
 			values('raiserror(''Partition key data type is not supported.'', 16, 1);')
 		return
 	end
-	if @FileGroup is null
+	if @FileGroup is null or @FileGroup = 'Default' or @FileGroup = '[Default]'
 	begin
 		select @FileGroup = name from sys.data_spaces where is_default = 1 and type_desc = 'ROWS_FILEGROUP'
 	end

@@ -3,7 +3,8 @@ param (
     [string] $ServerName,
     [string] $DatabaseName,
     [string] $UserName = $null,
-    [string] $Password = $null
+    [string] $Password = $null,
+    [switch] $IgnoreTest
     
 )
 $OriginalVerbosePreference = $VerbosePreference 
@@ -43,8 +44,8 @@ class SystemDeployment {
     [bool] $CheckHashInternal = $true
     [bool] $DisableHashChecking = $false
 
-    [bool] $ShowQuestion = $true
-    SystemDeployment([string] $serverName, [string] $databaseName, [string] $userName, [string] $password, [string] $systemName, [bool] $disableHashChecking = $false){
+    [bool] $RunTest = $true
+    SystemDeployment([string] $serverName, [string] $databaseName, [string] $userName, [string] $password, [string] $systemName, [bool] $disableHashChecking = $false, [bool] $runTest = $true){
 
         $this.ConnectionStringBuilder = New-Object System.Data.SqlClient.SqlConnectionStringBuilder
         $this.ConnectionStringBuilder.psobject.Properties["ApplicationName"].Value = 'installer.sqlnotes.info'
@@ -58,6 +59,7 @@ class SystemDeployment {
         $this.ConnectionStringBuilder.psobject.Properties["TrustServerCertificate"].Value = $true
         $this.ConnectionStringBuilder.psobject.Properties["UserID"].Value = $userName
 
+        $this.RunTest = $runTest
         $this.SystemName = $SystemName        
         $this.DatabaseName = $databaseName
         $this.DisableHashChecking = $disableHashChecking
@@ -317,9 +319,11 @@ if @@trancount > 0
         
         $this.PrintHighlight("Deployment to code base $($this.SystemName) is completed ")
 
-        $this.PrintHighlight("Start testing...")
-        $this.ExecuteFolder($(Join-Path -Path $this.SystemPath -ChildPath "Tests"))
-        $this.PrintHighlight("Testing...done.")
+        if($this.RunTest){
+            $this.PrintHighlight("Start testing...")
+            $this.ExecuteFolder($(Join-Path -Path $this.SystemPath -ChildPath "Tests"))
+            $this.PrintHighlight("Testing...done.")
+        }
     }
 }
 
@@ -328,7 +332,7 @@ $ErrorActionPreference = 'Stop'
 $DisableHashChecking = $true
 try{
     $VerbosePreference = 'Continue'
-    $([SystemDeployment]::new($ServerName, $DatabaseName, $UserName, $Password, "System", $DisableHashChecking)).Deploy()
+    $([SystemDeployment]::new($ServerName, $DatabaseName, $UserName, $Password, "System", $DisableHashChecking, $(-not $IgnoreTest))).Deploy()
 }
 finally{
     $VerbosePreference = $OriginalVerbosePreference

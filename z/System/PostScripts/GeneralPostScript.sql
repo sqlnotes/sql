@@ -1,0 +1,4 @@
+exec z.usp_TraceRefreshMetaData
+go
+exec z.usp_DataInitializationMaster
+go
