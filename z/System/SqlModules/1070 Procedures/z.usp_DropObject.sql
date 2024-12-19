@@ -15,7 +15,7 @@ begin
 									when 'CLR_TABLE_VALUED_FUNCTION' then 'drop function ' + quotename(s.name) + '.' + quotename(o.name)
 									when 'CLR_TRIGGER' then 'drop trigger ' + quotename(s.name) + '.' + quotename(o.name)
 									when 'DEFAULT_CONSTRAINT' then 'alter table' + quotename(s.name) + '.' + quotename(p.name) + ' drop constaint ' + quotename(o.name)
-									--when 'EDGE_CONSTRAINT' then
+									when 'EDGE_CONSTRAINT' then 'alter table' + quotename(s.name) + '.' + quotename(p.name) + ' drop constaint ' + quotename(o.name)
 									when 'EXTENDED_STORED_PROCEDURE' then 'drop procedure ' + quotename(s.name) + '.' + quotename(o.name)
 									when 'FOREIGN_KEY_CONSTRAINT' then 'alter table' + quotename(s.name) + '.' + quotename(p.name) + ' drop constaint ' + quotename(o.name)
 									when 'PRIMARY_KEY_CONSTRAINT' then 'alter table' + quotename(s.name) + '.' + quotename(p.name) + ' drop constaint ' + quotename(o.name)

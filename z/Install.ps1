@@ -4,9 +4,10 @@ param (
     [string] $DatabaseName,
     [string] $UserName = $null,
     [string] $Password = $null,
-    [switch] $IgnoreTest
-    
+    [switch] $PerformTest,
+    [switch] $EnableHashChecking
 )
+
 $OriginalVerbosePreference = $VerbosePreference 
 if (!(Get-Module -ListAvailable -Name SqlServer)) {
     $VerbosePreference = "SilentlyContinue"
@@ -42,10 +43,10 @@ class SystemDeployment {
     $SqlCmdParameters = @()
     $HashTable = @{}
     [bool] $CheckHashInternal = $true
-    [bool] $DisableHashChecking = $false
+    [bool] $EnableHashChecking = $false
 
     [bool] $RunTest = $true
-    SystemDeployment([string] $serverName, [string] $databaseName, [string] $userName, [string] $password, [string] $systemName, [bool] $disableHashChecking = $false, [bool] $runTest = $true){
+    SystemDeployment([string] $serverName, [string] $databaseName, [string] $userName, [string] $password, [string] $systemName, [bool] $enableHashChecking = $false, [bool] $runTest = $true){
 
         $this.ConnectionStringBuilder = New-Object System.Data.SqlClient.SqlConnectionStringBuilder
         $this.ConnectionStringBuilder.psobject.Properties["ApplicationName"].Value = 'installer.sqlnotes.info'
@@ -62,7 +63,7 @@ class SystemDeployment {
         $this.RunTest = $runTest
         $this.SystemName = $SystemName        
         $this.DatabaseName = $databaseName
-        $this.DisableHashChecking = $disableHashChecking
+        $this.EnableHashChecking = $enableHashChecking
         $this.BuildSqlCmdParammeters()
         $this.MaxFolderVersion = [System.Version]::new("0.0.0")
         $this.SystemPath = Get-Item -Path $(Join-Path -Path $PSScriptRoot -ChildPath $this.SystemName)
@@ -234,7 +235,7 @@ class SystemDeployment {
         try{
             $this.Exception = $null
             $this.ReadFile($fileName)
-            if((-not $this.DisableHashChecking) -and $this.CheckHashInternal -and $this.HashTable.ContainsKey($this.CurrentFileHash)){
+            if(($this.EnableHashChecking) -and $this.CheckHashInternal -and $this.HashTable.ContainsKey($this.CurrentFileHash)){
                 $this.HashTable[$this.CurrentFileHash] = $true
                 return
             }
@@ -329,10 +330,9 @@ if @@trancount > 0
 
 $ErrorActionPreference = 'Stop'
 
-$DisableHashChecking = $true
 try{
     $VerbosePreference = 'Continue'
-    $([SystemDeployment]::new($ServerName, $DatabaseName, $UserName, $Password, "System", $DisableHashChecking, $(-not $IgnoreTest))).Deploy()
+    $([SystemDeployment]::new($ServerName, $DatabaseName, $UserName, $Password, "System", $EnableHashChecking, $PerformTest)).Deploy()
 }
 finally{
     $VerbosePreference = $OriginalVerbosePreference
