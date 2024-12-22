@@ -73,12 +73,12 @@ begin
 	exec sp_tableoption 'z.SystemUpdateBatchLog', 'large value types out of row', 1
 end
 go
-if object_id('z.CreateDatabaseUpdateLog') is null
+if object_id('z.usp_CreateDatabaseUpdateLog') is null
 begin
-	exec('create procedure z.CreateDatabaseUpdateLog as --')
+	exec('create procedure z.usp_CreateDatabaseUpdateLog as --')
 end
 go
-alter procedure z.CreateDatabaseUpdateLog
+alter procedure z.usp_CreateDatabaseUpdateLog
 (
 	@BatchID bigint output, 
 	@BatchLogID bigint output, 

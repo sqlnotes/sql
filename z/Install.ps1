@@ -195,7 +195,7 @@ class SystemDeployment {
         }
         $cmd = $this.ManagementConnection.CreateCommand()
         $cmd.CommandType = [System.Data.CommandType]::StoredProcedure
-        $cmd.CommandText = "z.CreateDatabaseUpdateLog"
+        $cmd.CommandText = "z.usp_CreateDatabaseUpdateLog"
         $cmd.Parameters.Add("@BatchID", [System.Data.SqlDbType]::BigInt).Direction = [System.Data.ParameterDirection]::InputOutput
         $cmd.Parameters.Add("@BatchLogID", [System.Data.SqlDbType]::BigInt).Direction = [System.Data.ParameterDirection]::InputOutput
         $cmd.Parameters.Add("@SystemName", [System.Data.SqlDbType]::VarChar, 128).Value = $this.SystemName;
