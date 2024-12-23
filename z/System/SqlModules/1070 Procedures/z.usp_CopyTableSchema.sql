@@ -4,10 +4,10 @@ create or alter procedure z.usp_CopyTableSchema
 	@FullTargetTableName nvarchar(256),
 	@FileGroupOrPartitionScheme nvarchar(128) = null, -- NULL: 'Use Source Object File Group', 'Use default Database File Group', 'Use Source Object Partition Scheme', FileGroupName or PartitionSchemeName(FieldName)
 	@DropTargetTableIfExists bit = 1,
-	@CopyIdentity bit = 0,
+	@CopyIdentity bit = 1,
 	@CopyTableSchema bit = 1,
 	@CopyIndexes bit = 1,
-	@CopyXMLIndexes bit = 0,
+	@CopyXMLIndexes bit = 1,
 	@CopyDefault bit = 1,
 	@ScriptAfterTableCreation nvarchar(max) = null,
 	@DataCompression varchar(20) = null,
