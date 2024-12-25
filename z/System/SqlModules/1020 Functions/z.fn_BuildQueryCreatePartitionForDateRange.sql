@@ -93,13 +93,15 @@ begin
 	select	@DateFrom = z.fn_GetPeriodStart(@DateFrom, @PartitionRangeType, @PartitionRangeTypeInterval, default),
 			@DateTo = z.fn_GetPeriodStart(@DateTo, @PartitionRangeType, @PartitionRangeTypeInterval, default)
 
-	select	@DateTo =	case @PartitionRangeType
-							when 'Minute' then dateadd(minute, @NumberOfPartitions * @PartitionRangeTypeInterval, @DateFrom)
-							when 'Hourly' then dateadd(hour, @NumberOfPartitions * @PartitionRangeTypeInterval, @DateFrom)
-							when 'Daily' then dateadd(day, @NumberOfPartitions * @PartitionRangeTypeInterval, @DateFrom)
-							when 'Monthly' then dateadd(month, @NumberOfPartitions * @PartitionRangeTypeInterval, @DateFrom)
-							when 'Yearly' then dateadd(year, @NumberOfPartitions * @PartitionRangeTypeInterval, @DateFrom)
-						end
+	select	@DateTo =	isnull(@DateTo,
+								case @PartitionRangeType
+									when 'Minute' then dateadd(minute, @NumberOfPartitions * @PartitionRangeTypeInterval, @DateFrom)
+									when 'Hourly' then dateadd(hour, @NumberOfPartitions * @PartitionRangeTypeInterval, @DateFrom)
+									when 'Daily' then dateadd(day, @NumberOfPartitions * @PartitionRangeTypeInterval, @DateFrom)
+									when 'Monthly' then dateadd(month, @NumberOfPartitions * @PartitionRangeTypeInterval, @DateFrom)
+									when 'Yearly' then dateadd(year, @NumberOfPartitions * @PartitionRangeTypeInterval, @DateFrom)
+								end
+							)
 	
 	select	@df = iif(@DateFrom <= @DateTo, @DateFrom, @DateTo),
 			@dt = iif(@DateFrom <= @DateTo, @DateTo, @DateFrom)
