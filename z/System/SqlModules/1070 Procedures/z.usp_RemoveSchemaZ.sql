@@ -61,10 +61,10 @@ begin
 					)
 		if @SQL is null
 		begin
-			if exists(select * from sys.partition_schemes where name = 'PS_zPartitionGeneric')
-				drop partition scheme PS_zPartitionGeneric
-			if exists(select * from sys.partition_functions where name = 'PF_zPartitionGeneric')
-				drop partition function PF_zPartitionGeneric;
+			if exists(select * from sys.partition_schemes where name = 'PS_SchemaZPartitionGeneric')
+				drop partition scheme PS_SchemaZPartitionGeneric
+			if exists(select * from sys.partition_functions where name = 'PF_SchemaZPartitionGeneric')
+				drop partition function PF_SchemaZPartitionGeneric;
 			break
 		end
 		begin try

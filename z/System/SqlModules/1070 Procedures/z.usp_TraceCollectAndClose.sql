@@ -38,8 +38,8 @@ begin
 			TraceSequence bigint not null constraint ' + quotename(cast(newid()  as nvarchar(max))) + ' default (datediff_big(second, ''1900-01-01'', getutcdate()) * 268435456 | next value for z.SeqGeneralID),
 			EventID int not null,
 			EventName nvarchar(128) not null,
-			constraint ' + quotename(cast(newid() as nvarchar(max))) + ' primary key (TraceSequence)  with (data_compression= page) on PS_zPartitionGeneric(TraceSequence)
-) on PS_zPartitionGeneric(TraceSequence)'
+			constraint ' + quotename(cast(newid() as nvarchar(max))) + ' primary key (TraceSequence)  with (data_compression= page) on PS_SchemaZPartitionGeneric(TraceSequence)
+) on PS_SchemaZPartitionGeneric(TraceSequence)'
 			exec(@SQL)
 		end
 		declare c1 cursor local fast_forward for
