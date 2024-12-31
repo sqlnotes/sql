@@ -1,4 +1,4 @@
-create or alter function z.fn_PreviousCommittedRowVersion()
+create or alter function z.fn_GetLastCommittedRowVersion()
 returns binary(8)
 as
 begin 

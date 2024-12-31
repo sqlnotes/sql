@@ -11,7 +11,7 @@ create or alter procedure z.usp_CreateServiceJob
 	@ByTime varchar(8000) = '00:00',
 	@StartDate date = null,
 	@EndDate date = null,
-	@DeleteAfterExecution bit = 0, -- 0, job will never be removed. 3, job will be removed after first run
+	@DeleteAfterExecution bit = 0, -- 1, job will be removed after execution
 	@CategoryName nvarchar(50) = 'Schema z Jobs'
 )
 as

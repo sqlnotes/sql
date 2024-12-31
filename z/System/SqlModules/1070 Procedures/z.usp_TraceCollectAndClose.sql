@@ -155,7 +155,7 @@ begin
 					stuff((
 							select 'else if @EventName = ' + quotename(tt.EventName, '''') + '
 		begin
-			exec '+tt.ProcedureName + ' @TraceSequence
+			exec '+tt.ProcedureName + ' @TraceSequence = @TraceSequence, @TraceID = ' + cast(TraceID as nvarchar(max)) + ', @EventName = ' + quotename(tt.EventName, '''') + '
 		end
 		'
 								from z.TraceTrigger tt 
