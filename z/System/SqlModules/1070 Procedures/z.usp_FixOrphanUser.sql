@@ -1,4 +1,7 @@
 create or alter procedure z.usp_FixOrphanUser
+(
+	@UserName nvarchar(128) = null
+)
 as
 begin
     set nocount on
@@ -8,6 +11,7 @@ begin
         from sys.database_principals p
 			inner join sys.server_principals s on s.name collate database_default = p.name  and s.sid <> p.sid
         where p.type_desc in ('SQL_USER')
+			and (@UserName is null or p.name = @UserName)
     open c
     fetch next from c into @SQL
     while @@fetch_status = 0
