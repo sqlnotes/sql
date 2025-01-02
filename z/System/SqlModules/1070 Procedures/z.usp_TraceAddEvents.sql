@@ -10,7 +10,11 @@ create or alter procedure z.usp_TraceAddEvents
 as
 begin
 	set nocount, xact_abort on
-	
+	if @TraceName is null and @TraceID is null
+	begin
+		raiserror('Either @TraceName or @TraceID must be provided', 16, 1)
+		return;
+	end
 	declare @Error varchar(8000), @EventID int, @ColumnID int
 	declare @Trace table(TraceID int primary key with(ignore_dup_key=on))
 	declare @Events table(EventID int primary key with(ignore_dup_key=on))

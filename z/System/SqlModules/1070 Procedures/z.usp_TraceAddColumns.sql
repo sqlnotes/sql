@@ -8,7 +8,12 @@ create or alter procedure z.usp_TraceAddColumns
 as
 begin
 	set nocount, xact_abort on
-	
+	if @TraceName is null and @TraceID is null
+	begin
+		raiserror('Either @TraceName or @TraceID must be provided', 16, 1)
+		return;
+	end
+
 	declare @Error varchar(8000), @EventID int, @ColumnID int
 	declare @Columns table(ColumnID int primary key with(ignore_dup_key=on))
 	begin try

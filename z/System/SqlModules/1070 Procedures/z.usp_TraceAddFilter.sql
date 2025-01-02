@@ -17,7 +17,13 @@ begin
 
 	if @TraceID is null and @TraceName is null
 	begin
-		raiserror('Must provide value for @TraceID or @TraceName', 16, 1)
+		raiserror('Either @TraceName or @TraceID must be provided', 16, 1)
+		return
+	end
+
+	if @ColumnName is null and @ColumnID is null
+	begin
+		raiserror('Either @ColumnName or @ColumnID must be provided', 16, 1)
 		return
 	end
 
