@@ -24,20 +24,40 @@ begin
 	deallocate c
 	while 1=1
 	begin
+		;with x0 as
+		(
+			select o.object_id, o.parent_object_id, 1 Level, o.type_desc
+			from sys.objects o
+			where schema_id = schema_id('z')
+				and parent_object_id = 0
+				and o.object_id <> @@procid
+			union all
+			select o.object_id, o.parent_object_id, x0.Level + 1, o.type_desc
+			from sys.objects o
+				inner join x0 on o.parent_object_id = x0.object_id
+			where o.schema_id = schema_id('z')
+				and x0.type_desc not in('SQL_TABLE_VALUED_FUNCTION')
+				and o.object_id <> @@procid
+		),
+		x1 as
+		(
+			select top 1 *
+			from x0
+			order by Level desc
+		)
 		select @SQL = (
-						select top 1 
-								case o.type_desc
+						select case o.type_desc
 									when 'AGGREGATE_FUNCTION' then 'drop aggregate ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'CHECK_CONSTRAINT' then 'alter table' + quotename(s.name) + '.' + quotename(p.name) + ' drop constaint ' + quotename(o.name)
+									when 'CHECK_CONSTRAINT' then 'alter table' + quotename(s.name) + '.' + quotename(p.name) + ' drop constraint ' + quotename(o.name)
 									when 'CLR_SCALAR_FUNCTION' then 'drop function ' + quotename(s.name) + '.' + quotename(o.name)
 									when 'CLR_STORED_PROCEDURE' then 'drop procedure ' + quotename(s.name) + '.' + quotename(o.name)
 									when 'CLR_TABLE_VALUED_FUNCTION' then 'drop function ' + quotename(s.name) + '.' + quotename(o.name)
 									when 'CLR_TRIGGER' then 'drop trigger ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'DEFAULT_CONSTRAINT' then 'alter table' + quotename(s.name) + '.' + quotename(p.name) + ' drop constaint ' + quotename(o.name)
-									when 'EDGE_CONSTRAINT' then 'alter table' + quotename(s.name) + '.' + quotename(p.name) + ' drop constaint ' + quotename(o.name)
+									when 'DEFAULT_CONSTRAINT' then 'alter table' + quotename(s.name) + '.' + quotename(p.name) + ' drop constraint ' + quotename(o.name)
+									when 'EDGE_CONSTRAINT' then 'alter table' + quotename(s.name) + '.' + quotename(p.name) + ' drop constraint ' + quotename(o.name)
 									when 'EXTENDED_STORED_PROCEDURE' then 'drop procedure ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'FOREIGN_KEY_CONSTRAINT' then 'alter table' + quotename(s.name) + '.' + quotename(p.name) + ' drop constaint ' + quotename(o.name)
-									when 'PRIMARY_KEY_CONSTRAINT' then 'alter table' + quotename(s.name) + '.' + quotename(p.name) + ' drop constaint ' + quotename(o.name)
+									when 'FOREIGN_KEY_CONSTRAINT' then 'alter table' + quotename(s.name) + '.' + quotename(p.name) + ' drop constraint ' + quotename(o.name)
+									when 'PRIMARY_KEY_CONSTRAINT' then 'alter table' + quotename(s.name) + '.' + quotename(p.name) + ' drop constraint ' + quotename(o.name)
 									when 'REPLICATION_FILTER_PROCEDURE' then 'drop procedure ' + quotename(s.name) + '.' + quotename(o.name)
 									when 'RULE' then 'drop rule ' + quotename(s.name) + '.' + quotename(o.name)
 									when 'SEQUENCE_OBJECT' then 'drop sequence ' + quotename(s.name) + '.' + quotename(o.name)
@@ -48,16 +68,14 @@ begin
 									when 'SQL_TABLE_VALUED_FUNCTION' then 'drop function ' + quotename(s.name) + '.' + quotename(o.name)
 									when 'SQL_TRIGGER' then 'drop trigger ' + quotename(s.name) + '.' + quotename(o.name)
 									when 'SYNONYM' then 'drop synonym ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'UNIQUE_CONSTRAINT' then 'alter table' + quotename(s.name) + '.' + quotename(p.name) + ' drop constaint ' + quotename(o.name)
+									when 'UNIQUE_CONSTRAINT' then 'alter table' + quotename(s.name) + '.' + quotename(p.name) + ' drop constraint ' + quotename(o.name)
 									when 'USER_TABLE' then 'drop table ' + quotename(s.name) + '.' + quotename(o.name)
 									when 'VIEW' then 'drop view ' + quotename(s.name) + '.' + quotename(o.name)
 								end + ';'
-						from sys.objects o
+						from x1
+							inner join sys.objects o on x1.object_id = o.object_id
 							inner join sys.schemas s on s.schema_id = o.schema_id
 							left join sys.objects p on p.object_id = o.parent_object_id
-						where o.object_id not in (@@procid)
-							and s.name = 'z'
-						order by newid()
 					)
 		if @SQL is null
 		begin
@@ -68,6 +86,7 @@ begin
 			break
 		end
 		begin try
+		--print @SQL
 		exec(@SQL)
 		end try
 		begin catch
