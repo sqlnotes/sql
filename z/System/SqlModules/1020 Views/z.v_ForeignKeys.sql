@@ -16,7 +16,7 @@ as
 			fk.update_referential_action_desc UpdateAction,
 			fk.is_system_named IsSystemNamed,
 			fk.is_disabled IsDisabled,
-			fk.is_not_trusted IsNotTusted
+			fk.is_not_trusted IsNotTrusted
 	from sys.foreign_keys fk
 		cross apply (
 						select stuff(
