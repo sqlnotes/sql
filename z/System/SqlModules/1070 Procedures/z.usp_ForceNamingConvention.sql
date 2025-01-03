@@ -31,22 +31,34 @@ begin
 				end,
 				ExpectedIndexName, 
 				case when IsPrimaryKey = 1 or IsUniqueConstraint = 1 then 'Object' else 'Index'end 
-		from z.v_Indexes
-		where (@ObjectID is null or ObjectID = @ObjectID)
+		from z.v_Indexes i
+		where (
+					@ObjectID is null 
+					and exists(select * from z.DatabaseSchemas ds where ds.SchemaName = i.SchemaName)
+				or ObjectID = @ObjectID
+				)
 			and ExpectedIndexName <> IndexName
 		union all
 		select	quotename(SchemaName) + '.' + quotename(DefaultName),
 				ExpectedDefaultName,
 				'Object'
-		from z.v_DefaultConstraints
-		where (@ObjectID is null or ParentObjectID = @ObjectID)
+		from z.v_DefaultConstraints d
+		where (
+					@ObjectID is null 
+					and exists(select * from z.DatabaseSchemas ds where ds.SchemaName = d.SchemaName)
+				or ParentObjectID = @ObjectID
+				)
 			and ExpectedDefaultName <> DefaultName
 		union all
 		select quotename(SchemaName) + '.' + quotename(ForeignKeyName),
 				ExpectedForeignKeyName,
 				'Object' 
-		from z.v_ForeignKeys
-		where (@ObjectID is null or ParentObjectID = @ObjectID)
+		from z.v_ForeignKeys f
+		where (
+					@ObjectID is null 
+					and exists(select * from z.DatabaseSchemas ds where ds.SchemaName = f.SchemaName)
+				or ParentObjectID = @ObjectID
+				)
 			and ExpectedForeignKeyName <> ForeignKeyName
 	open c
 	fetch next from c into @ObjectName, @NewName, @ObjectType

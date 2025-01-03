@@ -78,3 +78,4 @@ update set '+stuff((select ', t.'+ quotename(columnName)+'= s.'+ quotename(colum
 set identity_insert ' + @FullObjectName + ' off;' else '' end
 	exec z.usp_PrintString @SQL
 end
+go
