@@ -23,4 +23,3 @@ begin
 	return
 end
 go
-select * from z.fn_ExtractSystemHealthEvent()

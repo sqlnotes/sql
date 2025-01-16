@@ -8,8 +8,8 @@ begin
 	(
 		select cast([SchemaName] as nvarchar(128)) as [SchemaName]
 			from (
-					values('z'),
-						('dbo')
+					values('z')--,
+						--('dbo')
 				) v([SchemaName])
 	)
 	merge [z].[DatabaseSchemas] t
