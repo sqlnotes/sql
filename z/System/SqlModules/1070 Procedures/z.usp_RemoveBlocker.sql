@@ -57,7 +57,7 @@ end'
 	if z.fn_GetServiceJobID(@Proc) is null
 	begin
 		exec (@SQL)
-		exec z.usp_CreateServiceJob @Name = @Proc, @ProcedureName = @Proc, @Description = @Proc, @DeleteAfterRun = 3, @Interval = 3600, @DailyAt = null, @CheckRegistry = 0	
+		exec z.usp_CreateServiceJob @Name = @Proc, @Command = @Proc, @Description = @Proc, @DeleteAfterExecution = 3, @Frequency = 'Daily'
 		exec z.usp_StartServiceJob @Name = @Proc
 	end
 end
