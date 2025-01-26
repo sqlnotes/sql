@@ -1,4 +1,4 @@
-create or alter function z._fn_SecondToTimeString(@Seconds bigint)
+create or alter function z.fn_SecondsToTimeString(@Seconds bigint)
 returns varchar(30)
 as
 begin
