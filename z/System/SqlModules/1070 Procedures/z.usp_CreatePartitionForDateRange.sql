@@ -12,7 +12,6 @@ create or alter procedure z.usp_CreatePartitionForDateRange
 as
 begin
 	set nocount on
-	exec z.usp_RemoveBlocker
 	declare @SQL nvarchar(max)
 	declare c cursor static local for
 		select SQL
