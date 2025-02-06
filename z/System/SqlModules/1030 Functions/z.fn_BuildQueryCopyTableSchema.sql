@@ -51,7 +51,10 @@ begin
 
 	if @FileGroupOrPartitionScheme is null
 		return;
-	
+	if charindex('(', @FileGroupOrPartitionScheme) = 0 and charindex('[', @FileGroupOrPartitionScheme) = 0
+	begin
+		select @FileGroupOrPartitionScheme = quotename(@FileGroupOrPartitionScheme)
+	end
 	insert into @ret(Ordinal, PartName, Definition)
 		select	10000, 'Table',
 				cast('create table ' as nvarchar(max)) + @FullTargetTableName + '
