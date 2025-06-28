@@ -73,7 +73,7 @@ declare @Buffer table(ColumnID int, Length int, Data varbinary(max))
 while getutcdate() <= @EndDate
 begin
 	if @EventCount = 0
-		waitfor delay ''00:00:00.010''
+		waitfor delay ''00:00:00.500''
 	select @EventCount = 0'
 	+(
 		select '
@@ -222,5 +222,6 @@ ___Next___:
 	end catch
 end
 go
+
 
 

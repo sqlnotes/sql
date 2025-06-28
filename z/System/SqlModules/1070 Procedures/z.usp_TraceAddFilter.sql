@@ -51,7 +51,7 @@ begin
 	end
 	declare @SQL nvarchar(max)
 	select	@ColumnID = ColumnID, @ColumnName = ColumnName,
-			@SQL = 'declare @Value ' + Definition + ' = cast(@v as ' + Definition + ')
+			@SQL = 'declare @Value ' + replace(Definition, 'max', 256) + ' = cast(@v as ' + Definition + ')
 exec sp_trace_setfilter  @traceid = @TraceID, @columnid = @ColumnID, @logical_operator = @LogicOperatorInt, @comparison_operator = @ComparisonOperatorInt, @value = @Value'
 	from z.v_TraceColumn
 	where (@ColumnID is null or ColumnID = @ColumnID)
@@ -62,6 +62,7 @@ exec sp_trace_setfilter  @traceid = @TraceID, @columnid = @ColumnID, @logical_op
 		print 'No filters added, or colum is not filterable'
 		return
 	end
+	--print @SQL
 	select	@LogicOperatorInt = case when @LogicOperator = 'and' then 0 else 1 end,
 			@ComparisonOperatorInt =	case @ComparisonOperator
 											when '=' then 0
@@ -85,25 +86,3 @@ exec sp_trace_setfilter  @traceid = @TraceID, @columnid = @ColumnID, @logical_op
 	end
 end
 go
---exec z.usp_CreateTrace 'abc'
---select * from z.v_Trace
---exec z.usp_TraceAddColumns @TraceName = 'abc', @TraceEventColumnQuery = 'select ColumnID from z.v_TraceColumn where ColumnID in(1,2,3)', @EventColumnList = 'IndexID'
---exec z.usp_TraceAddColumns @TraceName = 'abc', @TraceEventColumnQuery = 'select ColumnID from z.v_TraceColumn where ColumnID in(1,2,3)', @EventColumnList = 'TextData'
-
---exec z.usp_TraceAddColumns @TraceName = 'abc', @EventColumnList = 'TextData'
-
---select * from z.v_TraceDefinition where TraceID = 3 and IsEventSelected = 1
-
---select * from z.v_TraceColumn where ColumnID in(1,2,3)
-
---select * from z.v_TraceDefinition where TraceID = 3 and IsEventSelected = 1
---exec z.usp_TraceAddFilter @TraceName = 'abc', @ColumnName = 'DatabaseID', @LogicOperator = 'and', @ComparisonOperator = '=', @Value = 100
---select * from z.v_TraceDefinition where TraceID = 3 and IsEventSelected = 1
---select * from z.v_TraceEventColumn where TraceEventID in(12,13)
-
---exec z.usp_TraceAddFilter
-
---exec z.usp_TraceAddFilter @TraceName = 'abc', @ColumnName = 'TransactionID', @LogicOperator = 'and', @ComparisonOperator = '=', @Value = 1000
-
---select * from fn_trace_getfilterinfo(3)
-
