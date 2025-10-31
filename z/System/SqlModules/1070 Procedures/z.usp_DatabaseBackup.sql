@@ -74,7 +74,7 @@ begin
 	fetch next from c into @DatabaseName, @StandardizedDatabaseName
 	while @@fetch_status = 0
 	begin
-		select @BackupPath = @BackupFolder + iif(@@servername like '%\%', replace(@@servername, '\', @FolderSeparator), @@servername + '\MSSQLSERVER') + @FolderSeparator 
+		select @BackupPath = @BackupFolder + iif(@@servername like '%\%', replace(@@servername, '\', @FolderSeparator), @@servername + @FolderSeparator + 'MSSQLSERVER') + @FolderSeparator 
 							+ @StandardizedDatabaseName + @FolderSeparator 
 							+ @BackupType + @FolderSeparator
 		if not exists(select * from sys.dm_os_file_exists(@BackupPath) where file_is_a_directory = 1)
@@ -97,7 +97,7 @@ begin
 		select @SQL = @SQL + iif(@BackupCompression = 1, 'compression', 'no_compression')
 		if @OtherBackupOptions is not null
 			select @SQL = @SQL + ', ' + @OtherBackupOptions
-		
+		print @SQL
 		exec(@SQL)
 
 		declare c1 cursor local for
@@ -132,5 +132,3 @@ begin
 	end catch
 end
 go
---exec z.usp_DatabaseBackup @Databases = 'model,master,test2', @OtherBackupOptions = null
---select * from sys.master_files
