@@ -4,7 +4,6 @@ param (
     [string] $DatabaseName,
     [string] $UserName = $null,
     [string] $Password = $null,
-    [switch] $PerformTest,
     [switch] $EnableHashChecking
 )
 
@@ -45,8 +44,7 @@ class SystemDeployment {
     [bool] $CheckHashInternal = $true
     [bool] $EnableHashChecking = $false
 
-    [bool] $RunTest = $true
-    SystemDeployment([string] $serverName, [string] $databaseName, [string] $userName, [string] $password, [string] $systemName, [bool] $enableHashChecking = $false, [bool] $runTest = $true){
+    SystemDeployment([string] $serverName, [string] $databaseName, [string] $userName, [string] $password, [string] $systemName, [bool] $enableHashChecking = $false){
 
         $this.ConnectionStringBuilder = New-Object System.Data.SqlClient.SqlConnectionStringBuilder
         $this.ConnectionStringBuilder.psobject.Properties["ApplicationName"].Value = 'installer.sqlnotes.info'
@@ -60,7 +58,6 @@ class SystemDeployment {
         $this.ConnectionStringBuilder.psobject.Properties["TrustServerCertificate"].Value = $true
         $this.ConnectionStringBuilder.psobject.Properties["UserID"].Value = $userName
 
-        $this.RunTest = $runTest
         $this.SystemName = $SystemName        
         $this.DatabaseName = $databaseName
         $this.EnableHashChecking = $enableHashChecking
@@ -319,12 +316,6 @@ if @@trancount > 0
         $this.WriteHashToDB()
         
         $this.PrintHighlight("Deployment to code base $($this.SystemName) is completed ")
-
-        if($this.RunTest){
-            $this.PrintHighlight("Start testing...")
-            $this.ExecuteFolder($(Join-Path -Path $this.SystemPath -ChildPath "Tests"))
-            $this.PrintHighlight("Testing...done.")
-        }
     }
 }
 
@@ -332,7 +323,7 @@ $ErrorActionPreference = 'Stop'
 
 try{
     $VerbosePreference = 'Continue'
-    $([SystemDeployment]::new($ServerName, $DatabaseName, $UserName, $Password, "System", $EnableHashChecking, $PerformTest)).Deploy()
+    $([SystemDeployment]::new($ServerName, $DatabaseName, $UserName, $Password, "System", $EnableHashChecking)).Deploy()
 }
 finally{
     $VerbosePreference = $OriginalVerbosePreference
