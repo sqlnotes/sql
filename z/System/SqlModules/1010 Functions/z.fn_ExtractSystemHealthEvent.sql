@@ -14,12 +14,18 @@ begin
 			return
 	end
 	insert into @ret(Date, EventName, EventBody, DateUTC)
-		select	
-				convert(datetime, switchoffset(convert(datetimeoffset, d.value('@timestamp', 'datetime')), datename(tzoffset, sysdatetimeoffset()))) Date,
-				d.value('@name', 'nvarchar(128)') EventName,
-				isnull(d.query('.'), '') EventBody,
-				d.value('@timestamp', 'datetime') DateUTC
-		from @x.nodes('RingBufferTarget/event') n(d)
+		select Date, EventName, EventBody, DateUTC
+		from (
+				select Date, EventName, EventBody, DateUTC, row_number() over(partition by Date order by Date)  rn
+				from (
+						select	
+								convert(datetime, switchoffset(convert(datetimeoffset, d.value('@timestamp', 'datetime')), datename(tzoffset, sysdatetimeoffset()))) Date,
+								d.value('@name', 'nvarchar(128)') EventName,
+								isnull(d.query('.'), '') EventBody,
+								d.value('@timestamp', 'datetime') DateUTC
+						from @x.nodes('RingBufferTarget/event') n(d)
+					)x1
+			) x2
 	return
 end
 go

@@ -12,13 +12,14 @@ create or alter procedure z.usp_CreateServiceJob
 	@StartDate date = null,
 	@EndDate date = null,
 	@DeleteAfterExecution bit = 0, -- 1, job will be removed after execution
-	@CategoryName nvarchar(50) = 'Schema z Jobs'
+	@CategoryName nvarchar(50) = 'Schema z Jobs',
+	@SetJobOwnerToSA bit = 1
 )
 as
 begin
 	set nocount, xact_abort on
 	declare @IntervalLocal int = @Interval, @ScheduleNames varchar(max), @JobID uniqueidentifier, @JobName nvarchar(128), @StepName nvarchar(128), @FirstStep nvarchar(max), @DatabaseName nvarchar(128) = db_name(), 
-			@AutomaticRemoveJobAfterExecution int =  case when isnull(@DeleteAfterExecution, 0) = 1 then 3 else 0 end, @ScheduleName nvarchar(128), @Operation char(1)
+			@AutomaticRemoveJobAfterExecution int =  case when isnull(@DeleteAfterExecution, 0) = 1 then 3 else 0 end, @ScheduleName nvarchar(128), @Operation char(1), @SAName nvarchar(128)
 	if @Name is null or @Command is null
 	begin
 		raiserror('@Name and @Command must not be null.', 16, 1)
@@ -110,9 +111,15 @@ end
 		exec msdb.dbo.sp_update_job @job_id = @JobID, @start_step_id = 1		
 	end
 	-- put it here for now.
-	if is_srvrolemember('sysadmin') = 1
+	if is_srvrolemember('sysadmin') = 1 and @SetJobOwnerToSA = 1
 	begin
-		exec msdb.dbo.sp_update_job @job_id = @JobID, @owner_login_name=N'sa'
+		select @SAName = name
+		from sys.server_principals
+		where sid = 0x01
+		if @@rowcount > 0
+		begin
+			exec msdb.dbo.sp_update_job @job_id = @JobID, @owner_login_name = @SAName
+		end
 	end
 
 	declare c cursor local for

@@ -1,4 +1,4 @@
-create or alter procedure z.usp_DatabaseBackup
+create or alter procedure z.usp_BackupDatabase
 (
 	@Databases nvarchar(max) = 'AllDatabases', --'AllDatabases', 'UserDatabases', 'SystemDatabases', 'Database1,Dabase2...'
 	@BackupType nvarchar(50) = 'Full', --'Full, Log, Diff'
