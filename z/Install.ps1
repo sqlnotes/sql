@@ -153,10 +153,11 @@ class SystemDeployment {
         $this.CurrentFileContent = Get-Content -Path $path -Raw
         $this.CurrentFileHash = $null
         if($this.CheckHashInternal){
-            $this.CurrentFileHash = ([System.Security.Cryptography.HashAlgorithm]::Create("MD5").ComputeHash([System.Text.Encoding]::UTF8.GetBytes($this.CurrentFileContent))
-                                         | foreach-object { $_.ToString("x2") }
-                                    ).ToLower() -join ""
-            
+            $hashBytes = [System.Security.Cryptography.HashAlgorithm]::Create("MD5").ComputeHash(
+                [System.Text.Encoding]::UTF8.GetBytes($this.CurrentFileContent)
+            )
+            $this.CurrentFileHash = ($hashBytes | ForEach-Object { $_.ToString("x2") }) -join ""
+            $this.CurrentFileHash = $this.CurrentFileHash.ToLower()
         }
     }
     [void] ReadHashFromDB(){
@@ -220,7 +221,11 @@ class SystemDeployment {
         $cmd.Parameters.Add("@FileHash", [System.Data.SqlDbType]::VarChar, 100).Value = $null
         $cmd.Parameters.Add("@FileName", [System.Data.SqlDbType]::NVarChar, -1).Value = $null
         $cmd.Parameters.Add("@FileContent", [System.Data.SqlDbType]::NVarChar, -1).Value = $null
-        $cmd.Parameters.Add("@ErrorMessage", [System.Data.SqlDbType]::NVarChar, -1).Value = ($null -eq $this.Exception) ? $null : $this.Exception.ToString()
+        $ErrorMessage = $null
+        if($null -ne $this.Exception){
+            $ErrorMessage = $this.Exception.ToString()
+        }
+        $cmd.Parameters.Add("@ErrorMessage", [System.Data.SqlDbType]::NVarChar, -1).Value = $ErrorMessage
 
         $cmd.Parameters["@BatchID"].Value = $this.BatchID
         $cmd.Parameters["@BatchLogID"].Value = $this.BatchLogID
