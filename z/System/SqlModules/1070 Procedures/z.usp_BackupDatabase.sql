@@ -10,7 +10,9 @@ create or alter procedure z.usp_BackupDatabase
 as
 begin
 	set nocount on
-	declare @BackupPath nvarchar(4000), @SQL nvarchar(max), @DatabaseName nvarchar(128), @StandardizedDatabaseName nvarchar(128), @FolderSeparator varchar(1), @BackupFileName nvarchar(4000)
+	declare @BackupPath nvarchar(4000), @SQL nvarchar(max), @DatabaseName nvarchar(128), @StandardizedDatabaseName nvarchar(128), @FolderSeparator varchar(1), @BackupFileName nvarchar(4000),
+			@BackupFileExtension varchar(10), @RetentionCutoff char(15), @Prefix nvarchar(260), @PrefixPattern nvarchar(260), @PrefixLength int
+	declare @DirectoryFiles table(Subdirectory nvarchar(512), Depth int, [File] bit)
 	if @BackupType not in ('Full', 'Log', 'Diff')
 	begin
 		raiserror('@BackupType must be Full, Log, or Diff', 16, 1)
@@ -59,6 +61,8 @@ begin
 	end
 
 	select @BackupFolder = rtrim(@BackupFolder), @FolderSeparator = iif(@@version like '%linux%', '/', '\'), @BackupType = upper(@BackupType), @RetentionHours = abs(@RetentionHours)
+	select	@BackupFileExtension = case @BackupType when 'FULL' then '.bak' when 'DIFF' then '.diff' when 'LOG' then '.log' end,
+			@RetentionCutoff = convert(char(8), dateadd(hour, - @RetentionHours, getdate()), 112) + '_' + replace(convert(char(8), dateadd(hour, - @RetentionHours, getdate()), 108), ':', '')
 	if right(@BackupFolder, 1) in ('/', '\')
 		select @BackupFolder = left(@BackupFolder, len(@BackupFolder) -1)
 	
@@ -99,7 +103,7 @@ begin
 			select @SQL = @SQL + ', ' + @OtherBackupOptions
 		print @SQL
 		exec(@SQL)
-
+		/*
 		declare c1 cursor local for
 			select bf.physical_device_name
 			from msdb.dbo.backupset bs
@@ -120,6 +124,29 @@ begin
 		end
 		close c1
 		deallocate c1
+		*/
+		delete from @DirectoryFiles
+		select	@Prefix = @StandardizedDatabaseName + '_',
+				@PrefixPattern = replace(replace(@StandardizedDatabaseName, '!', '!!'), '_', '!_') + '!_',
+				@PrefixLength = len(@StandardizedDatabaseName) + 1
+		insert into @DirectoryFiles(Subdirectory, Depth, [File])
+			exec master.sys.xp_dirtree @BackupPath, 1, 1
+		declare c2 cursor local for
+			select @BackupPath + Subdirectory
+			from @DirectoryFiles
+			where [File] = 1
+				and Subdirectory like @PrefixPattern + '%' escape '!'
+				and right(Subdirectory, len(@BackupFileExtension)) = @BackupFileExtension
+				and substring(Subdirectory, @PrefixLength + 1, 15) < @RetentionCutoff
+		open c2
+		fetch next from c2 into @BackupFileName
+		while @@fetch_status = 0
+		begin
+			exec master..xp_delete_file 0, @BackupFileName
+			fetch next from c2 into @BackupFileName
+		end
+		close c2
+		deallocate c2
 		fetch next from c into @DatabaseName, @StandardizedDatabaseName
 	end
 	close c
