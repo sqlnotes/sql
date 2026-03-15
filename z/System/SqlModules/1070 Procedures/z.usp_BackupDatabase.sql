@@ -10,7 +10,8 @@ create or alter procedure z.usp_BackupDatabase
 as
 begin
 	set nocount on
-	declare @BackupPath nvarchar(4000), @SQL nvarchar(max), @DatabaseName nvarchar(128), @StandardizedDatabaseName nvarchar(128), @FolderSeparator varchar(1), @BackupFileName nvarchar(max)
+	declare @BackupPath nvarchar(4000), @SQL nvarchar(max), @DatabaseName nvarchar(128), @StandardizedDatabaseName nvarchar(128), @FolderSeparator varchar(1), @BackupFileName nvarchar(max),
+			@SkipRetentionCleanup bit = 0
 	if @BackupType not in ('Full', 'Log', 'Diff')
 	begin
 		raiserror('@BackupType must be Full, Log, or Diff', 16, 1)
@@ -77,6 +78,7 @@ begin
 		select @BackupPath = @BackupFolder + iif(@@servername like '%\%', replace(@@servername, '\', @FolderSeparator), @@servername + @FolderSeparator + 'MSSQLSERVER') + @FolderSeparator 
 							+ @StandardizedDatabaseName + @FolderSeparator 
 							+ @BackupType + @FolderSeparator
+		select @SkipRetentionCleanup = iif(left(@BackupPath, 2) = '\\', 1, 0)
 		if not exists(select * from sys.dm_os_file_exists(@BackupPath) where file_is_a_directory = 1)
 		begin
 			exec master.sys.xp_create_subdir @BackupPath
@@ -100,26 +102,33 @@ begin
 		print @SQL
 		exec(@SQL)
 
-		declare c1 cursor local for
-			select bf.physical_device_name
-			from msdb.dbo.backupset bs
-				left outer join msdb.dbo.backupmediafamily bf ON bs.media_set_id = bf.media_set_id
-				inner join msdb.dbo.backupmediaset bms ON bs.media_set_id = bms.media_set_id
-				cross apply sys.dm_os_file_exists(bf.physical_device_name) f
-			where bms.software_name = 'Microsoft SQL Server'
-				and bs.type = case @BackupType when 'FULL' then 'D' when 'DIFF' then 'I' when 'LOG' then 'L' end
-				and bs.database_name = @DatabaseName
-				and bs.Backup_Finish_Date < dateadd(hour, - @RetentionHours, getdate())
-				and f.file_exists = 1
-		open c1
-		fetch next from c1 into @BackupFileName
-		while @@fetch_status = 0
+		if @SkipRetentionCleanup = 1
 		begin
-			exec master..xp_delete_file 0, @BackupFileName
-			fetch next from c1 into @BackupFileName
+			print 'Skipping retention cleanup for UNC backup path: ' + @BackupPath
 		end
-		close c1
-		deallocate c1
+		else
+		begin
+			declare c1 cursor local for
+				select bf.physical_device_name
+				from msdb.dbo.backupset bs
+					left outer join msdb.dbo.backupmediafamily bf ON bs.media_set_id = bf.media_set_id
+					inner join msdb.dbo.backupmediaset bms ON bs.media_set_id = bms.media_set_id
+					cross apply sys.dm_os_file_exists(bf.physical_device_name) f
+				where bms.software_name = 'Microsoft SQL Server'
+					and bs.type = case @BackupType when 'FULL' then 'D' when 'DIFF' then 'I' when 'LOG' then 'L' end
+					and bs.database_name = @DatabaseName
+					and bs.Backup_Finish_Date < dateadd(hour, - @RetentionHours, getdate())
+					and f.file_exists = 1
+			open c1
+			fetch next from c1 into @BackupFileName
+			while @@fetch_status = 0
+			begin
+				exec master..xp_delete_file 0, @BackupFileName
+				fetch next from c1 into @BackupFileName
+			end
+			close c1
+			deallocate c1
+		end
 		fetch next from c into @DatabaseName, @StandardizedDatabaseName
 	end
 	close c
