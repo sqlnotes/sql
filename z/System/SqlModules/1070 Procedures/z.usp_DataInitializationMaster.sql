@@ -1,4 +1,7 @@
 create or alter procedure z.usp_DataInitializationMaster
+(
+	@SchemaName nvarchar(128) = 'z'
+)
 as
 begin
 	set nocount on
@@ -8,7 +11,7 @@ begin
 		from sys.procedures
 		where name like 'usp!_DataInitialization%' escape '!'
 			and name not in ('usp_DataInitializationHelper', 'usp_DataInitializationMaster')
-			and schema_id = schema_id('z')
+			and schema_id = iif(@SchemaName is null, schema_id, schema_id(@SchemaName))
 		order by 1 asc
 	open c
 	fetch next from c into @SQL
