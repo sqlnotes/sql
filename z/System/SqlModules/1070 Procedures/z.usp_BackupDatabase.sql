@@ -92,7 +92,7 @@ begin
 		end
 		else if @BackupType = 'LOG'
 		begin
-			select @SQL =	'backup log '   + quotename(@DatabaseName) + ' to disk = ''' + @BackupFileName + '.log'' with '
+			select @SQL =	'backup log '   + quotename(@DatabaseName) + ' to disk = ''' + @BackupFileName + '.trn'' with '
 		end
 		select @SQL = @SQL + iif(@BackupCompression = 1, 'compression', 'no_compression')
 		if @OtherBackupOptions is not null
