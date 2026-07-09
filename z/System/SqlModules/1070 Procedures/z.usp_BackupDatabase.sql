@@ -10,7 +10,7 @@ create or alter procedure z.usp_BackupDatabase
 as
 begin
 	set nocount on
-	declare @BackupPath nvarchar(4000), @SQL nvarchar(max), @DatabaseName nvarchar(128), @StandardizedDatabaseName nvarchar(128), @FolderSeparator varchar(1), @BackupFileName nvarchar(max)
+	declare @BackupPath nvarchar(4000), @SQL nvarchar(max), @DatabaseName nvarchar(128), @StandardizedDatabaseName nvarchar(128), @FolderSeparator varchar(1), @BackupFileName nvarchar(4000)
 	if @BackupType not in ('Full', 'Log', 'Diff')
 	begin
 		raiserror('@BackupType must be Full, Log, or Diff', 16, 1)
@@ -26,7 +26,7 @@ begin
 	insert into @DatabaseList(DatabaseName, StandardizedDatabaseName, DataSizeMB)
 		select	d.name, 
 				replace(translate(d.name, '<>:"/\?*', '        '), ' ', '_'),
-				sum(m.size) *8/1024
+				sum(cast(m.size as bigint)) *8/1024
 		from sys.databases d
 			inner join sys.master_files m on m.database_id = d.database_id
 		where d.state_desc not in ('RESTORING', 'RECOVERING', 'RECOVERY_PENDING', 'SUSPECT', 'EMERGENCY')
