@@ -8,6 +8,7 @@ Command examples in these guides assume your working directory is `z`.
 3. [Understand the process](deployment-process.md): folder traversal, subsystem versions,
    script hashes, logging, and guidelines for writing deployment scripts.
 
-The tools are `Deploy.ps1`, `Deploy.sql`, `Deploy.Common.ps1`, and `TestDB.ps1`.
+The tools are `Deploy.ps1`, `Deploy.sql`, and `Deploy.Common.ps1`; use
+`Deploy.ps1 -RunTests` for test execution.
 Documentation for individual modules belongs in their own `docs` folders, such
 as [System/docs](../System/docs/readme.md). Documentation contents are never executed.

@@ -7,7 +7,6 @@
 | `Deploy.ps1` | Orchestrate bootstrap, deployment or optional test-only execution, logs, and completion |
 | `Deploy.sql` | Create a missing database and initialize current deployment metadata |
 | `Deploy.Common.ps1` | Build traversal plans and provide shared SQL/connection helpers |
-| `TestDB.ps1` | Discover and execute product tests separately from deployment |
 
 The deployer validates the folder tree, runs bootstrap, opens a metadata
 connection, and acquires an exclusive database-local lock. It then reads installed

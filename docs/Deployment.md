@@ -144,12 +144,12 @@ calculates, compares, or stores hashes. Test log entries use batch/log IDs only.
 ./z/Deploy.ps1 -ServerName MyServer -DatabaseName MyTestDatabase -RootPath ./MyTestSuite/System -RunTests
 ```
 
-Supply your own test tree and run the separate test program against an appropriate
+Supply your own test tree and run test mode against an appropriate
 test database. Test scripts are not bundled with the public project:
 
 ```powershell
-./z/TestDB.ps1 -ServerName MyServer -DatabaseName MyTestDatabase -RootPath ./MyTestSuite/System -ShowPlan
-./z/TestDB.ps1 -ServerName MyServer -DatabaseName MyTestDatabase -RootPath ./MyTestSuite/System
+./z/Deploy.ps1 -ServerName MyServer -DatabaseName MyTestDatabase -RootPath ./MyTestSuite/System -RunTests -ShowPlan
+./z/Deploy.ps1 -ServerName MyServer -DatabaseName MyTestDatabase -RootPath ./MyTestSuite/System -RunTests
 ```
 
 It discovers `tests` folders in subsystems and organizational folders, then executes
