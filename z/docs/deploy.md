@@ -1,103 +1,45 @@
-# Using Deploy.ps1
+# Install and update
 
-## Prepare
+[Installer guide](readme.md) · [System guide](../System/docs/readme.md)
 
-SQL Server 2017 or later is supported. Basic `trim(expression)` is available
-since SQL Server 2017. The SQL Server 2022-only
-`leading`, `trailing`, and `both` positional syntax is not used.
-See [Microsoft's TRIM documentation](https://learn.microsoft.com/en-us/sql/t-sql/functions/trim-transact-sql).
+## Prerequisites
 
-Use PowerShell 7 with the `SqlServer` module installed. To install it for your user:
+Use PowerShell 7 (the traversal uses modern .NET path APIs) with the `SqlServer` PowerShell module available. Use a login allowed to create a database if needed, create/alter schema and module/table objects, maintain deployment metadata and execute the supplied administrative post scripts. Feature use may require separate Agent, Broker, server DMV, backup or security rights.
 
-```powershell
-Install-Module SqlServer -Scope CurrentUser
-```
+The intended SQL baseline is 2017+, but current shared index metadata/schema-copy requires SQL Server 2019+. [Compatibility limits](../System/docs/troubleshooting.md).
 
-Use a login with permission to create the database when needed and to create or
-alter the objects used by your modules. The deployer creates a missing database;
-when the database exists, it initializes missing metadata and deploys into it.
-Bootstrap assumes the current metadata schema; legacy schema migration is not supported.
-It does not delete and recreate an existing database.
+## Commands
 
-## Preview and deploy
-
-From the `z` directory, preview the execution plan:
+Run from the public repository root, substituting the intended target:
 
 ```powershell
-./Deploy.ps1 -ServerName MyServer -DatabaseName MyDatabase -ShowPlan
+./z/Deploy.ps1 -ServerName localhost -DatabaseName SchemaZ_Example -ShowPlan
+./z/Deploy.ps1 -ServerName localhost -DatabaseName SchemaZ_Example
 ```
 
-Preview does not connect to SQL Server or load installed versions. It assumes a
-new installation and includes all numbered versions; it is a folder-plan preview,
-not a validation of SQL syntax, database permissions, or existing database state.
-
-Deploy using the current Windows identity:
-
-```powershell
-./Deploy.ps1 -ServerName MyServer -DatabaseName MyDatabase
-```
-
-SQL authentication is also supported. Supply credentials at runtime:
-
-```powershell
-$credential = Get-Credential
-./Deploy.ps1 -ServerName MyServer -DatabaseName MyDatabase `
-    -UserName $credential.UserName -Password $credential.GetNetworkCredential().Password
-```
-
-Connections are encrypted. `TrustServerCertificate` defaults to `True`. To require
-certificate validation by the client, pass `-DisableTrustServerCertificate`.
+Preview returns the filesystem plan without connecting or reading installed versions. Execution bootstraps via SQLcmd-capable `Invoke-Sqlcmd`, obtains metadata lock, reads installed versions and recalculates the plan.
 
 ## Parameters
 
-| Parameter | Meaning |
+[Source](../Deploy.ps1)
+
+| Parameter | Default and behavior |
 | --- | --- |
-| `ServerName` | Required SQL Server target |
-| `DatabaseName` | Required database; 1–128 characters, without single quotes, closing brackets, line breaks, `$`, or parentheses |
-| `UserName`, `Password` | Optional SQL authentication; omit `UserName` for Windows authentication |
-| `DisableHashChecking` | Disable hash comparison and rerun eligible scripts; omit to enable hash checking |
-| `DisableTrustServerCertificate` | Require a certificate trusted by the client; omit to trust the server certificate |
-| `RootPath` | Module root; defaults to `System` next to `Deploy.ps1` |
-| `ShowPlan` | Return the initial-install plan without database access |
-| `RunTests` | Execute only reserved test folders; omitted by default |
+| ServerName | Required string |
+| DatabaseName | Required string; 1–128 characters; restricted SQLcmd/quote/bracket/newline delimiters rejected |
+| UserName, Password | Optional strings; omitted/empty user selects Windows authentication |
+| DisableHashChecking | Switch, false; true executes eligible unchanged scripts |
+| DisableTrustServerCertificate | Switch, false; true requires certificate validation |
+| RootPath | Script-adjacent System directory; selects deployment tree and root CodeBase |
+| ShowPlan | Switch, false; returns ordered validated plan without SQL |
+| RunTests | Switch, false; executes reserved test folders only in unhashed Test batches |
 
-An alternate root can be supplied explicitly:
+Connections encrypt; certificate trust is enabled by default. Supply SQL credentials at runtime without committing values. Script execution has unlimited query timeout; metadata calls use 30 seconds and connection opening uses 15 seconds.
 
-```powershell
-./Deploy.ps1 -ServerName MyServer -DatabaseName MyDatabase -RootPath ./AnotherModule
-```
+## Existing databases
 
-The root folder's name becomes its canonical path, for example `/AnotherModule`.
+Current-schema bootstrap is repeatable and retains existing metadata. It does not upgrade older incompatible metadata schemas. Numbered child paths gain independent histories: moved guarded baselines replay under the new child owner while earlier System history remains.
 
-## Redeploy
+Root post executes on repeats: initialization can reset the generic retention policy and naming enforcement can rename existing objects. This is consequential even when shared module hashes are unchanged.
 
-```powershell
-./Deploy.ps1 -ServerName MyServer -DatabaseName MyDatabase
-```
-
-Hash checking is enabled by default. Successful content hashes can skip scripts;
-eligible `pre` and `post` always run without hash comparison. To rerun all eligible
-scripts, pass `-DisableHashChecking`. A subsystem's entire `baseline` is
-skipped once it has a completed version above `0.0.0`, even with hashing disabled.
-Current-version
-migrations remain eligible, so write scripts to tolerate repeated execution.
-See [process details](deployment-process.md) for version and hash behavior.
-
-## Verify and investigate errors
-
-Run these read-only queries in the deployed database:
-
-```sql
-select SystemID, CodeBase, Version, Date from z.Systems order by CodeBase;
-select BatchID, SystemID, SystemVersion, HasError, StartDate, EndDate
-from z.SystemUpdateBatch order by BatchID desc;
-select BatchID, BatchLogID, SystemID, FileHash, ErrorMessage, StartDate, EndDate
-from z.SystemUpdateBatchLog where ErrorMessage is not null order by BatchLogID desc;
-```
-
-On failure, inspect the failing script and its error before retrying. The deployer
-stops, but successful earlier scripts are not automatically undone. An unfinished
-subsystem retains its previously completed version. The console reports completed
-subsystems and prints `Deployment completed.` only when the full plan succeeds.
-Logs reference `z.SystemScriptHash` by SystemID/FileHash for script details. They
-do not duplicate filename/content. Unhashed test entries have batch/log IDs only.
+Review [execution semantics](deployment-process.md) and take an appropriate recovery path before applying changes to an important database. A failed deployment is not automatically rolled back as a whole.

@@ -1,23 +1,27 @@
 # Schema Z
 
-Welcome to the **Schema Z**, a collection of SQL Server scripts and utilities. This library is not designed to solve every challenge you may encounter, but it aims to simplify specific scenarios, such as automated partition management, ETL processes, and many others. 
+Schema Z is a SQL Server library of shared SQL utilities and administration
+features. SQL objects use the `z` schema. Numbered subsystem folders establish
+deployment order and independent deployment histories.
 
-This is an on-going project, and we are committed to enhancing its functionality and expanding coverage to address more common use cases for both developers and DBAs.
+Start with the [System developer guide](z/System/docs/readme.md). It links to
+shared utilities, object references, and the seven feature subsystems:
 
-## Contents
-This repository includes:
+- [Partition](z/System/010-Partition/docs/readme.md): boundaries and retention.
+- [Monitoring](z/System/020-Monitoring/docs/readme.md): sessions and resource information.
+- [Trace](z/System/030-Trace/docs/readme.md): SQL Trace configuration and collection.
+- [Jobs](z/System/040-Jobs/docs/readme.md): SQL Agent jobs and schedule helpers.
+- [Backup](z/System/050-Backup/docs/readme.md): backups and database snapshots.
+- [Security](z/System/060-Security/docs/readme.md): permission generators and user utilities.
+- [Async](z/System/070-Async/docs/readme.md): Service Broker sender infrastructure.
 
-**Administration Scripts:** Scripts for monitoring, backup, recovery, security, and automation.\
-**Performance Tuning:** Indexing strategies, query optimization, and execution plan analysis.\
-**Data Warehousing:** ETL processes, data transformation, and reporting solutions.\
-**Development Utilities:** Functions, stored procedures, dynamic SQL for various development needs, and deployment.\
-**Miscellaneous:** Useful scripts that don't fit into a single category.
+Read [deployment](z/docs/deploy.md) before running `z/Deploy.ps1`. Review each
+feature's prerequisites and limitations before using its examples. Installation
+does not automatically configure every operational feature.
 
-## Contributing
+The documentation beside the code is the authoritative developer reference.
+Reference pages link to SQL definitions and describe current behavior, including
+known limitations. The former wiki and separate legacy guides are retired.
 
-Developers: read the [deployment and testing guide](z/docs/readme.md) before
-changing the deployment process or adding subsystem scripts.
-
-We welcome contributions from the community! Whether you're adding new utilities, enhancing existing ones, or reporting issues, your import is invaluebble and greatly appreciated. Together, we can make **Schema Z** more useful for everyone.
-
---End--
+For deployment mechanics and authoring scripts, see the
+[deployment developer guide](z/docs/readme.md).

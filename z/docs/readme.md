@@ -1,14 +1,10 @@
-# Deployment developer guide
+# Installer developer guide
 
-Start here when using or changing the Schema Z deployment tools.
-Command examples in these guides assume your working directory is `z`.
+[System and subsystem documentation](../System/docs/readme.md)
 
-1. [Deploy a database](deploy.md): prerequisites, authentication, preview, and redeployment.
-2. [Run tests](testing.md): tests for deployed SQL objects and test authoring.
-3. [Understand the process](deployment-process.md): folder traversal, subsystem versions,
-   script hashes, logging, and guidelines for writing deployment scripts.
+- [Install/update commands and parameters](deploy.md)
+- [Traversal, repeatability and failure behavior](deployment-process.md)
+- [Deployment tables and procedures](reference.md)
+- [Preview and verification](testing.md)
 
-The tools are `Deploy.ps1`, `Deploy.sql`, and `Deploy.Common.ps1`; use
-`Deploy.ps1 -RunTests` for test execution.
-Documentation for individual modules belongs in their own `docs` folders, such
-as [System/docs](../System/docs/readme.md). Documentation contents are never executed.
+The installer deploys local SQL source to a specified database. It can create the database if absent, create schema `z`, initialize metadata, then execute System and numbered children. It does not grant a complete application permission model or make all administrative features available on every edition/platform.

@@ -1,165 +1,37 @@
-# How deployment works
+# Deployment process
 
-## Responsibilities
+[Installer guide](readme.md) · [Metadata reference](reference.md)
 
-| File | Responsibility |
-| --- | --- |
-| `Deploy.ps1` | Orchestrate bootstrap, deployment or optional test-only execution, logs, and completion |
-| `Deploy.sql` | Create a missing database and initialize current deployment metadata |
-| `Deploy.Common.ps1` | Build traversal plans and provide shared SQL/connection helpers |
+## Source and plan
 
-The deployer validates the folder tree, runs bootstrap, opens a metadata
-connection, and acquires an exclusive database-local lock. It then reads installed
-versions and builds the actual execution plan before running product scripts.
-The lock covers product deployment; bootstrap runs before that lock is acquired.
+[Deploy.ps1](../Deploy.ps1) orchestrates execution. [Deploy.Common.ps1](../Deploy.Common.ps1) defines traversal/connection/RPC helpers. [Deploy.sql](../Deploy.sql) bootstraps database/schema and current metadata; it requires SQLcmd mode and DatabaseName substitution.
 
-After bootstrap, deployment metadata is read and changed only through typed
-stored-procedure calls. SQL Server procedures raise lock, namespace, and batch
-validation errors; subsystem/batch creation and completion are transactional.
-PowerShell handles folder planning and calls the procedures. Developer SQL files
-execute directly as written; they are not rewritten by the metadata layer.
+Each folder visits pre → baseline → versions → modules → direct SQL files → other folders alphabetically → post. Files sort by filename with ordinal case-insensitive comparison. Version children parse as .NET Version and sort numerically. The installed version is included, along with newer versions; hashing normally prevents unchanged replay.
 
-| Procedure | Metadata operation |
-| --- | --- |
-| `z.usp_AcquireDeploymentLock`, `z.usp_ReleaseDeploymentLock` | Hold and release the deployment session lock |
-| `z.usp_GetDeploymentSystems` | Read completed subsystem versions |
-| `z.usp_BeginDeployment` | Register a subsystem and start its batch |
-| `z.usp_GetDeploymentHashes`, `z.usp_RemoveDeploymentHash` | Read hashes and prune unused eligible hashes |
-| `z.usp_CreateDatabaseUpdateLog` | Register content before execution and record hash-linked execution logs |
-| `z.usp_CompleteDeployment` | Validate the batch and atomically advance version/close batch |
-| `z.usp_FailDeployment` | Mark an unsuccessful batch |
+Only nonreserved children of subsystem roots become separately owned/versioned systems. Reserved names are pre, baseline, versions, modules, post, tests, docs. Descendants within a reserved stage organize that stage's files. Docs are excluded. Linked/reparse-point folders and invalid version paths are rejected.
 
-## Folder order
+Numbered children run 010-Partition through 070-Async. System modules precede children and System post follows them.
 
-```text
-System/
-  pre/
-  baseline/
-  versions/
-    0.0.1/
-    0.0.2/
-  modules/
-  *.sql
-  ChildSubsystem/
-    ...same structure...
-  post/
-  tests/
-  docs/
-```
+## Baselines and identities
 
-```mermaid
-flowchart LR
-    A[pre] --> B[baseline] --> C[versions] --> D[modules]
-    D --> E[Direct SQL files] --> F[Child folders] --> G[post]
-```
+Installed version >0.0.0 excludes the owning subsystem's entire baseline subtree, even with hash checking disabled. Unversioned/new systems at 0.0.0 remain eligible. Children without migrations can remain 0.0.0, using hashes for repeat skipping.
 
-Every executed folder follows this order recursively. Optional stages may be
-absent. Direct SQL files and ordinary child folders use case-insensitive ordinal
-name sorting; numeric version folders use .NET version ordering.
-`tests` is excluded from normal deployment; `-RunTests` executes only tests.
-`docs` is excluded from both deployment and
-test discovery. Linked folders are rejected.
+CodeBase uses paths such as `/System/010-Partition`. SQL derives SystemID as GUID from MD5 of `trim(lower(CodeBase))`. Case/outer-space aliases share identity according to SQL normalization/collation; paths are not normalized independently by PowerShell. Renaming prefixes changes identity: keep deployed names stable.
 
-Use `pre` for prerequisites/preparation, `baseline` for the initial foundational
-objects, `versions` for versioned changes, `modules` for repeatable functions/views/
-procedures, and `post` for work that requires completed children.
+## Hashes and logs
 
-Baseline establishes the starting point for versions. Once its owning subsystem
-has a completed version above `0.0.0`, skip the entire baseline subtree, including
-its pre/post folders. This rule is independent of hash checking. A new child still
-runs its own baseline even when the parent is already versioned. Subsystems at
-`0.0.0`, including those without numbered versions, retain baseline eligibility.
+Every executed product script, including pre/post, gets SHA-256 from UTF-8 encoding of the original decoded file text. It is a content hash, not a hash of SQLcmd-expanded or sanitized SQL. Hashes are scoped to subsystem owner.
 
-Nonreserved child folders directly under a subsystem become child subsystems.
-Folders below reserved stages are organizational only. For example:
+Only current successful hashes skip eligible scripts. Pre/post always execute within an eligible subtree, even if their hashes exist. Failed content retries. Identical contents share a canonical first filename; filenames alone do not determine identity.
 
-| Folder | Version owner |
-| --- | --- |
-| `System/Accounting` | `/System/Accounting` |
-| `System/Accounting/Reports` | `/System/Accounting/Reports` |
-| `System/modules/Accounting` | `/System` |
-| `System/Accounting/baseline/Tables` | `/System/Accounting` |
-| `System/Accounting/docs` | No execution or version record |
+Before metadata RPC, content containing password or encryption is replaced entirely with `***`. This keyword filter is not general secret detection; keep secret literals out of source. Original text is used for execution/hashing.
 
-A `versions` container can have its own reserved stages and direct SQL files.
-Its other children must be numbered versions. Within each numbered folder,
-the normal recursive execution order applies.
+Logs reference owner/hash and retain failure text/times. Pruning deactivates obsolete hashes, preserving history and successful baseline/version rows. Tests have null hashes and no retained source content.
 
-## Independent versions
+## Transactions, locking and failures
 
-`z.Systems` stores one completed version per subsystem using paths such as
-`/System` and `/System/Accounting` in `CodeBase`, an `nvarchar(4000)` column.
-`SystemID` is a stored `uniqueidentifier` derived from the MD5 hash of
-`trim(lower(CodeBase))`. Case and surrounding spaces are ignored for identity.
-Batch, hash, and log tables reference `SystemID` through foreign keys rather
-than repeating the codebase string. SQL resolves installed versions for each
-requested path, so the client does not duplicate SQL's normalization rules.
+Bootstrap table creation is transactional; individual metadata begin/complete operations are transactional. The metadata connection holds session-owned exclusive application lock `z.Deploy` with zero wait; a competing installer fails promptly. Bootstrap precedes this lock, so it does not serialize the complete bootstrap phase.
 
-For each subsystem, the highest numbered folder in its own `versions` directory
-is the target. A new subsystem starts at `0.0.0`. The installed version and newer
-folders execute in numeric order: if installed at `0.0.2`, `0.0.2` runs again and
-`0.0.10` runs afterward. Older folders are skipped.
+Product files execute through separate SQL execution connections. Each starts with standard session options/open-transaction guard and ends with an open-transaction rollback/error guard. A file manages its own transaction. Entire deployment is not atomic; successful prior files/children remain after a later failure.
 
-An installed version above the available maximum is rejected before product
-scripts execute. When no numbered folders exist, an existing version is retained.
-A version is recorded as completed only after that subsystem's scripts, children,
-and `post` succeed. A completed child keeps its version if its parent later fails.
-
-## Hashes and execution history
-
-Hash skipping is enabled by default; disable it with `-DisableHashChecking`.
-Successful script content is identified by SHA-256 within
-the owning subsystem. Identical content at different paths in that same subsystem
-can therefore be skipped; matching content in another subsystem is independent.
-Metadata stores `FileHash` as `varbinary(32)`, the raw 32-byte SHA-256 digest,
-instead of a hexadecimal string. Normal deployment hashes every executed file,
-including pre/post. Eligible `pre` and `post` and their descendants always execute
-without comparing hashes. Stages inside a skipped baseline do not execute.
-
-Register hashes before executing scripts; failed records are retained. Only
-current successful hashes (`IsCurrent`/`HasSucceeded`) permit skipping. The hash
-inventory includes all current records and their success status; the client
-separates inventory from successful skip candidates. Identical
-contents use the first registered filename as canonical.
-On successful completion, unused hashes outside baseline/version folders are
-marked inactive, preserving historical log references. Successful baseline and
-version hashes remain active; removed/replaced failed records in those folders
-retire while their rows remain. Moving or deleting
-a script does not delete the SQL
-objects it previously created.
-
-| Metadata | Purpose |
-| --- | --- |
-| `z.Systems` | Last completed subsystem version and completion date |
-| `z.SystemUpdateBatch` | Subsystem deployment attempt and success/failure status |
-| `z.SystemUpdateBatchLog` | Script start/end and error, linked by SystemID/FileHash; no filename/content |
-| `z.SystemScriptHash` | Content hashes, canonical filename/content, current/success status |
-
-Bootstrap creates missing metadata tables using the current schema and refreshes
-the deployment procedures. Repeating bootstrap preserves existing current-schema
-records. It does not migrate older schemas or rename legacy subsystem records.
-
-`-RunTests` discovers only reserved tests in recursive order. Batches use version
-`Test`; subsystem versions/dates do not advance. No hashes are calculated,
-compared, or stored for tests; unhashed log entries use batch/log IDs only.
-
-## Script authoring and failure behavior
-
-- Write scripts that tolerate repeated execution, including current-version migrations.
-- Arrange filenames/folders so prerequisites precede their dependants.
-- Each script runs in a separate SQL invocation; do not depend on connection-local
-  temporary tables or session settings from a previous file.
-- Standard session options and transaction-leak checks wrap every executed file.
-  Close every transaction you open; a leftover transaction causes an error.
-- There is no transaction covering the whole deployment. A later error does not
-  undo earlier completed scripts; make retry behavior deliberate.
-- Only `.sql` files execute. README files and other documentation are ignored.
-- Use UTF-8 without BOM and CRLF line endings for SQL files.
-- PowerShell masks content containing password/encryption keywords before sending
-  it to metadata logging procedures. SQL does not sanitize incoming content.
-  File hashes are calculated from original content before masking. Actual SQL
-  execution still sends the original script to the server; metadata masking
-  does not hide that execution from tracing. Keep credentials out of scripts.
-
-After changing deployment scripts, verify initial deployment, redeployment,
-version tracking, and error handling in a disposable test database.
+Versions advance only on successful subsystem completion. Incomplete ancestors are marked failed when a child fails; completed siblings retain success. Investigate the failed log and partial state before retry. Hash disabling does not override baseline/version eligibility.
