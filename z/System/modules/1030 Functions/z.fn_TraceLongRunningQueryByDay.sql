@@ -1,4 +1,4 @@
-﻿create or alter function z.fn_TraceLongRunningQueryByDay(@Days int)
+create or alter function z.fn_TraceLongRunningQueryByDay(@Days int)
 returns table
 as
 return(

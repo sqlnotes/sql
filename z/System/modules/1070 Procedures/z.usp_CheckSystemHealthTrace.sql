@@ -1,4 +1,4 @@
-﻿create or alter procedure z.usp_CheckSystemHealthTrace
+create or alter procedure z.usp_CheckSystemHealthTrace
 as
 begin
 	set nocount on

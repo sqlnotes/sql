@@ -1,79 +1,164 @@
-# Install Schema z
-Schema z can be installed using the PowerShell script in this repository. Please note that it only supports **PowerShell Core Edition** which can be downloaded from: https://github.com/PowerShell/PowerShell
+# Deploy Schema Z
 
-The installation program deploys code to the database specified in the parameter. If the database does not exist, a new one with specified name will be created.
+For detailed commands, testing instructions, and implementation guidance, start
+with the [deployment developer guide](../z/docs/readme.md).
 
-**Installation Command**
+Run `z/Deploy.ps1` with PowerShell 7 and the `SqlServer` module installed.
+The supported SQL Server versions are 2017 and later.
+The former `Install.ps1` and `Install.sql` entry points are replaced by
+`Deploy.ps1` and `Deploy.sql`.
 
-Use install.ps1 with SQL Authentication  to install Schema z:
-
-``` ps
-install.ps1 SQLServerName DatabaseName UserName Password
+```powershell
+./z/Deploy.ps1 -ServerName MyServer -DatabaseName MyDatabase
 ```
 
-Use install.ps1 with Windows Authentication  to install Schema z:
-``` ps
-install.ps1 myServer MyDatabase
-```
-**Optional Parameter**
+Windows authentication is used when `UserName` is omitted. For SQL authentication,
+supply `-UserName` and `-Password` at runtime. Do not store credentials in scripts.
+`TrustServerCertificate` defaults to `True`; pass `-DisableTrustServerCertificate`
+when using a certificate trusted by the client.
 
-* -PerformTest
+## Options
 
-Add -PerformTest parameter to run test after installation.
+| Parameter | Purpose |
+| --- | --- |
+| `ServerName`, `DatabaseName` | Required target server and database |
+| `UserName`, `Password` | Optional SQL authentication credentials |
+| `DisableHashChecking` | Rerun eligible scripts without hash comparison; hash checking is enabled when omitted |
+| `RootPath` | Root module folder; defaults to `System` beside the deployer |
+| `ShowPlan` | Return the traversal plan without contacting SQL Server; assumes initial versions |
+| `RunTests` | Execute only reserved tests folders; off by default |
+| `DisableTrustServerCertificate` | Require a certificate trusted by the client; server certificate trust is enabled when omitted |
 
-``` ps
-install.ps1 myServer MyDatabase -PerformTest
-```
-
-
-# Uninstall Schema z
-A SQL procedure can be called to uninstall Schema z.
-
-``` sql
-exec z.usp_RemoveSchemaZ @Confirm = 1
-```
-
-# How It Works
-The deployment script is developed using Powershell Core. Unlike other SQL Server deployment tools, it operates in a straightforward manner by iterating all the sql files in all sub-folders and executing them in a specific sequence. The scripts within the same folder are executed in alphabetical order. If sub-folders exist, the scripts in the sub-folders are executed first, followed by those in the parent folder. Currently, the script only supports executing SQL files, but future enhancements may include the ability to run PowerShell scripts. Below is the workflow of installation script.
-
-1. SQL script **Install.sql** is executed on the database specified on target server. If database does not exists, it will be created. This script creates tables for versioning and installation related information.
-2. SQL scripts located in the **PreScripts** folder will be executed. This folder is intended to contain  the scripts that verify server or database configurations or database level or perform tasks that must be executed for every deployment.
-3. The **Objects** folder contains scripts for creating objects. 
-4. Next, the deployment process executes scripts located in the version folders. There may be one or multiple version folders, named in a format such as **xxx.xx.xx.xx**(Major.Minor.Build.Revision). Any folder name that can be implicitly converted to the System.Version class in the .NET framework is treated as a version folder. NOt all version folders are deployed. For an initial deployment, scripts are executed sequentially from the lowest to highest version. If the database is already at a specific version, scripts for the earlier versions are skipped, and only those for the current version and later are deployed.
-5. The **SQLModules** folder contains the scripts for objects such as procedures, functions, triggers, views, where each object is represented as an individual script. The execution order of these objects and their dependencies is  determined by the arrangement of the sub-folder.
-6. Folder **PostScripts**, similar to **PreScripts**, is executed for every deployment. However, these scripts are executed at the end of the deployment process.
-7. Folder **Tests** contains all the test scipts. By defualt, they will not be executed. However, if the switch parameter **-PerformTest** is enabled, the scripts in this folder will be executed.
-
-
-There is an another optional parameter **-EnableHashChecking**, when enabled, it ensures that a script is not executed multiple times if it has already been deployed. For example, the procedure xyz was deployed in version 3.0. Current version is 8.0. However, this procedure has not changed. It will not be re-deployed with this switch . This parameter is typically designed to reduce number of scripts sent to the server -- if a script has already been deployed, it will not be deployed again. It can be useful particularly when there are a large number of files or a slow network connection to the server.
-
-# Tables
-
-1. **System Table**: This table stores the name of the system and current version. For Schema z, there will only be one record with the name "System". YOu can customize the deployment script to use this table for tracking the version of each sub-systems.
-2. **SystemScriptHash**: This table stores the MD5 hash values for the content of every file except the scripts in the **PreScripts** and **PostScript** folders. If two files have the same hash value, they are considered identical, even if they are located in different folders. When the **-EnableHashChecking** switch is enabled, identical files will not be redeployed - only one is deployed. When SQL files are removed from the deployment folder, their corresponding hashes are also removed by the deployment script.
-3. **SystemUpdateBatch**: Each execution of the deployment script generates a record in this table, containing information such as deployment start and end dates.
-4. **SystemUPdateBatchLog**: This table contains detailed information about each deployment, including the file content, execution start and end dates, and any error messages encountered.
-
-# Script Execution
-
-Before running each script, following query is executed. 
-
-``` sql
-set textsize 2147483647
-set ansi_nulls, ansi_padding, ansi_warnings, arithabort, quoted_identifier, ansi_null_dflt_on, concat_null_yields_null on
-set transaction isolation level read committed
-set context_info 0x73716C6E6F7465732E696E666F
-if @@trancount > 0 
-    raiserror('There are open transaction before file execution', 16, 1)
-go
+```powershell
+./z/Deploy.ps1 -ServerName MyServer -DatabaseName MyDatabase -ShowPlan
+./z/Deploy.ps1 -ServerName MyServer -DatabaseName MyDatabase -DisableHashChecking
 ```
 
-After the completion of each script, following query will be executed.
+## Folder structure and order
 
-``` sql
-if @@trancount > 0 
-    raiserror('There are open transaction after file execution', 16, 1)
-go
+```text
+System/
+  pre/
+  baseline/
+  versions/
+    0.0.1/
+    0.0.2/
+  modules/
+  *.sql
+  ChildSubsystem/
+    ...same structure...
+  post/
+  tests/
+  docs/
 ```
 
-A script may be deployed multiple times. For this program to function correctly, developers must ensure the script is idempotent, meaning it can be executed repeatedly without causing unintended side effects. For instance, if the script modifies data, subsequent executions should not alter the data again after the initial run. Similarly, if the script creates a table, re-executing it should not attempt to create the same table again, avoiding errors.
+Every folder executes in this order:
+
+1. `pre`
+2. `baseline`
+3. `versions`
+4. `modules`
+5. Direct `.sql` files, sorted by name
+6. Other child folders, sorted by name
+7. `post`
+
+Missing stages are skipped. The same ordering applies inside organizational
+folders, including nested `pre` and `post`. Name ordering is ordinal and case
+insensitive. Version folders are sorted numerically, so `0.0.2` precedes `0.0.10`.
+Within a `versions` container, nonreserved child folders must be valid .NET
+version names. Its own reserved stages and direct SQL files use the same order.
+Linked folders are rejected to avoid escaping the deployment tree.
+
+Baseline establishes the starting point for versions. Once the owning subsystem
+has a completed version above `0.0.0`, its entire baseline subtree is skipped,
+including nested pre/post. This applies even when hash checking is disabled.
+New or unversioned subsystems at `0.0.0` retain baseline eligibility independently
+of their parent's version.
+
+Only nonreserved child folders of a subsystem are independent subsystems.
+Descendants inside `pre`, `baseline`, `versions`, `modules`, `post`, or `tests`
+are organizational folders and never receive separate version records.
+`tests` is excluded from installation everywhere.
+
+Every subsystem can have a `docs` folder for its documentation. It is reserved:
+its contents are excluded from both deployment and test discovery, including SQL
+examples and nested folders. It never receives a subsystem version record.
+
+## Version tracking
+
+`z.Systems` stores one row per subsystem, with canonical forward-slash paths
+such as `/System`, `/System/ChildSubsystem`, and `/System/ChildSubsystem/Nested`.
+`CodeBase` supports 4000 Unicode characters. `SystemID` is a `uniqueidentifier`
+derived from the MD5 hash of `trim(lower(CodeBase))`, so case and surrounding
+spaces do not create different subsystem identities. Other metadata tables
+reference this compact ID instead of repeating the codebase string.
+
+Each subsystem uses its own installed version. Deployment includes the current
+version folder and newer folders. An installed version greater than the highest
+available numbered version is rejected before product scripts run. With no
+numbered versions, the existing version is retained, or `0.0.0` for a new subsystem.
+The completed version is saved only after the subsystem's scripts, children, and
+post stage succeed. Successfully completed children keep their independent versions
+if a later parent stage fails.
+
+## Bootstrap, hashes, and logs
+
+`Deploy.sql` creates the target database if needed and initializes metadata using
+the current schema. Repeating bootstrap preserves current version, hash, and
+execution history. Legacy metadata migration is not supported.
+
+Eligible `pre` and `post` always execute, including their descendants, without
+comparing hashes. All normally executed script content is hashed with SHA-256 and
+stored as `FileHash varbinary(32)`.
+Hash checking is enabled by default: an already successful hash in the
+same subsystem is skipped only while current, including identical content at
+another path. Hashes register before execution; failed records are retained.
+Identical contents retain the first filename as canonical. Hashes are independent
+between subsystems. Removed content outside baseline/version
+folders is marked inactive after successful completion, preserving historical log
+references; successful baseline/version hashes remain active. Removed/replaced
+failed records retire even in those folders while keeping their rows. The hash
+inventory includes current records with success status; only successful entries
+permit skips. Use `-DisableHashChecking` to rerun eligible
+scripts without hash skipping.
+
+`z.SystemUpdateBatch` records each subsystem attempt; `z.SystemUpdateBatchLog`
+records individual script start, completion, and error details, referencing
+SystemID/FileHash instead of duplicating filename/content. The logging
+procedure does not advance subsystem versions. Metadata writes use parameters.
+All metadata reads, writes, locking, and logging use stored-procedure RPC calls
+after bootstrap. SQL Server raises metadata validation errors. Developer SQL
+files continue to execute directly without modification.
+Scripts run with standard session options and transaction-leak checks. A script
+error stops deployment; previously completed scripts are not globally rolled back.
+Deployments acquire an exclusive database-local lock while running product scripts.
+
+## Tests
+
+`Deploy.ps1 -RunTests` discovers only reserved `tests` folders recursively and
+runs them in folder execution order. This mode is off by default. It records
+version `Test` batches without advancing subsystem version/date and never
+calculates, compares, or stores hashes. Test log entries use batch/log IDs only.
+
+```powershell
+./z/Deploy.ps1 -ServerName MyServer -DatabaseName MyTestDatabase -RootPath ./MyTestSuite/System -RunTests
+```
+
+Supply your own test tree and run the separate test program against an appropriate
+test database. Test scripts are not bundled with the public project:
+
+```powershell
+./z/TestDB.ps1 -ServerName MyServer -DatabaseName MyTestDatabase -RootPath ./MyTestSuite/System -ShowPlan
+./z/TestDB.ps1 -ServerName MyServer -DatabaseName MyTestDatabase -RootPath ./MyTestSuite/System
+```
+
+It discovers `tests` folders in subsystems and organizational folders, then executes
+only test scripts. It does not deploy modules or follow ETL configuration to other
+servers. Review test side effects before execution; administrative tests may operate on
+server traces. The former `-All` and documented `-PerformTest` options are not used.
+
+## Remove Schema Z
+
+```sql
+exec z.usp_RemoveSchemaZ @Confirm = 1;
+```

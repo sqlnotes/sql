@@ -1,4 +1,4 @@
-﻿create or alter procedure z.usp_TakeSnapshotActiveSessions
+create or alter procedure z.usp_TakeSnapshotActiveSessions
 as
 begin
       set nocount, xact_abort on

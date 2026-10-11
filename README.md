@@ -14,6 +14,10 @@ This repository includes:
 **Miscellaneous:** Useful scripts that don't fit into a single category.
 
 ## Contributing
+
+Developers: read the [deployment and testing guide](z/docs/readme.md) before
+changing the deployment process or adding subsystem scripts.
+
 We welcome contributions from the community! Whether you're adding new utilities, enhancing existing ones, or reporting issues, your import is invaluebble and greatly appreciated. Together, we can make **Schema Z** more useful for everyone.
 
 --End--
