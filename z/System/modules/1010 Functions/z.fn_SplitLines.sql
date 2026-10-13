@@ -1,4 +1,4 @@
-create or alter function z.fn_ReadLinesFromString
+create or alter function z.fn_SplitLines
 (
 	@Str nvarchar(max)
 )

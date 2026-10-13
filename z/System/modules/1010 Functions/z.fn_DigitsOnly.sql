@@ -1,4 +1,4 @@
-create or alter function z.fn_NumbersOnly(@str varchar(max))
+create or alter function z.fn_DigitsOnly(@str varchar(max))
 returns nvarchar(max)
 as
 begin

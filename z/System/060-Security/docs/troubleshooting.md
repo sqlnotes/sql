@@ -18,4 +18,4 @@ These pages describe source behavior. A successful installation or module compil
 
 ## Version constraint
 
-z.fn_BuildQueryCopyUserPermission references sys.external_languages and its external_language_id/language columns. This catalog is a SQL Server 2019-era feature, so the current function is not a reliable SQL Server 2017 interface despite the project baseline. Check the target version before installing or using it.
+z.fn_BuildQueryCopyUserPermission references sys.external_languages and its external_language_id/language columns, available from the minimum supported SQL Server version, 2019 (15.x).

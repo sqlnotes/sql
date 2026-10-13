@@ -11,23 +11,13 @@ Declarations show required parameters, defaults and output parameters. Unless sp
 ```sql
 create or alter procedure z.usp_AcquireSemaphore
 (
-	@Resource nvarchar(200), -- Name of the semaphore
+	@SemaphoreName nvarchar(200), -- Name of the semaphore
 	@TotalCount int = 1, -- Size of the semaphore, default it's binary semaphore
 	@LockOwner varchar(32) = 'Transaction'
 )
 ```
 
-Acquires resource/slot application locks; returns positive slot number and stores session context. No internal transaction/result set. Transaction ownership needs caller transaction; no timeout/capacity validation. See coordination.
-
-## z.usp_CollectInfo
-
-[Source](../../modules/1070%20Procedures/z.usp_CollectInfo.sql)
-
-```sql
-create or alter procedure z.usp_CollectInfo
-```
-
-Calls Monitoring z.usp_CheckSystemHealthTrace then z.usp_TakeSnapshotActiveSessions. Writes collector data; needs collector permissions. No encompassing transaction; output follows callees.
+Acquires resource/slot application locks; returns a positive slot number and stores session context, or prints a message and returns -1 for detected repeated acquisition. No internal transaction/result set. Transaction ownership needs caller transaction; no timeout/capacity validation. See coordination.
 
 ## z.usp_CopyTableSchema
 
@@ -39,7 +29,7 @@ create or alter procedure z.usp_CopyTableSchema
 	@FullSourceTableName nvarchar(256),
 	@FullTargetTableName nvarchar(256),
 	@FileGroupOrPartitionScheme nvarchar(128) = null, -- NULL: 'Use Source Object File Group', 'Use default Database File Group', 'Use Source Object Partition Scheme', FileGroupName or PartitionSchemeName(FieldName)
-	@DropTargetTableIfExists bit = 1,
+	@DropTargetTableIfExists bit = 0,
 	@CopyIdentity bit = 1,
 	@CopyTableSchema bit = 1,
 	@CopyIndexes bit = 1,
@@ -47,21 +37,23 @@ create or alter procedure z.usp_CopyTableSchema
 	@CopyDefault bit = 1,
 	@ScriptAfterTableCreation nvarchar(max) = null,
 	@DataCompression varchar(20) = null,
-	@PrintCode bit = 0
+	@PrintCode bit = 0,
+	@PartitionNumber int = 1,
+	@ShowPlan bit = 0
 )
 ```
 
-Executes schema-copy DDL, dropping target by default, without copying rows. Starts transaction with xact_abort; catch can roll back caller work. Needs source metadata and target DDL permissions. See schema-copy.
+Generates schema-copy DDL and executes it without copying rows, or returns ordered Ordinal/PartName/Definition rows with `@ShowPlan = 1` without executing generated SQL. Existing target replacement is explicit. Default partition is 1; NULL storage/compression inherit each selected heap/index partition's settings. Uses its own transaction or a caller-transaction savepoint. Needs source metadata and target DDL permissions. See [schema-copy behavior and limits](schema-copy.md).
 
 ## z.usp_CreateAllServiceJobs
 
-[Source](../../modules/1070%20Procedures/z.usp_CreateAllServiceJobs.sql)
+[Source](../../post/1010%20Procedures/z.usp_CreateAllServiceJobs.sql)
 
 ```sql
 create or alter procedure z.usp_CreateAllServiceJobs
 ```
 
-Creates General DailyMaintenance hourly/interval 1 via z.usp_CreateServiceJob, then removes orphaned schedules. Collector/trace job calls are commented out. Needs Agent/msdb rights; no encompassing transaction.
+Defined in System post after the Jobs subsystem is installed. Calling it creates General DailyMaintenance hourly/interval 1 via z.usp_CreateServiceJob, then removes orphaned schedules. Deployment defines the procedure but does not invoke it automatically. Needs Agent/msdb rights; no encompassing transaction.
 
 ## z.usp_DataInitialization_DatabaseSchemas
 
@@ -121,7 +113,7 @@ Executes usp_DataInitialization* except Helper/Master, sorted by quoted name. De
 create or alter procedure z.usp_DropAllLocalTempTables
 ```
 
-Dynamically drops catalog-selected local temp tables in tempdb, excluding ##. Broad catalog-based selection; do not assume a carefully scoped cleanup contract. Needs rights on selected objects; no transaction/result set.
+Executes catalog-selected local-temp-table DROP statements in tempdb, excluding ## and candidates that do not resolve through object_id in that execution context. Selection depends on metadata visibility and name resolution; do not assume a carefully scoped cleanup contract. Needs rights on selected objects; no transaction/result set.
 
 ## z.usp_DropObject
 
@@ -182,7 +174,7 @@ Executes trusted @Query and returns select-from-values SQL in @SQL output using 
 create or alter procedure z.usp_PrintString (@str nvarchar(max))
 ```
 
-Prints nvarchar input by lines and chunks up to 4000 characters with unlimited recursion. No persisted writes/result set; long lines become multiple messages.
+Uses z.fn_SplitLines to print nvarchar input by lines, then chunks up to 4000 characters with unlimited recursion. No persisted writes/result set; long lines become multiple messages.
 
 ## z.usp_RefeshAllSQLModules
 
@@ -201,7 +193,7 @@ Name is spelled Refesh. Refreshes all visible current-database modules with defi
 ```sql
 create or alter procedure z.usp_ReleaseSemaphore
 (
-	@Resource nvarchar(200), --name of the semaphore
+	@SemaphoreName nvarchar(200), --name of the semaphore
 	@LockOwner varchar(32) = 'Transaction'
 )
 ```

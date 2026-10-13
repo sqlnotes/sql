@@ -26,6 +26,6 @@ Installation visits these children in the order shown. Each has its own develope
 
 ## Compatibility and permissions
 
-The intended baseline is SQL Server 2017+, but the current shared index view references `sys.indexes.optimize_for_sequential_key` and schema-copy output emits that option. Those paths require SQL Server 2019+. See [current limitations](troubleshooting.md).
+The minimum supported version is SQL Server 2019 (15.x). The shared index view and schema-copy output use `optimize_for_sequential_key`, supported from that version. See [current limitations](troubleshooting.md).
 
 Administrative routines can modify more than `z` or the current database. The library does not grant a universal application role. Callers need permissions for the catalog queries, DDL, SQL Agent and server features they invoke. Examples assume an installed library in the selected database. They describe current source behavior and are illustrative, not a complete compatibility/concurrency test.

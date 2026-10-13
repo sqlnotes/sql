@@ -1,6 +1,3 @@
-/*
-This procedure drop all local temp tables created incurrent session
-*/
 create or alter procedure z.usp_DropAllLocalTempTables
 as
 begin

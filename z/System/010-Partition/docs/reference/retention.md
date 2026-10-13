@@ -41,6 +41,6 @@ The no-parameter procedure applies every row in z.PartitionedTableDataRetention,
 
 Dependencies: z.fn_GetPeriodStart, z.fn_BuildQueryCreatePartitionForDateRange, z.v_PartitionedIndexes and generated z.usp_CopyTableSchema calls. The source filename differs from the function definition name.
 
-Weekly cutoff is missing. Only clustered indexes (IndexID=1) are selected; heaps are omitted. The builder switches PartitionNumber-1 and does not validate range direction. Schema-copy omissions can cause switch incompatibility.
+Weekly cutoff is missing. Heap and clustered partitions (IndexID 0/1) are selected. The builder switches the partition preceding each selected boundary row (`PartitionNumber - 1`), passing that exact number to schema copy so each target index inherits the switched partition's filegroup and compression. It does not validate range direction; source features and engine restrictions can still prevent switching.
 
-Within a boundary group, rn=1 is chosen by descending unquoted schema.object and receives the merge; emission sorts quoted SourceObject ascending. This intends to merge after switches for ordinary identifiers, but ordering can differ for unusual quoted identifiers. Review all sharing tables and emitted order. No feature lock protects plan generation/execution.
+Partitions are emitted in descending ordinal order so merging a higher boundary does not renumber partitions still awaiting switch-out. Within a boundary group, rn=1 is chosen by descending quoted SourceObject and receives the merge; emission sorts the same quoted SourceObject ascending, placing the merge after the group's switches. Review all sharing tables. No feature lock protects plan generation/execution.

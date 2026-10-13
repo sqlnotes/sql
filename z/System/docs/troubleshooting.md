@@ -4,7 +4,7 @@
 
 ## Compatibility
 
-`z.v_Indexes` references `sys.indexes.optimize_for_sequential_key` and schema-copy emits that option. These paths require SQL Server 2019+; the intended 2017 baseline is not currently satisfied. Microsoft lists this column as available from SQL Server 2019 in its [sys.indexes reference](https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-indexes-transact-sql?view=sql-server-ver17).
+`z.v_Indexes` references `sys.indexes.optimize_for_sequential_key` and schema-copy emits that option. The minimum supported version is SQL Server 2019 (15.x), which supports these paths. Microsoft lists this column as available from SQL Server 2019 in its [sys.indexes reference](https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-indexes-transact-sql?view=sql-server-ver17).
 
 ## Environment detection
 
@@ -20,7 +20,7 @@ No overall timeout exists. Nonpositive capacity creates endless retries. The res
 
 ## Generated SQL
 
-Schema-copy resets identity to `identity(1,1)` and does not clone foreign keys, check constraints, triggers, permissions or extended properties. `@CopyIndexes = 1` selects table creation even with `@CopyTableSchema = 0`. `@PrintCode = 1` prints and executes.
+Schema copy preserves identity seed/increment when requested and selects table/index/default categories independently. It does not clone foreign keys, CHECK constraints, triggers, permissions or extended properties. `@ShowPlan = 1` returns ordered scripts without generated-SQL execution; `@PrintCode = 1` alone prints and executes. With `@CopyTableSchema = 0`, an existing target is required. See [schema-copy behavior and limits](reference/schema-copy.md).
 
 `z.fn_BuildQueryMergeTable` leaves a source-query placeholder. Identity omission can produce empty list entries; legacy text/image comparisons emit invalid `t.cast(...)`. `z.usp_GetQueryResultToSQL` uses temporal style 120 (fractional precision can be lost) and uses byte length for its `nchar` type branch. Validate output against representative data.
 

@@ -28,7 +28,7 @@ Recursive splitters can exceed the default recursion limit. Use an explicit sort
 
 ```sql
 declare @Sequence int = next value for z.SeqGeneralID;
-declare @Identifier bigint = z.fn_GetZSequenceID(@Sequence);
+declare @Identifier bigint = z.fn_GenerateZSequenceID(null, @Sequence);
 
 select @Identifier Identifier, Date, Sequence
 from z.fn_DecodeZSequenceID(@Identifier);
@@ -39,14 +39,14 @@ The ID combines UTC seconds since 1900 and a 28-bit sequence. Allocation is not 
 ## Preview a schema copy
 
 ```sql
-select Ordinal, PartName, Definition
-from z.fn_BuildQueryCopyTableSchema(
-	N'z.DatabaseSchemas', N'dbo.DatabaseSchemasCopy',
-	N'Use default Database File Group', 1, null)
-order by Ordinal;
+exec z.usp_CopyTableSchema
+	@FullSourceTableName = N'z.DatabaseSchemas',
+	@FullTargetTableName = N'dbo.DatabaseSchemasCopy',
+	@PartitionNumber = 1,
+	@ShowPlan = 1;
 ```
 
-This returns SQL without creating a table. [Review copy limitations](reference/schema-copy.md). The executing procedure drops an existing target by default.
+This returns ordered `Ordinal`, `PartName` and `Definition` rows without creating a table or executing any returned SQL. With storage and compression overrides omitted, it inherits each source heap/index's settings; a partitioned source uses the selected partition, defaulting to partition 1. Normal targets are nonpartitioned. [Review copy limitations](reference/schema-copy.md). The executing procedure protects an existing target by default; replacement requires an explicit request. `@PrintCode = 1` prints and executes in normal mode; use `@ShowPlan = 1` for preview.
 
 ## Print initialization SQL
 
@@ -63,9 +63,12 @@ This prints a script based on current rows, without executing its merge. Output 
 ```sql
 begin tran;
 declare @Slot int;
-exec @Slot = z.usp_AcquireSemaphore @Resource = N'ExampleWork', @TotalCount = 1;
--- Perform work here.
-exec z.usp_ReleaseSemaphore @Resource = N'ExampleWork';
+exec @Slot = z.usp_AcquireSemaphore @SemaphoreName = N'ExampleWork', @TotalCount = 1;
+if @Slot > 0
+begin
+	-- Perform work here.
+	exec z.usp_ReleaseSemaphore @SemaphoreName = N'ExampleWork';
+end
 commit;
 ```
 

@@ -1,4 +1,4 @@
-create or alter function z.fn_LettersOnly(@str varchar(max))
+create or alter function z.fn_AsciiLettersOnly(@str varchar(max))
 returns nvarchar(max)
 as
 begin

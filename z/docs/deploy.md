@@ -6,7 +6,7 @@
 
 Use PowerShell 7 (the traversal uses modern .NET path APIs) with the `SqlServer` PowerShell module available. Use a login allowed to create a database if needed, create/alter schema and module/table objects, maintain deployment metadata and execute the supplied administrative post scripts. Feature use may require separate Agent, Broker, server DMV, backup or security rights.
 
-The intended SQL baseline is 2017+, but current shared index metadata/schema-copy requires SQL Server 2019+. [Compatibility limits](../System/docs/troubleshooting.md).
+The minimum supported version is SQL Server 2019 (15.x). [Compatibility limits](../System/docs/troubleshooting.md).
 
 ## Commands
 

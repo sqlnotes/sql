@@ -3,29 +3,22 @@ returns binary(8)
 as
 begin 
 	/*
-		This function calculates the row version just before the current minimum active row version 
-		('min_active_rowversion()'). This is useful in scenarios where the exact boundary of committed 
-		data needs to be identified for ETL.
+		Returns an inclusive polling watermark: one less than the lowest active
+		rowversion in the current database. Capture it before reading changes and
+		use RowVersion > @PreviousWatermark and RowVersion <= @Watermark.
 
-		Explanation:
-		- The min_active_rowversion() function returns an unsigned 8-byte binary value 
-		  representing the minimum active transaction row version.
-		- To compute the previous version, we cannot directly cast it to a bigint and subtract 1 
-		  because of a special case:
-		  - When min_active_rowversion() is 0x8000000000000000, its bigint representation is 
-			-9223372036854775808 (the minimum value for a bigint).
-		  - Subtracting 1 from this value causes an overflow.
-		- Instead:
-		  - For the special case (0x8000000000000000), the result should be 0x7FFFFFFFFFFFFFFF 
-			(9223372036854775807 in bigint).
-		  - For all other cases, simply subtract 1 from the bigint representation of the row version.
-    
-		Return Value:
-		A binary(8) value representing the previous row version
+		With no active rowversions, min_active_rowversion() returns @@dbts + 1,
+		so this function returns @@dbts. With active rowversions, later committed
+		values can lie above the watermark and are deferred to a subsequent poll.
+		The watermark need not belong to an existing or committed row: rolled-back
+		changes also consume rowversions. It does not determine snapshot visibility.
+
+		Treat the eight bytes as an unsigned counter. Casting to bigint preserves
+		the bits but interprets the high bit as a sign. Subtraction still yields the
+		correct predecessor except at 0x8000000000000000 (bigint minimum), where
+		subtracting one would overflow; return 0x7FFFFFFFFFFFFFFF instead.
+		This assumes a nonzero counter; zero has no unsigned predecessor.
 	*/
 	declare @MinActiveRowVersion binary(8) = min_active_rowversion()
 	return cast(case when @MinActiveRowVersion = 0x8000000000000000 then 0x7FFFFFFFFFFFFFFF else cast(@MinActiveRowVersion as bigint) - 1 end as binary(8))
 end
-
-
-    

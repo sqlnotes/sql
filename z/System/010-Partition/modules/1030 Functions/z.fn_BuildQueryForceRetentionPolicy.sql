@@ -38,7 +38,7 @@ begin
 	order by Ordinal
 
 	insert into @ret(Name, SQL)
-		select 'Partition Swapout Partition' + cast(a.PartitionNumber as varchar) + ':' + format(a.BoundaryDateValue, 'yyyy-MM-dd HH:mm') + ' for ' + a.SourceObject,
+		select 'Partition Swapout Partition' + cast(a.SourcePartitionNumber as varchar) + ':' + format(a.BoundaryDateValue, 'yyyy-MM-dd HH:mm') + ' for ' + a.SourceObject,
 				' -- Swapout period ' + format(a.BoundaryDateValue, 'yyyy-MM-dd HH:mm') + '
 if object_id(' + quotename(a.TargetObject, '''') + ') is not null
 begin
@@ -52,8 +52,8 @@ begin
 		return
 	end
 end
-exec z.usp_CopyTableSchema @FullSourceTableName = ' + quotename(a.SourceObject, '''') + ', @FullTargetTableName = ' + quotename(a.TargetObject, '''') + ', @FileGroupOrPartitionScheme = ' + quotename(a.FileGroupName, '''') + ', @DropTargetTableIfExists = 0, @CopyIdentity = 1
-alter table ' + a.SourceObject + ' switch partition ' + cast(a.PartitionNumber - 1 as nvarchar(20)) + ' to ' + a.TargetObject + ';
+exec z.usp_CopyTableSchema @FullSourceTableName = ' + quotename(a.SourceObject, '''') + ', @FullTargetTableName = ' + quotename(a.TargetObject, '''') + ', @PartitionNumber = ' + cast(a.SourcePartitionNumber as nvarchar(20)) + ', @DropTargetTableIfExists = 0, @CopyIdentity = 1
+alter table ' + a.SourceObject + ' switch partition ' + cast(a.SourcePartitionNumber as nvarchar(20)) + ' to ' + a.TargetObject + ';
 '
 			+	case 
 					when @ArchivedSwappedPartitions = 1 then ''
@@ -65,7 +65,7 @@ alter table ' + a.SourceObject + ' switch partition ' + cast(a.PartitionNumber -
 				'declare @ID' + cast(rn as varchar(max)) + ' ' + a.BoundaryValueDataType + ' = '
 				+	case a.BoundaryValueDataType
 						when 'bigint' then cast(a.BoundaryValue as nvarchar(100)) + ';'
-						else 'convert(' + a.BoundaryValueDataType + ',' + quotename(convert(nvarchar(100), cast(a.BoundaryValue as datetime2), 121), '''') + ', 121)'
+						else 'convert(' + a.BoundaryValueDataType + ',' + quotename(case when a.BoundaryValueDataType = 'datetime' then convert(nvarchar(100), cast(a.BoundaryValue as datetime), 121) else convert(nvarchar(100), cast(a.BoundaryValue as datetime2), 121) end, '''') + ', 121)'
 						end + '
 alter partition function '+quotename(a.PartitionFunctionName)+'()   merge range (@ID' + cast(rn as varchar(max)) + ');'
 					else ''
@@ -75,13 +75,13 @@ alter partition function '+quotename(a.PartitionFunctionName)+'()   merge range 
 						quotename(object_schema_name(i.ObjectID)) + '.' + quotename(object_name(i.ObjectID)) SourceObject, 
 						quotename(object_schema_name(i.ObjectID)) + '.' + quotename(object_name(i.ObjectID) + '_Partition_' + format(i.BoundaryDateValue, 'yyyyMMddHHmm')) TargetObject, 
 						i.BoundaryDateValue, i.BoundaryValueDataType, i.BoundaryValue, 
-						i.PartitionFunctionName, i.PartitionNumber, i.FileGroupName,
-						row_number() over (partition by i.PartitionNumber order by object_schema_name(i.ObjectID) +'.' + object_name(i.ObjectID) desc ) rn
+						i.PartitionFunctionName, i.PartitionNumber, i.PartitionNumber - 1 SourcePartitionNumber,
+						row_number() over (partition by i.PartitionNumber order by quotename(object_schema_name(i.ObjectID)) + N'.' + quotename(object_name(i.ObjectID)) desc ) rn
 				from z.v_PartitionedIndexes i
 				where i.PartitionFunctionName = @PartitionFunctionName
-					and i.IndexID = 1
+					and i.IndexID in (0, 1)
 					and BoundaryDateValue <= @FirstPeriodToKeep
 			) a
-		order by a.PartitionNumber, a.SourceObject
+		order by a.PartitionNumber desc, a.SourceObject
 	return
 end

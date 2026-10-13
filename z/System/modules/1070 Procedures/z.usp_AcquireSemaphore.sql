@@ -1,25 +1,25 @@
 create or alter procedure z.usp_AcquireSemaphore
 (
-	@Resource nvarchar(200), -- Name of the semaphore
+	@SemaphoreName nvarchar(200), -- Name of the semaphore
 	@TotalCount int = 1, -- Size of the semaphore, default it's binary semaphore
 	@LockOwner varchar(32) = 'Transaction'
 )
 as
 begin
-	declare @ResourceInternal nvarchar(300), @SessionKey nvarchar(200) = 'Semaphore-' + @Resource, @SessionValue sql_variant
+	declare @ResourceInternal nvarchar(300), @SessionKey nvarchar(200) = 'Semaphore-' + @SemaphoreName, @SessionValue sql_variant
 	declare @i int = 1, @ret int = -1
-	if(applock_mode('public', @Resource, @LockOwner) = 'IntentExclusive')
+	if(applock_mode('public', @SemaphoreName, @LockOwner) = 'IntentExclusive')
 	begin
-		raiserror('You have acquired semaphore', 16,1)
+		print 'You have already acquired this semaphore.';
 		return -1;
 	end
-	exec sp_getapplock @Resource = @Resource,  @LockMode = 'IntentExclusive', @LockOwner = @LockOwner, @LockTimeout = -1
+	exec sp_getapplock @Resource = @SemaphoreName,  @LockMode = 'IntentExclusive', @LockOwner = @LockOwner, @LockTimeout = -1
 	while 1=1
 	begin
 		select @i = 1
 		while @i <= @TotalCount
 		begin
-			select @ResourceInternal = cast(@i as varchar(10)) + '-' + @Resource
+			select @ResourceInternal = cast(@i as varchar(10)) + '-' + @SemaphoreName
 			exec @ret = sp_getapplock @Resource = @ResourceInternal,  @LockMode = 'Exclusive', @LockOwner = @LockOwner, @LockTimeout = 0
 			if @ret >=0
 			begin

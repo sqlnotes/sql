@@ -89,5 +89,3 @@ when matched and (' + x2.UpdateWhereClause + ') then
 	from x2
 )
 go
---select * from z.fn_BuildQueryMergeTable('z.SystemUpdateBatch', default, default, default)
-

@@ -1,5 +1,5 @@
 create or alter view z.v_Indexes
-as    
+as
     select
         i.object_id ObjectID, i.index_id IndexID,
         object_schema_name(i.object_id) SchemaName, object_name(i.object_id) ObjectName, i.name IndexName,
@@ -13,7 +13,7 @@ as
             when i.type_desc like '%COLUMNSTORE%' then z.fn_GetExpectedName(i.type_desc, object_schema_name(i.object_id), object_name(i.object_id), null, null, null)
 			when i.type_desc = 'XML' then z.fn_GetExpectedName(xi.xml_index_type_description + isnull('_' + xi.secondary_type_desc, ''), object_schema_name(i.object_id), object_name(i.object_id), ic.IndexColumns, null, null)
 		end ExpectedIndexName,
-        case 
+        case
 			when i.type_desc = 'XML' then
 				xi.xml_index_type_description + isnull('_' + xi.secondary_type_desc, '')
 			else i.type_desc
@@ -24,7 +24,7 @@ as
         iic.IncludedColumns,
         i.filter_definition FilterDefinition,
         fg.name Partition,
-        (select top 1 '(' + col_name(ic.object_id, ic.column_id) + ')' from sys.index_columns ic where ic.object_id = i.object_id and ic.index_id = i.index_id and ic.partition_ordinal > 0) PartitionColumn,
+        (select top 1 '(' + quotename(col_name(ic.object_id, ic.column_id)) + ')' from sys.index_columns ic where ic.object_id = i.object_id and ic.index_id = i.index_id and ic.partition_ordinal > 0) PartitionColumn,
         (select top 1 p.data_compression_desc from sys.partitions p where p.data_compression in (1, 2) and p.object_id = i.object_id and p.index_id = i.index_id order by p.data_compression desc) Compression,
 		i.is_padded IsPadded,
 		i.fill_factor [FillFactor],
@@ -41,54 +41,54 @@ as
 		cross apply(
 						select stuff(
 										(
-											select ','+quotename(col_name(ic.object_id, ic.column_id)) 
-											from sys.index_columns ic 
-											where ic.object_id = i.object_id 
-												and ic.index_id = i.index_id 
+											select ','+quotename(col_name(ic.object_id, ic.column_id))
+											from sys.index_columns ic
+											where ic.object_id = i.object_id
+												and ic.index_id = i.index_id
 												and ic.is_included_column = 0
 												and (
 														ic.key_ordinal > 0  and i.type_desc <> 'XML'
 														or i.type_desc = 'XML'
 													)
-											order by ic.key_ordinal 
+											order by ic.key_ordinal
 											for xml path(''), type
-										).value('.', 'varchar(max)'), 
+										).value('.', 'nvarchar(max)'),
 									1, 1, '')
 								IndexColumns
 					) ic
 		cross apply(
 						select stuff(
 										(
-											select 
-													','+quotename(col_name(ic.object_id, ic.column_id)) + 
-														case 
+											select
+													','+quotename(col_name(ic.object_id, ic.column_id)) +
+														case
 															when i.type_desc <> 'XML' then
-																case when ic.is_descending_key = 0 then ' asc' else ' desc' end 
+																case when ic.is_descending_key = 0 then ' asc' else ' desc' end
 															else ''
 														end
-											from sys.index_columns ic 
-											where ic.object_id = i.object_id 
-												and ic.index_id = i.index_id 
-												and ic.is_included_column = 0 
+											from sys.index_columns ic
+											where ic.object_id = i.object_id
+												and ic.index_id = i.index_id
+												and ic.is_included_column = 0
 												and (
 														ic.key_ordinal > 0  and i.type_desc <> 'XML'
 														or i.type_desc = 'XML'
 													)
 											order by ic.key_ordinal for xml path(''), type
-										).value('.', 'varchar(max)'), 
+										).value('.', 'nvarchar(max)'),
 									1, 1, '') IndexColumnDefinition
 					) icd
 		outer apply(
 						select stuff(
 										(
-											select ','+quotename(col_name(ic.object_id, ic.column_id)) 
-											from sys.index_columns ic 
-											where ic.object_id = i.object_id 
-												and ic.index_id = i.index_id 
+											select ','+quotename(col_name(ic.object_id, ic.column_id))
+											from sys.index_columns ic
+											where ic.object_id = i.object_id
+												and ic.index_id = i.index_id
 												and ic.is_included_column = 1
-											order by ic.key_ordinal 
+											order by ic.key_ordinal
 											for xml path(''), type
-										).value('.', 'varchar(max)'), 
+										).value('.', 'nvarchar(max)'),
 									1, 1, '')
 								IncludedColumns
 					) iic
