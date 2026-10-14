@@ -8,7 +8,7 @@ Empty request snapshots can be normal: the collector excludes its own session. C
 
 ## Permission and partial-operation failures
 
-System supplies z.SeqGeneralID; Partition supplies PS_SchemaZPartitionGeneric. Server DMVs, Extended Events, and msdb Database Mail supply external data. System orchestration can schedule collection through Jobs.
+System supplies z.SeqGeneralID and PS_SchemaZPartitionGeneric. Server DMVs, Extended Events, and msdb Database Mail supply external data. System orchestration can schedule collection through Jobs.
 
 Read the relevant callable reference before retrying a failed write. Some procedures roll back any open transaction, including a caller's transaction; others leave earlier operations committed. Native server resources and filesystem actions do not share a single database rollback boundary. Catalog/DMV access is evaluated on the deployed server and depends on SQL Server version and caller context.
 

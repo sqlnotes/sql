@@ -4,7 +4,7 @@
 
 ## Objects and dependencies
 
-`PF_SchemaZPartitionGeneric` is a database-level bigint function, `range left`, initially no boundaries. `PS_SchemaZPartitionGeneric` places all partitions on `[Default]`. Guards preserve existing objects without checking their shape.
+`PF_SchemaZPartitionGeneric` is a database-level bigint function, `range left`, initially no boundaries. `PS_SchemaZPartitionGeneric` places all partitions on `[Default]`. System owns these shared storage definitions and the datetime equivalents PF_SchemaZPartitionGenericDateTime and PS_SchemaZPartitionGenericDateTime. Guards preserve existing objects without checking their shape.
 
 `z.PartitionedTableDataRetention` stores one policy per function. Shared System helpers calculate periods, encode/decode identifier boundaries, expose partition/index metadata and copy table schemas. Monitoring and Trace depend on the generic scheme; System post writes the shipped policy after all children.
 

@@ -6,7 +6,7 @@
 
 All children create SQL objects in `z`. Partition functions/schemes are database-level; SQL Agent jobs live in `msdb`. Folder ownership controls independent installer histories, not separate SQL schemas. [Installer metadata](../../docs/reference.md) is bootstrapped separately.
 
-System baseline creates `z.SeqGeneralID`. Shared modules deploy before children. Partition depends on shared date/ID functions, catalog views and schema-copy helpers. Monitoring and Trace depend on Partition. Root [post](../post) executes after all children.
+System baseline creates `z.SeqGeneralID` and the shared bigint/datetime partition functions and schemes in [SchemaZPartitionGeneric.sql](../baseline/2010%20Partitions/SchemaZPartitionGeneric.sql). Shared modules deploy before children. Partition depends on shared date/ID functions, catalog views and schema-copy helpers. Monitoring and Trace use System's shared bigint partition scheme; Partition provides boundary and retention maintenance. Root [post](../post) executes after all children.
 
 ## Initialization and orchestration
 

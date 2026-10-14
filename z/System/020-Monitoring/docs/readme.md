@@ -17,4 +17,4 @@ Snapshots capture requests at collection time, not a full session history. Query
 
 ## Prerequisites
 
-System supplies z.SeqGeneralID; Partition supplies PS_SchemaZPartitionGeneric. Server DMVs, Extended Events, and msdb Database Mail supply external data. System orchestration can schedule collection through Jobs.
+System supplies z.SeqGeneralID and PS_SchemaZPartitionGeneric. Server DMVs, Extended Events, and msdb Database Mail supply external data. System orchestration can schedule collection through Jobs.

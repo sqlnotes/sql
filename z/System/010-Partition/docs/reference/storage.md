@@ -4,7 +4,7 @@
 
 ## PF_SchemaZPartitionGeneric and PS_SchemaZPartitionGeneric
 
-[Source](../../baseline/2010%20Partitions/SchemaZPartitionGeneric.sql). Database-level `bigint`, `range left` function, initially no boundaries; scheme `all to ([Default])`. Existence guards do not reconcile a preexisting mismatched definition. Boundary maintenance uses System ID time encoding.
+[Source](../../../baseline/2010%20Partitions/SchemaZPartitionGeneric.sql). Database-level `bigint`, `range left` function, initially no boundaries; scheme `all to ([Default])`. Existence guards do not reconcile a preexisting mismatched definition. These shared storage objects belong to the System baseline. Boundary maintenance uses System ID time encoding for the bigint function. The same file defines PF_SchemaZPartitionGenericDateTime (datetime) and PS_SchemaZPartitionGenericDateTime using `range right`, empty boundaries and the default filegroup. The datetime-encoded bigint function uses `range left`. The datetime pair has no seeded retention policy. Existing versioned System installations skip the baseline; run this guarded file separately to add the datetime pair.
 
 ## z.PartitionedTableDataRetention
 

@@ -4,7 +4,7 @@
 
 ## Dependencies and installation
 
-System supplies z.SeqGeneralID, ID/date helpers, and z.usp_ForceNamingConvention. Partition supplies PS_SchemaZPartitionGeneric. Monitoring supplies z.v_ActiveSessions. SQL Trace system catalogs and sp_trace_* procedures are required.
+System supplies z.SeqGeneralID, ID/date helpers, z.usp_ForceNamingConvention, and PS_SchemaZPartitionGeneric. Monitoring supplies z.v_ActiveSessions. SQL Trace system catalogs and sp_trace_* procedures are required.
 
 The numbered folder installs in System's alphabetical child order. Shared System modules run before feature children; System post scripts run after all children. See [System documentation](../../docs/readme.md) for deployment and orchestration. Baseline tables use existence guards; they do not reconcile an existing table schema. Module definitions use create or alter.
 

@@ -79,6 +79,10 @@ begin
 					)
 		if @SQL is null
 		begin
+			if exists(select * from sys.partition_schemes where name = 'PS_SchemaZPartitionGenericDateTime')
+				drop partition scheme PS_SchemaZPartitionGenericDateTime
+			if exists(select * from sys.partition_functions where name = 'PF_SchemaZPartitionGenericDateTime')
+				drop partition function PF_SchemaZPartitionGenericDateTime;
 			if exists(select * from sys.partition_schemes where name = 'PS_SchemaZPartitionGeneric')
 				drop partition scheme PS_SchemaZPartitionGeneric
 			if exists(select * from sys.partition_functions where name = 'PF_SchemaZPartitionGeneric')

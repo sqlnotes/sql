@@ -17,7 +17,7 @@ The implementation uses SQL Trace, including sp_trace_getdata, rather than Exten
 
 ## Prerequisites
 
-System supplies z.SeqGeneralID, ID/date helpers, and z.usp_ForceNamingConvention. Partition supplies PS_SchemaZPartitionGeneric. Monitoring supplies z.v_ActiveSessions. SQL Trace system catalogs and sp_trace_* procedures are required.
+System supplies z.SeqGeneralID, ID/date helpers, z.usp_ForceNamingConvention, and PS_SchemaZPartitionGeneric. Monitoring supplies z.v_ActiveSessions. SQL Trace system catalogs and sp_trace_* procedures are required.
 
 ## Platform direction
 
