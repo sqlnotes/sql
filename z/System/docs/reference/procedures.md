@@ -55,16 +55,6 @@ create or alter procedure z.usp_CreateAllServiceJobs
 
 Defined in System post after the Jobs subsystem is installed. Calling it creates General DailyMaintenance hourly/interval 1 via z.usp_CreateServiceJob, then removes orphaned schedules. Deployment defines the procedure but does not invoke it automatically. Needs Agent/msdb rights; no encompassing transaction.
 
-## z.usp_DataInitialization_DatabaseSchemas
-
-[Source](../../modules/1070%20Procedures/z.usp_DataInitialization_DatabaseSchemas.sql)
-
-```sql
-create or alter procedure z.usp_DataInitialization_DatabaseSchemas
-```
-
-Merge-inserts z into z.DatabaseSchemas if missing. dbo example commented out. No deletion/update, explicit transaction or result set. Needs table writes.
-
 ## z.usp_DataInitialization_PartitionedTableDataRetention
 
 [Source](../../modules/1070%20Procedures/z.usp_DataInitialization_PartitionedTableDataRetention.sql)
@@ -136,11 +126,14 @@ Resolves current-database object ID and drops supported kind with dynamic SQL. N
 create or alter procedure z.usp_ForceNamingConvention
 (
 	@TableName nvarchar(256) = null,
-	@IgnoreError bit = 0
+	@IgnoreError bit = 0,
+	@SchemaNames nvarchar(max) = null,
+	@TableNames nvarchar(max) = null,
+	@ShowPlan bit = 0
 )
 ```
 
-Renames index/PK/UQ/default/FK using expected-name views and sp_rename. Null table limits to z.DatabaseSchemas; explicit table may target any schema. Sets xact_abort off, no internal transaction. Catch rolls back caller work and always throws even with IgnoreError=1. Needs metadata/ALTER.
+Renames indexes, PK/UQ constraints, defaults and foreign keys through expected-name views and `sp_rename`; it does not rename tables or schemas. Supply at least one selector: legacy `@TableName`, JSON string array `@SchemaNames`, or JSON string array `@TableNames`. Selection is their union, with duplicates removed. New table-list entries must be exactly two-part, schema-qualified current-database tables or views. Indexed views can contribute index candidates; ordinary views usually contribute none. All selectors are validated before renaming; malformed JSON, non-string/empty entries and unknown names are rejected. Empty arrays alone are insufficient, while an existing empty schema is valid. Legacy table-name resolution and the first two positional arguments remain compatible. `@ShowPlan = 1` returns `ObjectName`, `NewName` and `ObjectType` rows without renaming. Normal execution is non-atomic, with `xact_abort off` and no internal transaction or caller rollback. `@IgnoreError = 0` throws on the first failed rename; `1` prints that error and continues. Completed renames can persist after later failures. Metadata visibility and ALTER permissions control available objects and execution. See [selection and migration examples](../usage.md#preview-and-enforce-naming-conventions).
 
 ## z.usp_GeneralDailyMaintenance
 
@@ -221,7 +214,7 @@ Confirm=1 enables destructive removal of z plan guides/objects, generic partitio
 create or alter procedure z.usp_SetLargeValueOutOfRow
 ```
 
-Enables large value types out of row for every current-database table with max-length columns and option off. Not limited to z/DatabaseSchemas. Needs ALTER; no transaction/result set.
+Enables large value types out of row for every current-database table with max-length columns and option off. Not limited to schema z. Needs ALTER; no transaction/result set.
 
 ## z.usp_SkipTrigger
 

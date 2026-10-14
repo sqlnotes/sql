@@ -1,6 +1,7 @@
 -- Triggers
 
 -- Procedures
+exec z.usp_DropObject @ObjectName = N'z.usp_DataInitialization_DatabaseSchemas';
 exec z.usp_DropObject @ObjectName = N'z.usp_CollectInfo';
 exec z.usp_DropObject @ObjectName = N'z.usp_DatabaseBackup';
 exec z.usp_DropObject @ObjectName = N'z.usp_RemoveZSchema';
@@ -24,6 +25,7 @@ exec z.usp_DropObject @ObjectName = N'z.fn_StandardizeSchedule';
 -- Synonyms
 
 -- Tables
+exec z.usp_DropObject @ObjectName = N'z.DatabaseSchemas';
 
 -- Sequences
 

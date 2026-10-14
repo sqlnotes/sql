@@ -5,7 +5,7 @@
 | Reference | Contents |
 | --- | --- |
 | [Functions](functions.md) | Every shared function: strings, dates, IDs, environment and SQL generation |
-| [Catalog and baseline](catalog.md) | Sequence, schema registry and every catalog view |
+| [Catalog and baseline](catalog.md) | Sequence and every catalog view |
 | [Schema copy](schema-copy.md) | Generation, execution, permissions and copy limits |
 | [Coordination](coordination.md) | Semaphores and trigger flags |
 | [Procedures](procedures.md) | Every shared procedure: exact declarations, sources and behavior |

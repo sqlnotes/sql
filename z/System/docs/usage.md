@@ -40,8 +40,8 @@ The ID combines UTC seconds since 1900 and a 28-bit sequence. Allocation is not 
 
 ```sql
 exec z.usp_CopyTableSchema
-	@FullSourceTableName = N'z.DatabaseSchemas',
-	@FullTargetTableName = N'dbo.DatabaseSchemasCopy',
+	@FullSourceTableName = N'z.PartitionedTableDataRetention',
+	@FullTargetTableName = N'dbo.PartitionedTableDataRetentionCopy',
 	@PartitionNumber = 1,
 	@ShowPlan = 1;
 ```
@@ -52,11 +52,26 @@ This returns ordered `Ordinal`, `PartName` and `Definition` rows without creatin
 
 ```sql
 exec z.usp_DataInitializationHelper
-	@FullObjectName = N'z.DatabaseSchemas',
+	@FullObjectName = N'z.PartitionedTableDataRetention',
 	@ForceMatchedDataUpdate = 0;
 ```
 
 This prints a script based on current rows, without executing its merge. Output can contain sensitive data.
+
+## Preview and enforce naming conventions
+
+```sql
+exec z.usp_ForceNamingConvention
+	@SchemaNames = N'["z"]',
+	@TableNames = N'["dbo.OrderDetail","dbo.[Order]"]',
+	@ShowPlan = 1;
+```
+
+This selects all tables and indexed views in `z` plus the two named `dbo` objects. Schema and table selectors form a union; duplicates are processed once. JSON arrays allow commas and Unicode in names. Table-list entries must be schema-qualified current-database names, using SQL identifier brackets where needed. Preview returns `ObjectName`, `NewName` and `ObjectType` for proposed index, PK/UQ, default and foreign-key renames. Review the rows, then repeat with `@ShowPlan = 0` to apply them. Tables and schemas keep their names.
+
+At least one selector is required. Existing calls with `@TableName`, including the first two positional arguments, remain supported. `@IgnoreError = 1` prints rename failures and continues; selector validation errors still stop the call. Renames are not wrapped in a transaction and completed changes may persist after a failure. [Procedure reference](reference/procedures.md#zusp_forcenamingconvention).
+
+Before deploying this change to an existing installation, capture custom `SchemaName` rows from `z.DatabaseSchemas` and update scheduled jobs or scripts to pass them as an explicit `@SchemaNames` JSON array. Deployment removes that table and its initialization procedure; its configured scope is not migrated automatically. The framework's post-script explicitly selects only `z`.
 
 ## Coordinate a transaction
 

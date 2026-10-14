@@ -6,13 +6,13 @@
 
 All children create SQL objects in `z`. Partition functions/schemes are database-level; SQL Agent jobs live in `msdb`. Folder ownership controls independent installer histories, not separate SQL schemas. [Installer metadata](../../docs/reference.md) is bootstrapped separately.
 
-System baseline creates `z.SeqGeneralID` and `z.DatabaseSchemas`. Shared modules deploy before children. Partition depends on shared date/ID functions, catalog views and schema-copy helpers. Monitoring and Trace depend on Partition. Root [post](../post) executes after all children.
+System baseline creates `z.SeqGeneralID`. Shared modules deploy before children. Partition depends on shared date/ID functions, catalog views and schema-copy helpers. Monitoring and Trace depend on Partition. Root [post](../post) executes after all children.
 
 ## Initialization and orchestration
 
 `z.usp_DataInitializationMaster` discovers initialization procedures by name, sorted alphabetically in the chosen schema (default `z`; null includes all schemas). It supplies no encompassing transaction.
 
-`z.usp_DataInitialization_DatabaseSchemas` inserts `z` if absent. This table selects schemas for untargeted naming enforcement.
+Naming enforcement uses explicit schema/table selectors in `z.usp_ForceNamingConvention`. Root post passes `@SchemaNames = N'["z"]'`; no schema registry is maintained.
 
 `z.usp_DataInitialization_PartitionedTableDataRetention` inserts/updates the generic policy: monthly, interval 1, three forward periods, six periods kept, default filegroup, archive disabled. Root post runs again during repeats and can overwrite edits to this policy.
 
@@ -32,6 +32,8 @@ Retired names and their current replacements:
 
 | Retired object | Current object |
 | --- | --- |
+| `z.DatabaseSchemas` | Explicit `@SchemaNames`/`@TableNames` arguments to `z.usp_ForceNamingConvention` |
+| `z.usp_DataInitialization_DatabaseSchemas` | No initialization needed; callers select naming scope explicitly |
 | `z.usp_CollectInfo` | Call `z.usp_CheckSystemHealthTrace` and `z.usp_TakeSnapshotActiveSessions` directly as needed |
 | `z.usp_DatabaseBackup` | `z.usp_BackupDatabase` |
 | `z.usp_RemoveZSchema` | `z.usp_RemoveSchemaZ` |

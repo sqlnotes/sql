@@ -12,7 +12,7 @@
 
 ## Naming errors
 
-`z.usp_ForceNamingConvention` prints the error for `@IgnoreError = 1`, then throws unconditionally. Completed renames may persist; its catch can roll back a caller transaction.
+`z.usp_ForceNamingConvention` requires an explicit schema/table selector. Preview with `@ShowPlan = 1` before applying renames. `@IgnoreError = 0` stops on the first rename failure; `1` prints the error and continues with other candidates. Renaming is non-atomic, so completed changes may persist after a later failure. The procedure does not roll back caller work; the caller owns transaction recovery. Selector validation errors are never suppressed by `@IgnoreError`.
 
 ## Semaphore wait
 

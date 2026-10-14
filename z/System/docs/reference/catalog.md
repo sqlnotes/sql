@@ -4,11 +4,11 @@
 
 ## z.SeqGeneralID
 
-[Source](../../baseline/1010%20Sequences/z.SeqGeneralID.sql). Int sequence: start/min 1, increment 1, max 268435455, cycle, cache 268435455. Used as the low 28-bit component of System IDs. Sequence consumption needs appropriate sequence access and is not rolled back; cache loss/restarts can create gaps. Cycling means reuse is possible.
+[Source](../../baseline/1010%20Sequences/z.SeqGeneralID.sql). Int sequence: start/min 1, increment 1, max 268435455, cycle, cache 268435455.
 
-## z.DatabaseSchemas
+Use its value with a datetime in [z.fn_GenerateZSequenceID](functions.md#zfn_generatezsequenceid) to create a datetime-encoded `bigint` ID: seconds since 1900 form the higher bits, and the sequence supplies the low 28 bits. [z.fn_DecodeZSequenceID](functions.md#zfn_decodezsequenceid) retrieves the datetime and sequence components. See the [generate and decode example](../usage.md#generate-and-decode-an-identifier).
 
-[Source](../../baseline/2020%20Tables/z.DatabaseSchemas.sql). One column `SchemaName nvarchar(128) not null`, primary key `PK_z_DatabaseSchemas`. It is a configuration list, without a foreign key to `sys.schemas`. Untargeted naming enforcement selects schemas listed here; initialization inserts `z`. Reads/writes require ordinary table permissions.
+Sequence consumption needs appropriate sequence access and is not rolled back; cache loss/restarts can create gaps. Cycling means reuse is possible.
 
 ## Catalog views
 
