@@ -14,7 +14,7 @@ System baseline creates `z.SeqGeneralID` and the shared bigint/datetime partitio
 
 Naming enforcement uses explicit schema/table selectors in `z.usp_ForceNamingConvention`. Root post passes `@SchemaNames = N'["z"]'`; no schema registry is maintained.
 
-`z.usp_DataInitialization_PartitionedTableDataRetention` inserts/updates the generic policy: monthly, interval 1, three forward periods, six periods kept, default filegroup, archive disabled. Root post runs again during repeats and can overwrite edits to this policy.
+`z.usp_DataInitialization_PartitionedTableDataRetention` inserts missing generic bigint/datetime policies: monthly, interval 1, three future boundaries, an expiration cutoff six intervals before the current period, default filegroup, archive disabled. Root post runs again during repeats and preserves existing policy values.
 
 `z.usp_GeneralDailyMaintenance` calls Partition retention then enables out-of-row large values across eligible tables in the current database. [z.usp_CreateAllServiceJobs](../post/1010%20Procedures/z.usp_CreateAllServiceJobs.sql) is defined in root post after Jobs, and calls that subsystem to create hourly maintenance and remove orphaned schedules; defining it alone does not create jobs.
 

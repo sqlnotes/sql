@@ -9,17 +9,22 @@
 ```sql
 create or alter function z.fn_BuildQueryForcePartitionRetentionPolicy
 (
-    @PartitionFunctionName nvarchar(128),
-    @PartitionRangeType varchar(20),
-    @PartitionRangeTypeInterval int,
-    @ForwardedPartitionCount int,
-    @NextPartitionFileGroup nvarchar(128),
-    @PartitionsToKeep int,
-    @ArchivedSwappedPartitions bit,
+	@PartitionFunctionName nvarchar(128),
+	@PartitionRangeType varchar(20),
+	@PartitionRangeTypeInterval int,
+	@ForwardedPartitionCount int,
+	@NextPartitionFileGroup nvarchar(128),
+	@PartitionsToKeep int,
+	@ArchivedSwappedPartitions bit,
 	@Today datetime = null
 )
-returns @ret table(Ordinal int identity(1,1), Name varchar(300), SQL nvarchar(max))
 ```
+
+Returns the retained `Ordinal`, `Name`, `SQL` columns plus `Action`, `TableName` and `PartitionNumber`. A row represents an atomic action affecting all tables sharing the function; TableName can be null for a grouped action. Error rows contain executable error text. Selecting the function does not execute copies or DDL. Today defaults to UTC. Review error rows first; execute action rows in Ordinal order through EXEC sys.sp_executesql with no caller transaction.
+
+A positive interval and nonnegative forward count are required. Forward count means future boundaries: October with count 3 adds November, December, January, skipping existing values and anything at/below the maximum existing boundary. Missing historical periods remain combined. Date keys require Daily or coarser periods; Hourly/Minute policies are rejected.
+
+PartitionsToKeep = -1 disables expiration. Nonnegative values select boundaries at/before current period start minus count times interval; values below -1 are invalid. Datetime2 boundary precision is retained. The preceding partition is switched out for each selected boundary, highest ordinal first.
 
 ## z.usp_ForcePartitionRetentionPolicy
 
@@ -27,20 +32,24 @@ returns @ret table(Ordinal int identity(1,1), Name varchar(300), SQL nvarchar(ma
 
 ```sql
 create or alter procedure z.usp_ForcePartitionRetentionPolicy
+(
+	@PartitionFunctionName nvarchar(128) = null,
+	@ShowPlan bit = 0
+)
 ```
 
-## Inputs and returned plan
+No arguments applies all policy rows. A function selector requires a matching policy. ShowPlan returns `PartitionFunctionName`, `Ordinal`, `Action`, `TableName`, `PartitionNumber`, `SQL` in function/ordinal order. Preview performs metadata checks without executing copies or DDL; source schema-copy capability is validated additionally during execution. Preview can be captured with INSERT EXEC and does not start an implicit transaction.
 
-The TVF takes all policy columns plus optional Today (null uses local getdate()). It returns Ordinal identity, Name varchar(300), SQL nvarchar(max). PartitionsToKeep is normalized to absolute value (null becomes 0). Cutoff is current period start minus the retained-period count; it selects decoded boundaries <= cutoff.
+Execution requires no caller transaction and implicit_transactions off. Each function is serialized by a session application lock. Execution checks that each action changes the boundary count and stops with an error if no progress is made. Generated actions are regenerated after each commit, so merges cannot leave stale partition numbers for later actions. Each recovery and expired boundary is one transaction across every affected table. A failure rolls back that action, releases its lock, continues other functions, and raises a combined failure at the end.
 
-The first plan rows create future partitions, followed by per-table switch/archive/merge blocks. ArchivedSwappedPartitions=1 keeps targets; otherwise generated SQL drops them. Targets follow the same-schema Source_Partition_yyyyMMddHHmm pattern. An existing empty target is dropped/recreated; nonempty target raises an error.
+## Recovery, expiration and compression
 
-## Execution and limits
+Recovery creates absent `<Table>_Partition_SplitHold` holders using the exact last partition number. It switches tails out, splits future boundaries, adds trusted source/range CHECKs, switches back and removes holders. LEFT ranges use `> lower and <= upper`; RIGHT uses `>= lower and < upper`, with special handling for no lower boundary and NULL. Rows spanning more than the one destination range cause rollback, without redistribution. For LEFT, the first recovery split uses each scheme's original tail filegroup; subsequent splits use the policy filegroup.
 
-The no-parameter procedure applies every row in z.PartitionedTableDataRetention, captures getutcdate() once and supplies it as Today, sorts function name/Ordinal, then executes in one transaction. No explicit result set/output parameter. Catch rolls back any open transaction and rethrows. It needs source metadata, table/schema DDL, partition DDL and schema-copy permissions.
+Expiration creates same-schema `<Table>_Partition_YYYYMMDD`, or `_YYYYMMDD_HHMM` for Minute/Hourly. The suffix identifies the removed upper boundary rather than a month label. Any existing target is an error. It switches all affected heaps/clustered tables before merging the boundary. ArchivedSwappedPartitions = 1 retains targets; value 0 drops them within the transaction. No archive transport or direct-truncate shortcut is performed.
 
-Dependencies: z.fn_GetPeriodStart, z.fn_BuildQueryCreatePartitionForDateRange, z.v_PartitionedIndexes and generated z.usp_CopyTableSchema calls. The source filename differs from the function definition name.
+`z.usp_CopyTableSchema` remains the shared copy implementation. Calls pass the exact partition number and no placement/compression override, preserving each index's selected-partition storage/compression. All indexes must align on the managed function and partition column. No compression-by-age policy or populated-partition compression rebuild occurs.
 
-Weekly cutoff is missing. Heap and clustered partitions (IndexID 0/1) are selected. The builder switches the partition preceding each selected boundary row (`PartitionNumber - 1`), passing that exact number to schema copy so each target index inherits the switched partition's filegroup and compression. It does not validate range direction; source features and engine restrictions can still prevent switching.
+Required permissions include complete metadata visibility, source/target table DDL and partition function/scheme DDL. Unsupported source features, constraints or engine switch restrictions can reject an action; inspect preview and execution errors. Manual DDL outside the shared maintenance lock still requires coordination.
 
-Partitions are emitted in descending ordinal order so merging a higher boundary does not renumber partitions still awaiting switch-out. Within a boundary group, rn=1 is chosen by descending quoted SourceObject and receives the merge; emission sorts the same quoted SourceObject ascending, placing the merge after the group's switches. Review all sharing tables. No feature lock protects plan generation/execution.
+For RIGHT expiration, the retained upper partition is also held temporarily while empty neighbors merge. The empty destination's per-index compression is restored before switching retained rows back. Adjacent partitions with different filegroups for any index are rejected before DDL because preserving that placement would require data movement. Temporary merge holders use the _Partition_MergeHold suffix and must not already exist.

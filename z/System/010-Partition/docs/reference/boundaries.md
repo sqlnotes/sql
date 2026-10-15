@@ -35,20 +35,23 @@ create or alter procedure z.usp_CreatePartitionForDateRange
 	@DateFrom datetime = null,
 	@DateTo datetime = null,
 	@NumberOfPartitions int = 3,  -- can be positive or negative. When positive, partitions will be added in the future. When negative, partitions will be added backward.
-	@FileGroup nvarchar(128) = null
+	@FileGroup nvarchar(128) = null,
+	@ShowPlan bit = 0
 )
 ```
 
 ## Parameters and returned plan
 
-Use ObjectName or PartitionFunctionName to identify the existing function. Supported key types are date-like types or bigint System IDs. Default period Monthly, interval 1, DateFrom current local time when null, DateTo computed from count when null, count 3, storage default filegroup when null/Default/[Default]. Negative count requests backward boundaries.
+Use ObjectName or PartitionFunctionName to identify the existing function. Supported key types are date, datetime, datetime2, smalldatetime or bigint System IDs. Date keys require Daily or coarser periods. Default period Monthly, interval 1, DateFrom current UTC time when null, DateTo computed from count when null, count 3, storage default filegroup when null/Default/[Default]. Negative count requests backward boundaries.
 
-Both rounded endpoints are included. The TVF returns Ordinal identity, SQL and Date. Each missing boundary emits next-used statements for all schemes, a split and next-used statements again. Validation failures become executable raiserror text in a row. Selecting output does not throw those generated errors.
+Both rounded endpoints are included. The TVF returns Ordinal identity, SQL and Date. Procedure ShowPlan returns Ordinal, Date and SQL in Ordinal order; the default ShowPlan = 0 preserves execution behavior. Each missing boundary emits next-used statements for all schemes, a split and next-used statements again. Validation failures become executable raiserror text in a row. Selecting output does not throw those generated errors.
 
 ## Execution and limits
 
-The procedure runs SQL by Ordinal in a transaction; catch rolls back any open transaction and rethrows. No explicit result set or output parameter is declared. Appropriate function/scheme DDL and source metadata permission are needed.
+With ShowPlan = 1, the procedure only reads metadata and returns the builder SQL. It does not execute generated errors, next-used statements or splits, start a transaction or acquire the maintenance application lock. Preview supports INSERT EXEC capture and caller transactions; it preserves implicit_transactions and xact_abort settings. Runtime planning errors return an error SQL row with Ordinal 0 and Date NULL. A NULL ShowPlan parameter is rejected.
 
-Weekly is accepted but missing from computed end-date and iteration cases. The interval validation guard never rejects zero/null; zero can divide by zero, null can yield an empty/incomplete plan and abs(INT_MIN) overflows. Use positive intervals and a tested bounded date span.
+With ShowPlan = 0, the procedure resolves the function, acquires the same per-function session application lock as automatic maintenance, generates SQL under that lock and executes it by Ordinal in its own transaction. Caller transactions and implicit_transactions on are rejected without rolling back caller work. Metadata/function/scheme DDL permissions are required.
 
-Existing boundaries are omitted based on catalog state during generation. Concurrent DDL can make the plan stale. Splitting populated partitions can incur data movement, locks and log use.
+Weekly is supported and starts Monday independently of DATEFIRST; intervals must be positive. Invalid interval/type inputs produce executable error rows rather than throwing during function selection. Keep date/count products within SQL Server arithmetic and key-type limits.
+
+Candidates are converted to the partition key type before comparing with existing boundaries. Existing boundaries are omitted during generation and rechecked immediately before SPLIT. Maintenance procedures share a lock; manual DDL still needs coordination. This standalone interface can split populated data and incur data movement. Use automatic maintenance for populated-tail switch-aside recovery without historical backfill.

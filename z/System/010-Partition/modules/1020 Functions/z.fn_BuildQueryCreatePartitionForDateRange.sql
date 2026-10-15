@@ -46,7 +46,7 @@ begin
 			from sys.partition_parameters
 			where function_id = @PartitonFunctionID
 		) p
-	where DataType like 'date%' or Datatype = 'bigint'
+	where DataType in ('date', 'datetime', 'datetime2', 'smalldatetime', 'bigint')
 	if @@rowcount = 0
 	begin
 		insert into @ret(SQL)
@@ -57,7 +57,7 @@ begin
 	begin
 		select @FileGroup = name from sys.data_spaces where is_default = 1 and type_desc = 'ROWS_FILEGROUP'
 	end
-	if not exists(select * from sys.data_spaces where name = @FileGroup)
+	if not exists(select * from sys.filegroups where name = @FileGroup and type = 'FG' and is_read_only = 0)
 	begin
 		insert into @ret(SQL)
 			values('raiserror(''Could not find database file group.'', 16, 1);')
@@ -71,15 +71,20 @@ begin
 		return
 	end
 
-	if @PartitionRangeType not in ('Minute','Hourly', 'Daily', 'Weekly', 'Monthly', 'Yearly')
+	if @PartitionRangeType is null or @PartitionRangeType not in ('Minute','Hourly', 'Daily', 'Weekly', 'Monthly', 'Yearly')
 	begin
 		insert into @ret(SQL)
 			values('raiserror(''Invalid parameter @PartitionRangeType. Supported values Minute, Hourly, Daily, Weekly, Monthly, Yearly.'', 16, 1);')
 		return
 	end
 
-	select @PartitionRangeTypeInterval = abs(@PartitionRangeTypeInterval)
-	if isnull(@PartitionRangeTypeInterval, 0) is null
+	if @DataType = 'date' and @PartitionRangeType in ('Minute', 'Hourly')
+	begin
+		insert into @ret(SQL)
+			values('raiserror(''Date partition keys require Daily or coarser periods.'', 16, 1);')
+		return
+	end
+	if isnull(@PartitionRangeTypeInterval, 0) <= 0
 	begin
 		insert into @ret(SQL)
 			values('raiserror(''Invalid parameter  @PartitionRangeTypeInterval.'', 16, 1);')
@@ -88,7 +93,7 @@ begin
 	--- End validation ---
 
 	if @DateFrom is null
-		select @DateFrom = getdate()
+		select @DateFrom = getutcdate()
 
 	select	@DateFrom = z.fn_GetPeriodStart(@DateFrom, @PartitionRangeType, @PartitionRangeTypeInterval, default),
 			@DateTo = z.fn_GetPeriodStart(@DateTo, @PartitionRangeType, @PartitionRangeTypeInterval, default)
@@ -98,6 +103,7 @@ begin
 									when 'Minute' then dateadd(minute, @NumberOfPartitions * @PartitionRangeTypeInterval, @DateFrom)
 									when 'Hourly' then dateadd(hour, @NumberOfPartitions * @PartitionRangeTypeInterval, @DateFrom)
 									when 'Daily' then dateadd(day, @NumberOfPartitions * @PartitionRangeTypeInterval, @DateFrom)
+									when 'Weekly' then dateadd(week, @NumberOfPartitions * @PartitionRangeTypeInterval, @DateFrom)
 									when 'Monthly' then dateadd(month, @NumberOfPartitions * @PartitionRangeTypeInterval, @DateFrom)
 									when 'Yearly' then dateadd(year, @NumberOfPartitions * @PartitionRangeTypeInterval, @DateFrom)
 								end
@@ -110,11 +116,17 @@ begin
 		select name
 		from sys.partition_schemes 
 		where function_id = @PartitonFunctionID
+		order by name
 	open c
 
 	while @df <= @dt
 	begin
-		select @ID = case when @DataType = 'bigint' then cast(z.fn_GenerateZSequenceID(@df, 0) as sql_variant) else cast(@df as sql_variant) end
+		select @ID = case @DataType
+			when 'bigint' then convert(sql_variant, z.fn_GenerateZSequenceID(@df, 0))
+			when 'date' then convert(sql_variant, convert(date, @df))
+			when 'datetime' then convert(sql_variant, convert(datetime, @df))
+			when 'smalldatetime' then convert(sql_variant, convert(smalldatetime, @df))
+			else convert(sql_variant, @df) end
 		if not exists(
 						select * 
 						from sys.partition_range_values
@@ -134,9 +146,9 @@ begin
 			select @SQL = 'declare @ID ' + @DataType + ' = '
 						+	case @DataType
 								when 'bigint' then cast(@ID as nvarchar(100)) + ';/*'+convert(nvarchar(100), cast(@df as date), 121)+'*/'
-								else 'convert(' + @DataType + ',' + quotename(convert(nvarchar(100), cast(@ID as datetime2), 121), '''') + ', 121)'
+								else 'convert(' + @DataType + ', convert(datetime2(7),' + quotename(convert(nvarchar(100), cast(@ID as datetime2), 126), '''') + ', 126))'
 							end
-						+ ';alter partition function ' + quotename(@PartitionFunctionName) +  '() split range (@ID);'
+						+ ';if not exists(select * from sys.partition_range_values r inner join sys.partition_functions f on f.function_id = r.function_id where f.name = N' + quotename(@PartitionFunctionName, '''') + ' and r.value = @ID) alter partition function ' + quotename(@PartitionFunctionName) + '() split range (@ID);'
 			insert into @ret(SQL, Date)
 					values(@SQL, @df)
 			fetch first from c into @PartitionSchemeName
@@ -153,6 +165,7 @@ begin
 							when 'Minute' then dateadd(minute, @PartitionRangeTypeInterval, @df)
 							when 'Hourly' then dateadd(hour, @PartitionRangeTypeInterval, @df)
 							when 'Daily' then dateadd(day, @PartitionRangeTypeInterval, @df)
+							when 'Weekly' then dateadd(week, @PartitionRangeTypeInterval, @df)
 							when 'Monthly' then dateadd(month, @PartitionRangeTypeInterval, @df)
 							when 'Yearly' then dateadd(year, @PartitionRangeTypeInterval, @df)
 						end

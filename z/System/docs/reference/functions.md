@@ -127,7 +127,7 @@ create or alter function z.fn_GetPeriodStart
 returns datetime
 ```
 
-Returns datetime period start for Second, Minute, Hourly, Daily, Weekly, Monthly or Yearly. Default anchor is year 0006; Weekly depends on @@datefirst. Positive interval required but not validated. Arithmetic/return range can fail.
+Returns datetime period start for Second, Minute, Hourly, Daily, Weekly, Monthly or Yearly. Default anchor is year 0006; Weekly defaults to Monday 1900-01-01 independently of @@datefirst; an explicit StartDate anchors multiweek intervals to the Monday of its week. Positive interval required but not validated. Arithmetic/return range can fail.
 
 ## z.fn_IsAmazonRDS
 

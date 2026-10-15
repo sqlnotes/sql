@@ -4,20 +4,28 @@
 
 ## Objects and dependencies
 
-`PF_SchemaZPartitionGeneric` is a database-level bigint function, `range left`, initially no boundaries. `PS_SchemaZPartitionGeneric` places all partitions on `[Default]`. System owns these shared storage definitions and the datetime equivalents PF_SchemaZPartitionGenericDateTime and PS_SchemaZPartitionGenericDateTime. Guards preserve existing objects without checking their shape.
+System owns shared storage: `PF_SchemaZPartitionGeneric` / `PS_SchemaZPartitionGeneric` use datetime-encoded bigint and `range left`; `PF_SchemaZPartitionGenericDateTime` / `PS_SchemaZPartitionGenericDateTime` use datetime and `range right`. Both start without boundaries on the default filegroup. Guards preserve existing definitions.
 
-`z.PartitionedTableDataRetention` stores one policy per function. Shared System helpers calculate periods, encode/decode identifier boundaries, expose partition/index metadata and copy table schemas. Monitoring and Trace depend on the generic scheme; System post writes the shipped policy after all children.
+`z.PartitionedTableDataRetention` holds one policy per function. System initialization inserts missing generic policies and preserves customized rows. System supplies period/ID helpers, partition metadata and `z.usp_CopyTableSchema`. A function can affect several tables, indexes and schemes.
 
-## Generation
+## Forward maintenance
 
-The boundary builder resolves a function directly or from heap/clustered table storage, rounds dates to period starts, emits scheme `next used` and function `split range` statements for missing boundaries. Bigint boundaries use System's time encoding.
+Automatic maintenance uses UTC and adds only future period boundaries. A count of three in October means November, December and January. It does not backfill September/October into a populated catch-all after missed runs. For LEFT, the first recovery split preserves each scheme's original tail filegroup for switch-back; subsequent future splits use the policy filegroup.
 
-The retention builder adds future boundaries and selects clustered-index partitions with decoded boundaries at or before the cutoff. It creates same-schema `<Source>_Partition_yyyyMMddHHmm` targets, switches the preceding partition, optionally drops archives and emits merges.
+When the last partition contains data, one transaction creates absent `<Table>_Partition_SplitHold` tables, switches the affected tails out, adds boundaries, checks their destination range, switches them back and drops the holders. LEFT uses lower-exclusive/upper-inclusive bounds; RIGHT uses lower-inclusive/upper-exclusive bounds. Rows outside the destination range cause rollback rather than redistribution.
 
-The builder selects `IndexID = 1`; heaps are excluded. It does not comprehensively validate alignment, foreign keys or range direction. Review generated SQL against SQL Server switch requirements.
+## Expiration and compression
+
+Each expired boundary is a separate transaction: create matching targets, switch every affected heap/clustered partition, merge the boundary and drop targets when `ArchivedSwappedPartitions = 0`. With value 1, targets remain for later processing. Existing targets cause failure even when empty. Names use `<Table>_Partition_YYYYMMDD`, or `_YYYYMMDD_HHMM` for hourly/minute policies.
+
+`z.usp_CopyTableSchema` receives the exact source partition number and inherits placement and compression independently for every copied index. Indexes must be partition aligned. Maintenance does not change desired compression or move retained tables to other servers.
 
 ## Execution and concurrency
 
-The boundary procedure executes its plan in one transaction. The retention procedure uses UTC current time and executes all policies in one transaction. Both catch blocks roll back any open transaction and rethrow, including caller work.
+The maintenance executor serializes by partition function with a session application lock shared with the standalone boundary executor. Execution rejects caller transactions and implicit transactions. It regenerates metadata after each committed operation, isolates failures between functions and raises a combined error when any function fails.
 
-DDL takes schema locks and can move data in populated partitions. No feature application lock serializes maintenance. One worker per affected function is advisable; generation and execution can observe different catalog states.
+`@ShowPlan = 1` inspects metadata and returns ordered SQL without executing copies or DDL. Preview is a snapshot; execution generates a fresh plan under its lock. Manual DDL outside these procedures still needs coordination. No blocker-killing service is started.
+
+The existing job factory remains explicit. Defining or deploying it does not create or enable hourly maintenance jobs.
+
+For RIGHT expiration, the retained upper partition is also held temporarily while empty neighbors merge. The empty destination's per-index compression is restored before switching retained rows back. Adjacent partitions with different filegroups for any index are rejected before DDL because preserving that placement would require data movement. Temporary merge holders use the _Partition_MergeHold suffix and must not already exist.
