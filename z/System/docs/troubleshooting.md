@@ -26,4 +26,4 @@ Schema copy preserves identity seed/increment when requested and selects table/i
 
 ## Removal
 
-`z.usp_RemoveSchemaZ` catches and prints drop failures then retries a selected object; a persistent dependency can cause a nonprogressing loop. It is destructive and does not guarantee complete SQL Agent/Broker cleanup. It is not a deployment rollback mechanism.
+`z.usp_RemoveSchemaZ` cannot reliably complete removal of a standard installation. It attempts to drop `z.AsyncSender` without first dropping its service, `z.Async.sender`, which blocks queue removal. Its object-parent ordering does not resolve foreign-key or schema-bound dependencies; caught drop failures can retry indefinitely. User-defined types and XML schema collections are not cleaned up, and an unsupported object kind can prematurely end the loop. It drops itself before attempting the schema drop, so a final failure can leave a partially removed schema without the removal procedure. It is destructive, does not guarantee complete SQL Agent/Broker cleanup, and is not a deployment rollback mechanism.

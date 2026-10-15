@@ -9,10 +9,10 @@ shared utilities, object references, and the seven feature subsystems:
 
 - [Partition](z/System/010-Partition/docs/readme.md): boundaries and retention.
 - [Monitoring](z/System/020-Monitoring/docs/readme.md): sessions and resource information.
-- [Trace](z/System/030-Trace/docs/readme.md): SQL Trace configuration and collection.
-- [Jobs](z/System/040-Jobs/docs/readme.md): SQL Agent jobs and schedule helpers.
-- [Backup](z/System/050-Backup/docs/readme.md): backups and database snapshots.
-- [Security](z/System/060-Security/docs/readme.md): permission generators and user utilities.
+- [Trace](z/System/010-Trace/docs/readme.md): SQL Trace configuration and collection.
+- [Jobs](z/System/010-Jobs/docs/readme.md): SQL Agent jobs and schedule helpers.
+- [Backup](z/System/020-Backup/docs/readme.md): backups and database snapshots.
+- [Security](z/System/010-Security/docs/readme.md): permission generators and user utilities.
 - [Async](z/System/070-Async/docs/readme.md): Service Broker sender infrastructure.
 
 Read [deployment](z/docs/deploy.md) before running `z/Deploy.ps1`. Review each

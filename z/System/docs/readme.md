@@ -12,16 +12,16 @@ System is the shared foundation of Schema Z: identifiers, strings/dates, catalog
 
 ## Subsystems
 
-Installation visits these children in the order shown. Each has its own developer guide and object reference.
+Installation visits these children sequentially in the alphabetical order shown. Children with the same numeric prefix share an installation dependency tier and do not require installation precedence among themselves; runtime calls can still cross subsystem boundaries. Each has its own developer guide and object reference.
 
 | Subsystem | Purpose |
 | --- | --- |
+| [010-Jobs](../010-Jobs/docs/readme.md) | SQL Agent schedules and job management |
 | [010-Partition](../010-Partition/docs/readme.md) | Boundaries, schemes and retention |
+| [010-Security](../010-Security/docs/readme.md) | Login, user and permission utilities |
+| [010-Trace](../010-Trace/docs/readme.md) | Definitions, storage, collection and lifecycle |
+| [020-Backup](../020-Backup/docs/readme.md) | Backup/restore reporting and snapshots |
 | [020-Monitoring](../020-Monitoring/docs/readme.md) | Sessions, resource/space views and System Health |
-| [030-Trace](../030-Trace/docs/readme.md) | Definitions, storage, collection and lifecycle |
-| [040-Jobs](../040-Jobs/docs/readme.md) | SQL Agent schedules and job management |
-| [050-Backup](../050-Backup/docs/readme.md) | Backup/restore reporting and snapshots |
-| [060-Security](../060-Security/docs/readme.md) | Login, user and permission utilities |
 | [070-Async](../070-Async/docs/readme.md) | Service Broker configuration and conversation tracking |
 
 ## Compatibility and permissions

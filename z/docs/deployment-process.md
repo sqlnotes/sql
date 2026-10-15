@@ -10,13 +10,13 @@ Each folder visits pre → baseline → versions → modules → direct SQL file
 
 Only nonreserved children of subsystem roots become separately owned/versioned systems. Reserved names are pre, baseline, versions, modules, post, tests, docs. Descendants within a reserved stage organize that stage's files. Docs are excluded. Linked/reparse-point folders and invalid version paths are rejected.
 
-Numbered children run 010-Partition through 070-Async. System modules precede children and System post follows them.
+Children run sequentially: 010-Jobs, 010-Partition, 010-Security, 010-Trace, 020-Backup, 020-Monitoring, then 070-Async. A shared numeric prefix groups children with no installation ordering dependency among themselves; the installer still sorts their complete folder names alphabetically. System modules precede children and System post follows them.
 
 ## Baselines and identities
 
 Installed version >0.0.0 excludes the owning subsystem's entire baseline subtree, even with hash checking disabled. Unversioned/new systems at 0.0.0 remain eligible. Children without migrations can remain 0.0.0, using hashes for repeat skipping.
 
-CodeBase uses paths such as `/System/010-Partition`. SQL derives SystemID as GUID from MD5 of `trim(lower(CodeBase))`. Case/outer-space aliases share identity according to SQL normalization/collation; paths are not normalized independently by PowerShell. Renaming prefixes changes identity: keep deployed names stable.
+CodeBase uses paths such as `/System/010-Partition`. SQL derives SystemID as GUID from MD5 of `trim(lower(CodeBase))`. Case/outer-space aliases share identity according to SQL normalization/collation; paths are not normalized independently by PowerShell. Renaming a folder, including its prefix, changes identity. The renamed Trace, Jobs, Backup and Security paths therefore initialize new subsystem owners and hashes; guarded baselines become eligible under those owners. Existing metadata history remains under the former paths; the installer does not remap it or carry its version forward. Review baseline replay before updating an existing installation.
 
 ## Hashes and logs
 
