@@ -28,6 +28,7 @@ begin
 
 	if @Mode <> 'Specific'
 	begin
+		select @StartDate = isnull(@StartDate, convert(date, getdate()));
 		if isnull(@StartDate, '19900101') < '19900101' or isnull(@EndDate, '99991231') < '19900101'
 			return N'StartDate and EndDate must be on or after 1990-01-01.';
 		if isnull(@StartDate, '19900101') > isnull(@EndDate, '99991231')

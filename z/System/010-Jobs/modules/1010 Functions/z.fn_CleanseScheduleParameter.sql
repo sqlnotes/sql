@@ -23,6 +23,7 @@ Internal error: An expression services limit has been reached. Please look for p
 
 	*/
 	-- Schedule vocabulary has fixed case-insensitive semantics; identifiers and command text retain their own collation.
+	select @StartDate = isnull(@StartDate, convert(date, getdate()));
 	select @Frequency = replace(@Frequency, ' ', ''), @IntradayFrequency = replace(@IntradayFrequency, ' ', '');
 	;with x0 as
 	(

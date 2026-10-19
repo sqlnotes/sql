@@ -12,10 +12,19 @@ The database prefix is Unicode and quoted. If any complete name exceeds 128 UTF-
 
 Day vocabulary uses the same explicit case-insensitive, accent-sensitive comparison as validation and normalization. Weekly masks and relative monthly fields therefore retain the complete requested meaning in case-sensitive databases. This comparison applies to schedule words, not the database prefix or native name identity.
 
+An omitted StartDate uses the SQL Server local date; EndDate remains unlimited. Specific retains its explicit execution dates from ByDay. Returned Name rows describe the requested definition. CreateSchedule can resolve a historical every-day schedule with a different start date/name and returns its actual identity through ScheduleIDs.
+
 ## Parameters and defaults
 
 ```text
-@Frequency varchar(20) = 'Daily', @Interval int = 1, @ByDay varchar(8000) = null,@IntradayFrequency varchar(20) = 'Second', @IntradayInterval int = 10,@ByTime varchar(8000) = '00:00',@StartDate date = null,@EndDate date = null
+@Frequency varchar(20) = 'Daily',
+@Interval int = 1,
+@ByDay varchar(8000) = null,
+@IntradayFrequency varchar(20) = 'Second',
+@IntradayInterval int = 10,
+@ByTime varchar(8000) = '00:00',
+@StartDate date = null,
+@EndDate date = null
 ```
 
 These are the source-declared types and defaults. Table-valued-function callers must supply arguments or the `default` keyword explicitly.

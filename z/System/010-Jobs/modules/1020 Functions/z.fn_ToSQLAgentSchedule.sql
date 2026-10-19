@@ -13,13 +13,18 @@ returns table
 as
 return 
 (
-	with x0 as
+	with p as
 	(
-		select z.ScheduleID, z.Frequency, z.Interval, bd.value collate Latin1_General_100_CI_AS ByDay, IntradayFrequency, IntradayInterval, bt.value ByTime, StartDate, EndDate
-		from z.fn_CleanseScheduleParameter(@Frequency, @Interval, @ByDay, @IntradayFrequency, @IntradayInterval, @ByTime, @StartDate, @EndDate) z
+		select isnull(@StartDate, convert(date, getdate())) StartDate
+	),
+	x0 as
+	(
+		select z.ScheduleID, z.Frequency, z.Interval, bd.value collate Latin1_General_100_CI_AS ByDay, IntradayFrequency, IntradayInterval, bt.value ByTime, z.StartDate, EndDate
+		from p
+			cross apply z.fn_CleanseScheduleParameter(@Frequency, @Interval, @ByDay, @IntradayFrequency, @IntradayInterval, @ByTime, p.StartDate, @EndDate) z
 			outer apply string_split(z.ByDay, ',') bd
 			outer apply string_split(z.ByTime, ',') bt
-		where z.fn_ValidateScheduleParameter(@Frequency, @Interval, @ByDay, @IntradayFrequency, @IntradayInterval, @ByTime, @StartDate, @EndDate) is null
+		where z.fn_ValidateScheduleParameter(@Frequency, @Interval, @ByDay, @IntradayFrequency, @IntradayInterval, @ByTime, p.StartDate, @EndDate) is null
 	),
 	x1 as
 	(
