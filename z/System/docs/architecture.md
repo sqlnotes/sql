@@ -20,6 +20,8 @@ Naming enforcement uses explicit schema/table selectors in `z.usp_ForceNamingCon
 
 ## Transactions and concurrency
 
+Product errors use `throw`, including error scripts returned by partition builders. Explicit replacements retain error number 50000, severity 16 and their existing message text; parameterized messages are formatted before throwing. `throw` honors `xact_abort`, so validation failures can make an active caller transaction uncommittable. Partition entry guards deliberately use `xact_abort off` before rejecting a caller transaction, preserving that guard's existing transaction contract. Procedure session settings return to the caller's settings when the procedure exits.
+
 Functions/views do not start transactions or change persisted rows. Procedures vary: schema-copy execution uses its own transaction or a caller savepoint with `xact_abort on`, while `@ShowPlan = 1` returns scripts without transaction or generated-DDL execution; semaphores use caller-selected application-lock ownership; orchestration does not wrap all calls.
 
 Several catch blocks roll back any open transaction, including the caller's work. Installer serialization protects metadata, not concurrent application DDL or administrative calls. Consult each reference before nesting procedures.

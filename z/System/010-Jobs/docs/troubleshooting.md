@@ -4,11 +4,17 @@
 
 ## Diagnose current behavior
 
-Inspect the rows from z.fn_ToSQLAgentSchedule before creating a job. The Agent-start spelling normalizes to Agent Starts but the description branch tests Agent Start; the normalizer therefore returns no row for that mode. The reverse converter maps weekly bit 64 to Sunday instead of Saturday. Unsupported or incomplete input can produce no schedule rows without throwing. Start/stop detection relies on program_name patterns and is not an authoritative job-history report. Job names ultimately pass through nvarchar(128) variables even though @Name accepts 255 characters.
+Creation procedures reject an invalid schedule with error 51000 before changing jobs, categories or schedule attachments. A partially invalid list is rejected as a whole. Use z.fn_ValidateScheduleParameter to obtain the validation message; z.fn_ToSQLAgentSchedule returns no rows for invalid input. An empty conversion result is an error, not a request to remove all schedules. Agent Start is supported.
+
+A valid input can still produce no rows if the complete database-prefixed schedule name exceeds 128 UTF-16 code units. The creation error includes this name-length limit. Names are not hashed or truncated. Error 51001 means the database-local job/schedule lock could not be acquired within the allowed wait or acquisition otherwise failed; inspect competing transactions before retrying.
+
+Orphan cleanup excludes legacy global schedules and names belonging to other databases. AllOrphanedSchedules=1 is rejected. Reapplying a job attaches its new owned schedules before detaching old names; installation alone does not migrate existing Agent metadata. Preserved legacy orphans require separately scoped administrative cleanup.
+
+Start/stop detection relies on program_name patterns and is not an authoritative job-history report. The shared job-name helper returns nvarchar(128), intentionally truncating the complete database-prefixed name. Creation and lifecycle lookup use that same identity; original names with the same truncated result identify the same job.
 
 ## Permission and partial-operation failures
 
-System supplies z.fn_SplitString and semaphore acquire/release procedures. SQL Server Agent and msdb job/schedule procedures are required. The helpers do not start the Agent service.
+System supplies z.fn_SplitString. SQL Server Agent, msdb job/schedule procedures and sys.sp_getapplock are required. The helpers do not start the Agent service.
 
 Read the relevant callable reference before retrying a failed write. Some procedures roll back any open transaction, including a caller's transaction; others leave earlier operations committed. Native server resources and filesystem actions do not share a single database rollback boundary. Catalog/DMV access is evaluated on the deployed server and depends on SQL Server version and caller context.
 

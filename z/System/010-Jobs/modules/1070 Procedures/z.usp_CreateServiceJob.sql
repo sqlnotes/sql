@@ -11,20 +11,25 @@ create or alter procedure z.usp_CreateServiceJob
 	@ByTime varchar(8000) = '00:00',
 	@StartDate date = null,
 	@EndDate date = null,
-	@DeleteAfterExecution bit = 0, -- 1, job will be removed after execution
+	@DeleteAfterExecution int = 0, -- 0: never, 1: on success, 2: on failure, 3: on completion
 	@CategoryName nvarchar(50) = 'Schema z Jobs',
 	@SetJobOwnerToSA bit = 1
 )
 as
 begin
 	set nocount, xact_abort on
-	declare @IntervalLocal int = @Interval, @ScheduleNames varchar(max), @JobID uniqueidentifier, @JobName nvarchar(128), @StepName nvarchar(128), @FirstStep nvarchar(max), @DatabaseName nvarchar(128) = db_name(), 
-			@AutomaticRemoveJobAfterExecution int =  case when isnull(@DeleteAfterExecution, 0) = 1 then 3 else 0 end, @ScheduleName nvarchar(128), @Operation char(1), @SAName nvarchar(128)
+	declare @IntervalLocal int = @Interval, @ScheduleNames nvarchar(max), @JobID uniqueidentifier, @JobName nvarchar(128), @StepName nvarchar(128), @FirstStep nvarchar(max), @DatabaseName nvarchar(128) = db_name(),
+			@ScheduleName nvarchar(128), @Operation char(1), @SAName nvarchar(128), @Resource nvarchar(255) = z.fn_ResourceSQLScheduleOperation(), @LockResult int, @RebuildSteps bit = 0, @IsNewJob bit = 0
 	if @Name is null or @Command is null
 	begin
-		raiserror('@Name and @Command must not be null.', 16, 1)
-		return
+		throw 50000, '@Name and @Command must not be null.', 1;
 	end
+	if @DeleteAfterExecution is null or @DeleteAfterExecution not between 0 and 3
+		throw 51000, '@DeleteAfterExecution must be 0 (never), 1 (on success), 2 (on failure), or 3 (on completion).', 1;
+	declare @ValidationError nvarchar(4000) = z.fn_ValidateScheduleParameter(@Frequency, @Interval, @ByDay, @IntradayFrequency, @IntradayInterval, @ByTime, @StartDate, @EndDate);
+	if @ValidationError is not null throw 51000, @ValidationError, 1;
+	if not exists(select * from z.fn_ToSQLAgentSchedule(@Frequency, @Interval, @ByDay, @IntradayFrequency, @IntradayInterval, @ByTime, @StartDate, @EndDate))
+		throw 51000, 'The schedule definition did not produce any schedules; database-prefixed schedule names must fit the 128-character limit.', 1;
 	create table #Steps
 	(
 		step_id int,step_name nvarchar(128), subsystem nvarchar(40), command nvarchar(max), flags int, 
@@ -56,22 +61,25 @@ begin
 	end catch
 
 	select	@JobName = z.fn_GetServiceJobName(@Name),
-			@FirstStep = 'declare @DatabaseName nvarchar(128) = ' + quotename(@DatabaseName, '''')+ '
-if not (
-			databasepropertyex(@DatabaseName, ''IsInStandBy'') = 0 and databasepropertyex(@DatabaseName, ''Status'') = ''ONLINE''  
-		and databasepropertyex(@DatabaseName, ''UserAccess'') = ''MULTI_USER'' and databasepropertyex(@DatabaseName, ''Updateability'') = ''READ_WRITE''
-	)
+			@FirstStep = 'declare @DatabaseName nvarchar(128) = N' + quotename(@DatabaseName, '''')+ ';
+if isnull(databasepropertyex(@DatabaseName, ''IsInStandBy''), 1) <> 0
+	or isnull(databasepropertyex(@DatabaseName, ''Status''), '''') <> ''ONLINE''
+	or isnull(databasepropertyex(@DatabaseName, ''UserAccess''), '''') <> ''MULTI_USER''
+	or isnull(databasepropertyex(@DatabaseName, ''Updateability''), '''') <> ''READ_WRITE''
 begin
-	raiserror(''Job should not be running on this node.'', 16, 1)
+	throw 50000, ''Job should not be running on this node.'', 1;
 end
 '
 	select @StepName = @JobName
 	begin try
 	begin tran
+	exec @LockResult = sys.sp_getapplock @Resource = @Resource, @LockMode = N'Exclusive', @LockOwner = N'Transaction', @LockTimeout = 15000;
+	if @LockResult < 0 throw 51001, 'Could not acquire the database schedule operation lock.', 1;
 	exec z.usp_CreateSchedule @Frequency = @Frequency, @Interval = @Interval, @ByDay = @ByDay, @IntradayFrequency = @IntradayFrequency, @IntradayInterval = @IntradayInterval, @ByTime = @ByTime, @StartDate = @StartDate, @EndDate = @EndDate, @ScheduleNames = @ScheduleNames output
+	if nullif(@ScheduleNames, '') is null throw 51000, 'The schedule definition did not produce any schedules; database-prefixed schedule names must fit the 128-character limit.', 1;
 	insert into #ScheduleNames(ScheduleName)
-		select value
-		from string_split(@ScheduleNames, ',')
+		select Name
+		from z.fn_ToSQLAgentSchedule(@Frequency, @Interval, @ByDay, @IntradayFrequency, @IntradayInterval, @ByTime, @StartDate, @EndDate)
 
 	
 	select @JobID = (select job_id from msdb.dbo.sysjobs where name = @JobName)
@@ -81,35 +89,62 @@ end
 			exec msdb..sp_help_jobschedule @job_name = @JobName
 		insert into #Steps
 			exec msdb..sp_help_jobstep @job_name = @JobName
-		if exists(
-					select * 
-					from #Steps 
-					where step_id = 1
-						and command <> @FirstStep
-				)
+		if exists(select * from #Steps where step_id not in (1, 2))
+			throw 51000, 'The existing job has additional steps; remove them explicitly before reapplying its definition.', 1;
+		if not exists(select * from #Steps where step_id = 1) or not exists(select * from #Steps where step_id = 2)
 		begin
-			exec msdb.dbo.sp_update_jobstep @job_id = @JobID, @step_id = 1, @command  = @FirstStep
+			-- Rebuild together: inserting a missing first step can renumber the surviving step.
+			exec msdb.dbo.sp_delete_jobstep @job_id = @JobID, @step_id = 0
+			select @RebuildSteps = 1
 		end
-		if exists(
-					select * 
-					from #Steps 
-					where step_id = 2
-						and command <> @Command
-				)
+		else
 		begin
-			exec msdb.dbo.sp_update_jobstep @job_id = @JobID, @step_id = 2, @command  = @Command
+			-- Free a desired name first if the two existing step names were swapped.
+			declare @TemporaryStepName nvarchar(128) = N'Schema z repair ' + convert(nvarchar(36), newid()),
+					@TemporaryOtherStepName nvarchar(128) = N'Schema z repair ' + convert(nvarchar(36), newid());
+			if exists(select * from #Steps where step_id = 2 and step_name = N'Check Database Status')
+				exec msdb.dbo.sp_update_jobstep @job_id = @JobID, @step_id = 2, @step_name = @TemporaryStepName
+			if exists(select * from #Steps where step_id = 1 and step_name = @StepName)
+				exec msdb.dbo.sp_update_jobstep @job_id = @JobID, @step_id = 1, @step_name = @TemporaryOtherStepName
+			exec msdb.dbo.sp_update_jobstep @job_id = @JobID, @step_id = 1, @step_name = N'Check Database Status', @cmdexec_success_code = 0,
+				 @on_success_action = 3, @on_success_step_id = 0, @on_fail_action = 1, @on_fail_step_id = 0, @retry_attempts = 0, @retry_interval = 0,
+				 @os_run_priority = 0, @subsystem = N'TSQL', @database_name = N'master', @flags = 0
+			exec msdb.dbo.sp_update_jobstep @job_id = @JobID, @step_id = 2, @step_name = @StepName, @cmdexec_success_code = 0,
+				 @on_success_action = 1, @on_success_step_id = 0, @on_fail_action = 2, @on_fail_step_id = 0, @retry_attempts = 0, @retry_interval = 0,
+				 @os_run_priority = 0, @subsystem = N'TSQL', @database_name = @DatabaseName, @flags = 0
+			if exists(
+						select *
+						from #Steps
+						where step_id = 1
+							and command <> @FirstStep
+					)
+			begin
+				exec msdb.dbo.sp_update_jobstep @job_id = @JobID, @step_id = 1, @command  = @FirstStep
+			end
+			if exists(
+						select *
+						from #Steps
+						where step_id = 2
+							and command <> @Command
+					)
+			begin
+				exec msdb.dbo.sp_update_jobstep @job_id = @JobID, @step_id = 2, @command  = @Command
+			end
 		end
-		
 	end
 	else
 	begin
 		-- create a job without schedule defined
-		exec msdb.dbo.sp_add_job @job_name= @JobName, @enabled = 1, @notify_level_eventlog = 0, @notify_level_email = 0, @notify_level_netsend = 0, @notify_level_page = 0, @delete_level = @AutomaticRemoveJobAfterExecution, @description = @Description, @category_name = @CategoryName, @owner_login_name = null, @job_id = @JobID output
+		exec msdb.dbo.sp_add_job @job_name= @JobName, @enabled = 1, @notify_level_eventlog = 0, @notify_level_email = 0, @notify_level_netsend = 0, @notify_level_page = 0, @delete_level = @DeleteAfterExecution, @description = @Description, @category_name = @CategoryName, @owner_login_name = null, @job_id = @JobID output
+		select @RebuildSteps = 1, @IsNewJob = 1
+	end
+	if @RebuildSteps = 1
+	begin
 		exec msdb.dbo.sp_add_jobstep @job_id = @JobID, @step_name = 'Check Database Status', @step_id = 1, @cmdexec_success_code = 0, @on_success_action = 3, @on_success_step_id = 0, @on_fail_action = 1, @on_fail_step_id = 0, @retry_attempts = 0, @retry_interval = 0, @os_run_priority = 0, @subsystem=N'TSQL', @command = @FirstStep, @database_name=N'master', @flags=0
 		exec msdb.dbo.sp_add_jobstep @job_id = @JobID, @step_name = @StepName, @step_id = 2, @cmdexec_success_code = 0,  @on_success_action = 1, @on_success_step_id = 0, @on_fail_action = 2, @on_fail_step_id = 0, @retry_attempts = 0, @retry_interval = 0, @os_run_priority = 0, @subsystem = N'TSQL', @command = @Command, @database_name = @DatabaseName, @flags=0
-		exec msdb.dbo.sp_add_jobserver @job_id = @JobID, @server_name = N'(local)'
-		exec msdb.dbo.sp_update_job @job_id = @JobID, @start_step_id = 1		
 	end
+	if @IsNewJob = 1 exec msdb.dbo.sp_add_jobserver @job_id = @JobID, @server_name = N'(local)'
+	exec msdb.dbo.sp_update_job @job_id = @JobID, @start_step_id = 1, @description = @Description, @category_name = @CategoryName, @delete_level = @DeleteAfterExecution
 	-- put it here for now.
 	if is_srvrolemember('sysadmin') = 1 and @SetJobOwnerToSA = 1
 	begin
@@ -131,13 +166,14 @@ end
 		from #ScheduleNames a
 			full outer join #JobSchedule b on a.ScheduleName = b.schedule_name
 		where isnull(a.ScheduleName, '') <> isnull(b.schedule_name, '')
+		order by Operation desc -- Attach the replacement schedules before detaching the previous ones.
 	open c
 	fetch next from c into @ScheduleName, @Operation
 	while @@fetch_status = 0
 	begin
 		if @Operation = 'D'
 		begin
-			exec msdb.dbo.sp_detach_schedule @job_id = @JobID, @schedule_name = @ScheduleName
+			exec msdb.dbo.sp_detach_schedule @job_id = @JobID, @schedule_name = @ScheduleName, @delete_unused_schedule = 0
 		end
 		if @Operation = 'I'
 		begin

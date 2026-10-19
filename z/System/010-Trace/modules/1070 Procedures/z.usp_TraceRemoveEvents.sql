@@ -7,13 +7,12 @@ create or alter procedure z.usp_TraceRemoveEvents
 )
 as
 begin
-	set nocount, xact_abort on
+	set nocount, xact_abort on;
 	if @TraceName is null and @TraceID is null
 	begin
-		raiserror('Either @TraceName or @TraceID must be provided', 16, 1)
-		return;
+		throw 50000, N'Either @TraceName or @TraceID must be provided', 1;
 	end
-	declare @Error varchar(8000), @EventID int, @ColumnID int
+	declare @Error nvarchar(2048), @EventID int, @ColumnID int
 	declare @Events table(EventID int primary key with(ignore_dup_key=on))
 	begin try
 	insert into @Events(EventID)
@@ -33,10 +32,13 @@ begin
 	end
 	end try
 	begin catch
-		select @Error = 'Please ensure you use "select TraceEventID from  z.v_TraceEvent where ..." as TraceEventQuery
-' + isnull(error_message(), '')
-		raiserror(@Error, 16, 1)
-		return
+		select @Error = N'Please ensure you use "select TraceEventID from  z.v_TraceEvent where ..." as TraceEventQuery
+' + isnull(error_message(), N'');
+		-- Bound the escaped THROW message without splitting a doubled percent.
+		while datalength(replace(convert(nvarchar(max), @Error), N'%', N'%%')) > 4096
+			select @Error = left(@Error, len(@Error) - 1);
+		select @Error = replace(@Error, N'%', N'%%');
+		throw 50000, @Error, 1;
 	end catch
 	if not exists(select 1 from @Events)
 	begin

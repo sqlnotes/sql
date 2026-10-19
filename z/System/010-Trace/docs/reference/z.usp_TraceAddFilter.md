@@ -16,7 +16,7 @@ These are the source-declared types and defaults.
 
 ## Results, permissions, and limits
 
-No defined result set. Requires ALTER TRACE; errors use raiserror or native failures. No explicit transaction. A filter does not start a trace.
+No defined result set. Requires ALTER TRACE; errors use throw or native failures. No explicit transaction. A filter does not start a trace.
 
 ## Dependencies
 

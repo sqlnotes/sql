@@ -15,10 +15,11 @@ return
 (
 	with x0 as
 	(
-		select z.ScheduleID, z.Frequency, z.Interval, bd.value ByDay, IntradayFrequency, IntradayInterval, bt.value ByTime, StartDate, EndDate
+		select z.ScheduleID, z.Frequency, z.Interval, bd.value collate Latin1_General_100_CI_AS ByDay, IntradayFrequency, IntradayInterval, bt.value ByTime, StartDate, EndDate
 		from z.fn_CleanseScheduleParameter(@Frequency, @Interval, @ByDay, @IntradayFrequency, @IntradayInterval, @ByTime, @StartDate, @EndDate) z
 			outer apply string_split(z.ByDay, ',') bd
 			outer apply string_split(z.ByTime, ',') bt
+		where z.fn_ValidateScheduleParameter(@Frequency, @Interval, @ByDay, @IntradayFrequency, @IntradayInterval, @ByTime, @StartDate, @EndDate) is null
 	),
 	x1 as
 	(
@@ -106,8 +107,15 @@ return
 		from x1
 		group by case when x1.freq_type = 8 then cast(x1.freq_type as varchar) else cast(x1.freq_type as varchar) + '-' + cast(x1.freq_interval as varchar) end,
 			x1.freq_type, x1.freq_subday_type, x1.freq_subday_interval, x1.freq_relative_interval, x1.freq_recurrence_factor, x1.active_start_date, x1.active_end_date, x1.active_start_time, x1.active_end_time
-	)
-	select	cast('Schema z: ' + cast(x2.freq_type as varchar(1000)) + '-' + cast(x2.freq_interval as varchar(1000)) + '-' + cast(x2.freq_subday_type as varchar(1000)) + '-' + cast(x2.freq_subday_interval as varchar(1000)) + '-' + cast(x2.freq_relative_interval as varchar(1000)) + '-' + cast(x2.freq_recurrence_factor as varchar(1000)) + '-' + cast(x2.active_start_date as varchar(1000)) + '-' + cast(x2.active_end_date as varchar(1000)) + '-' + cast(x2.active_start_time as varchar(1000)) + '-' + cast(x2.active_end_time as varchar(1000)) as varchar(128)) as Name,
+	),
+	x3 as
+	(
+		select z.fn_GetScheduleNamePrefix() + convert(nvarchar(1000), x2.freq_type) + N'-' + convert(nvarchar(1000), x2.freq_interval) + N'-' + convert(nvarchar(1000), x2.freq_subday_type) + N'-' + convert(nvarchar(1000), x2.freq_subday_interval) + N'-' + convert(nvarchar(1000), x2.freq_relative_interval) + N'-' + convert(nvarchar(1000), x2.freq_recurrence_factor) + N'-' + convert(nvarchar(1000), x2.active_start_date) + N'-' + convert(nvarchar(1000), x2.active_end_date) + N'-' + convert(nvarchar(1000), x2.active_start_time) + N'-' + convert(nvarchar(1000), x2.active_end_time) FullName,
 			x2.freq_type, x2.freq_interval, x2.freq_subday_type, x2.freq_subday_interval, x2.freq_relative_interval, x2.freq_recurrence_factor, x2.active_start_date, x2.active_end_date, x2.active_start_time, x2.active_end_time
-	from x2
+		from x2
+	)
+	select convert(nvarchar(128), x3.FullName) Name,
+		x3.freq_type, x3.freq_interval, x3.freq_subday_type, x3.freq_subday_interval, x3.freq_relative_interval, x3.freq_recurrence_factor, x3.active_start_date, x3.active_end_date, x3.active_start_time, x3.active_end_time
+	from x3
+	where not exists(select * from x3 where datalength(FullName) > 256)
 )

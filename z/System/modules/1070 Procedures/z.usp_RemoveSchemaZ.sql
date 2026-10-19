@@ -7,8 +7,7 @@ begin
 	set nocount on
 	if isnull(@Confirm, 0) = 0
 	begin
-		raiserror('Please confirm removing z schema by passing value 1', 16, 1)
-		return
+		throw 50000, 'Please confirm removing z schema by passing value 1', 1;
 	end
 	declare @SQL nvarchar(max)	
 	declare c cursor local local for

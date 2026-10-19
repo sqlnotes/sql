@@ -154,8 +154,7 @@ drop table ' + @Target + N';
 		insert into @Ret(Name, SQL, Action, PartitionNumber) values('Extend future boundaries', N'if @@trancount > 0 or @@options & 2 = 2
 begin
 	set xact_abort off;
-	raiserror(''Partition maintenance requires no caller or implicit transaction.'', 16, 1);
-	return;
+	throw 50000, N''Partition maintenance requires no caller or implicit transaction.'', 1;
 end
 set xact_abort on;
 begin try
@@ -273,8 +272,7 @@ drop table ' + @MergeTarget + N';
 		insert into @Ret(Name, SQL, Action, PartitionNumber) values('Partition Swapout boundary ' + convert(varchar(40), @BoundaryDate, 126), N'if @@trancount > 0 or @@options & 2 = 2
 begin
 	set xact_abort off;
-	raiserror(''Partition maintenance requires no caller or implicit transaction.'', 16, 1);
-	return;
+	throw 50000, N''Partition maintenance requires no caller or implicit transaction.'', 1;
 end
 set xact_abort on;
 begin try

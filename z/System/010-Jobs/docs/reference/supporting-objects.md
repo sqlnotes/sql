@@ -34,7 +34,7 @@ Name nvarchar(255) -> uniqueidentifier: visible msdb job with z.fn_GetServiceJob
 
 [Source](../../modules/1010%20Functions/z.fn_GetServiceJobName.sql)
 
-Name nvarchar(255) -> nvarchar(255): z_ + parenthesized current database + _ + Name; read-only.
+Name nvarchar(255) -> nvarchar(128): z_ + parenthesized current database + _ + Name; read-only. The complete name intentionally uses native nvarchar(128) truncation. Names differing only beyond that limit identify the same job; no collision check or hash is added.
 
 ### Parameters and defaults
 
@@ -56,7 +56,7 @@ None.
 
 [Source](../../modules/1010%20Functions/z.fn_ResourceSQLScheduleOperation.sql)
 
-No inputs -> nvarchar(100): constant z.fn_ResourceSQLScheduleOperation used as shared semaphore resource.
+No inputs -> nvarchar(100): constant z.fn_ResourceSQLScheduleOperation used by the database-local exclusive transaction-owned job/schedule application lock.
 
 ### Parameters and defaults
 

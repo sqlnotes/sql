@@ -4,7 +4,7 @@
 
 ## Purpose and behavior
 
-Change only stopped selected traces; require Name or ID. Query parameters execute caller-supplied SQL returning IDs. Comma-list names use substring LIKE matching. Add supported columns to currently selected events; column 12 is excluded from added column list. Query/list results are combined with duplicate IDs ignored. Selection query errors become explanatory raiserror messages. Native changes loop without an explicit transaction.
+Change only stopped selected traces; require Name or ID. Query parameters execute caller-supplied SQL returning IDs. Comma-list names use substring LIKE matching. Add supported columns to currently selected events; column 12 is excluded from added column list. Query/list results are combined with duplicate IDs ignored. Selection query errors become explanatory throw messages. Native changes loop without an explicit transaction.
 
 ## Parameters and defaults
 

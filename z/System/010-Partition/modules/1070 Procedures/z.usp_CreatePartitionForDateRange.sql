@@ -16,8 +16,7 @@ begin
 	if @ShowPlan is null
 	begin
 		set xact_abort off;
-		raiserror('ShowPlan must be specified.', 16, 1);
-		return;
+		throw 50000, N'ShowPlan must be specified.', 1;
 	end
 	if @ShowPlan = 1
 	begin
@@ -44,8 +43,7 @@ begin
 	if @@trancount > 0 or (@@options & 2) = 2
 	begin
 		set xact_abort off;
-		raiserror('Partition maintenance requires no caller transaction and implicit_transactions off.', 16, 1);
-		return;
+		throw 50000, N'Partition maintenance requires no caller transaction and implicit_transactions off.', 1;
 	end
 	set xact_abort on;
 	declare @SQL nvarchar(max), @FunctionName sysname, @Resource nvarchar(255), @LockResult int, @LockHeld bit = 0;

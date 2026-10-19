@@ -8,7 +8,7 @@ begin
 	declare  @JobID uniqueidentifier 
 	select @JobID = JobID
 	from z.v_ServiceJobs
-	where ServiceName = @Name 
+	where JobID = z.fn_GetServiceJobID(@Name)
 		and IsExecuting = 1
 	if @@rowcount > 0
 	begin

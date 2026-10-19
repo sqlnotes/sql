@@ -15,8 +15,43 @@ select *
 from z.fn_ToSQLAgentSchedule('Daily', 1, null, 'Minute', 15, '08:00-17:00', default, default);
 ```
 
-Schedules are shared server objects. Creating/removing jobs and schedules changes msdb. Returned normalization rows describe the translation, not proof that SQL Agent accepted or executed it.
+Schedules reside in msdb and are logically database-scoped by name. Jobs in the same database can reuse a schedule; different databases receive separate names. Creating/removing jobs and schedules changes msdb. Returned normalization rows describe the translation, not proof that SQL Agent accepted or executed it.
+
+## Job names
+
+The complete job name is `z_(DatabaseName)_Name`, returned as `nvarchar(128)`. Overlength names are silently truncated. Creation, lookup, start/stop, enable/disable and removal use the same truncated identity. Two input names with the same truncated result refer to the same job. The original input can contain up to 255 UTF-16 units; the database prefix consumes part of the stored name's 128-unit capacity.
+
+## Job updates and automatic deletion
+
+Reapplying a job definition updates its non-NULL description/category and deletion mode, restores the two managed steps and starts with the database guard. A manually disabled job remains disabled. If either managed step is missing, both are rebuilt; additional custom steps cause an error and must be removed explicitly before reapplying.
+
+`@DeleteAfterExecution` accepts the native SQL Agent values:
+
+| Value | Delete the job |
+| --- | --- |
+| 0 | Never (default) |
+| 1 | When it succeeds |
+| 2 | When it fails |
+| 3 | When it completes, regardless of outcome |
+
+The former bit value 1 meant completion; use 3 to retain that behavior. Guard rejection currently ends the job reporting success, so modes 1 and 3 also apply to a guarded skip.
 
 ## Schedule vocabulary
 
-Use Daily, Weekly, Monthly, Specific or Idle. Agent-start conversion currently has a known defect. Interval is the day/week/month recurrence count. ByDay is comma-separated weekday names for Weekly, month numbers 1..31 or relative phrases such as First Monday for Monthly, and date-time values for Specific. IntradayFrequency is Hourly, Minute, Second or Specific. ByTime accepts comma-separated HH:mm[:ss] times or time ranges; repeating schedules use ranges, Specific intraday uses times. A lone repeating start time is expanded through one second before that time, potentially representing an overnight/full-day window; inspect native output rather than assuming cross-midnight support. SQL Agent remains the final validator.
+Use Daily, Weekly, Monthly, Specific, Agent Start or Idle. Interval is the day/week/month recurrence count. ByDay is comma-separated weekday names for Weekly, month numbers 1..31 or relative phrases such as First Monday for Monthly, and date-time values for Specific. IntradayFrequency is Hourly, Minute, Second or Specific. ByTime accepts comma-separated HH:mm[:ss] times or time ranges; repeating schedules use ranges, Specific intraday uses times. A lone repeating start time is expanded through one second before that time, potentially representing an overnight/full-day window; inspect native output rather than assuming cross-midnight support. Explicit reversed ranges are rejected. SQL Agent remains the final validator.
+
+Schedule keywords are case-insensitive and accent-sensitive regardless of database collation. For example, Weekly with Monday,tuesday retains both days, and monthly THIRD WEEKDAY has the same meaning as Third Weekday. Database names and the user command are preserved with their original text.
+
+Invalid relevant inputs, including any invalid or empty list member, reject the complete definition. The creation procedures raise error 51000 before changing existing jobs or schedules. To inspect the diagnostic without making changes, call z.fn_ValidateScheduleParameter with the same eight schedule arguments; NULL means validation succeeded. Parameters unused by the selected frequency retain their existing ignored behavior; Specific derives its execution dates from ByDay and ignores supplied StartDate and EndDate. Manual-only job creation is not inferred from an empty or invalid schedule.
+
+## Existing schedule changes
+
+Schedule names encode all ten timing fields. Reusing a name requires those fields to match the requested definition. If a schedule was edited without being renamed, creation raises error 51000 identifying it before creating any requested schedules. Restore its timing settings or rename it before retrying; other jobs may share it. A matching schedule that was manually disabled remains disabled.
+
+## Database ownership and transition
+
+Schedule names include the quoted current database, for example `Schema z: [MyDatabase]: <native fields>`. The entire name must fit 128 UTF-16 code units. Overlength names reject the complete definition instead of truncating it. Unicode and commas in database names are preserved; consume Name rows from z.fn_ToSQLAgentSchedule rather than splitting the legacy comma-joined ScheduleNames output.
+
+Reapply a job definition to move an existing job from shared legacy schedules to its database-owned schedules. New attachments are established before old ones are detached; unused legacy schedules are retained. Orphan cleanup removes only the current database's unattached prefixed schedules. AllOrphanedSchedules=1 now raises an error; global and legacy cleanup require separate administrative handling.
+
+The four definition/removal/cleanup procedures share a database-local exclusive transaction lock. A competing call waits up to 15 seconds, then raises error 51001 if acquisition fails. The lock is held until the outer transaction ends. Renaming a database changes its schedule prefix and requires explicitly reapplying definitions; existing Agent metadata is not automatically renamed.

@@ -4,7 +4,13 @@
 
 ## Purpose and behavior
 
-Eight shared schedule inputs -> Name varchar(128) and ten native integer schedule fields. Split requested days/times into combinations, consolidate weekly bitmasks, and derive deterministic Schema z: names. Read-only; inspect returned fields before use.
+Eight shared schedule inputs -> Name nvarchar(128) and ten native integer schedule fields. Split requested days/times into combinations, consolidate weekly bitmasks, and derive deterministic `Schema z: [DatabaseName]: <native fields>` names through z.fn_GetScheduleNamePrefix. Read-only; inspect returned fields before use.
+
+Invalid input returns no rows; no valid subset is emitted from a partially invalid list. Call z.fn_ValidateScheduleParameter with the same arguments for the diagnostic. The creation procedures raise that diagnostic as an error before modifying Agent metadata.
+
+The database prefix is Unicode and quoted. If any complete name exceeds 128 UTF-16 code units, the entire conversion returns no rows; names are never truncated. Input validation can succeed while the combined name is too long. Shorten the database name or use a shorter definition; job creation reports the name-length limit. Names are database-specific, while schedules can be reused by jobs in the same database.
+
+Day vocabulary uses the same explicit case-insensitive, accent-sensitive comparison as validation and normalization. Weekly masks and relative monthly fields therefore retain the complete requested meaning in case-sensitive databases. This comparison applies to schedule words, not the database prefix or native name identity.
 
 ## Parameters and defaults
 
@@ -20,6 +26,6 @@ No writes or explicit transaction. Requires function access; schedule conversion
 
 ## Dependencies
 
-Direct SQL object dependencies: `z.ByDay`, `z.ByTime`, `z.Frequency`, `z.Interval`, `z.ScheduleID`, `z.fn_CleanseScheduleParameter`.
+Direct SQL object dependencies: `z.fn_GetScheduleNamePrefix`, `z.fn_ValidateScheduleParameter`, `z.fn_CleanseScheduleParameter`.
 
 See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for subsystem-wide constraints.

@@ -10,44 +10,39 @@ create or alter procedure z.usp_TraceAddFilter
 )
 as
 begin
-	set nocount, xact_abort on
+	set nocount, xact_abort on;
 	if @Value is null
 		return
-	declare @LogicOperatorInt int, @ComparisonOperatorInt int
+	declare @LogicOperatorInt int, @ComparisonOperatorInt int;
 
 	if @TraceID is null and @TraceName is null
 	begin
-		raiserror('Either @TraceName or @TraceID must be provided', 16, 1)
-		return
+		throw 50000, N'Either @TraceName or @TraceID must be provided', 1;
 	end
 
 	if @ColumnName is null and @ColumnID is null
 	begin
-		raiserror('Either @ColumnName or @ColumnID must be provided', 16, 1)
-		return
+		throw 50000, N'Either @ColumnName or @ColumnID must be provided', 1;
 	end
 
 	select @TraceID = TraceID
 	from z.v_Trace
 	where (@TraceID is null or TraceID = @TraceID)
 		and (@TraceName is null or Name = @TraceName)
-		and Status = 'Stopped'
+		and Status = 'Stopped';
 	if @@rowcount = 0
 	begin
-		raiserror('No stopped trace found', 16, 1)
-		return
+		throw 50000, N'No stopped trace found', 1;
 	end
 
 	if @LogicOperator not in ('and', 'or')
 	begin
-		raiserror('@LogicOperator must be and, or.', 16, 1)
-		return
+		throw 50000, N'@LogicOperator must be and, or.', 1;
 	end
-	select @ComparisonOperator = replace(@ComparisonOperator, ' ', '')
+	select @ComparisonOperator = replace(@ComparisonOperator, ' ', '');
 	if @ComparisonOperator not in ('=', '!=', '<>', '>', '<', '>=', '<=', 'like', 'notlike')
 	begin
-		raiserror('@LogicOperator must be =, !=, <>, >, <, >=, <=, like, not like.', 16, 1)
-		return
+		throw 50000, N'@LogicOperator must be =, !=, <>, >, <, >=, <=, like, not like.', 1;
 	end
 	declare @SQL nvarchar(max)
 	select	@ColumnID = ColumnID, @ColumnName = ColumnName,

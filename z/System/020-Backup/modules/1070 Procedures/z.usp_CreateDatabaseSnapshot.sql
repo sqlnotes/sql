@@ -9,14 +9,13 @@ begin
 	select @SourceDatabaseName = db_name(db_id(isnull(@SourceDatabaseName, db_name())))
 	if @SourceDatabaseName is null
 	begin
-		raiserror('Could not find source database.', 16, 1)
-		return
+		throw 50000, 'Could not find source database.', 1;
 	end
 	select @DatabaseSnapshotName = isnull(@DatabaseSnapshotName, @SourceDatabaseName + '_Snapshot')
 	if db_id(@DatabaseSnapshotName) is not null
 	begin
-		raiserror('Database %s already exists.', 16, 1, @DatabaseSnapshotName)
-		return
+		declare @Error nvarchar(2048) = replace(formatmessage(N'Database %s already exists.', @DatabaseSnapshotName), N'%', N'%%');
+		throw 50000, @Error, 1;
 	end
 	
 	declare @SQL nvarchar(max), @Proc sysname = quotename(@SourceDatabaseName)+'..sp_executesql'
@@ -25,8 +24,7 @@ begin
 		exec @Proc N'select name, physical_name from sys.database_files where type = 0'
 	if @@rowcount = 0
 	begin
-		raiserror('Unknown error.', 16, 1)
-		return
+		throw 50000, 'Unknown error.', 1;
 	end
 
 	select @SQL = 'create database '+ quotename(@DatabaseSnapshotName) + ' on '

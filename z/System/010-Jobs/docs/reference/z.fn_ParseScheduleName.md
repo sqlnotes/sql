@@ -4,12 +4,12 @@
 
 ## Purpose and behavior
 
-ScheduleName varchar(128) -> normalized schedule columns. Require Schema z: prefix and ten hyphen-separated integer fields; parse through System z.fn_SplitString and z.fn_FromSQLAgentSchedule. Malformed names can return no rows; invalid dates can throw.
+ScheduleName nvarchar(128) -> normalized schedule columns. Accept legacy `Schema z: <native fields>` and database-prefixed `Schema z: [DatabaseName]: <native fields>` names. Validate quoted database-name delimiters, then parse ten hyphen-separated integer fields through System z.fn_SplitString and z.fn_FromSQLAgentSchedule. Names from another database can be inspected. Malformed names can return no rows; invalid dates can throw.
 
 ## Parameters and defaults
 
 ```text
-@ScheduleName varchar(128)
+@ScheduleName nvarchar(128)
 ```
 
 These are the source-declared types and defaults. Table-valued-function callers must supply arguments or the `default` keyword explicitly.

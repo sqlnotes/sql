@@ -41,7 +41,7 @@ return
 							case when @freq_interval & 8 = 8 then ',WednesDay' else '' end + 
 							case when @freq_interval & 16 = 16 then ',Thursday' else '' end + 
 							case when @freq_interval & 32 = 32 then ',Friday' else '' end + 
-							case when @freq_interval & 64 = 64 then ',Sunday' else '' end
+							case when @freq_interval & 64 = 64 then ',Saturday' else '' end
 						, 1, 1, '')--Weekly
 				when 16 then cast(@freq_interval as varchar(100))
 				when 32 then --'Monthly relative'

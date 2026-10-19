@@ -13,8 +13,7 @@ begin
 	declare @BackupPath nvarchar(4000), @SQL nvarchar(max), @DatabaseName nvarchar(128), @StandardizedDatabaseName nvarchar(128), @FolderSeparator varchar(1), @BackupFileName nvarchar(4000)
 	if @BackupType not in ('Full', 'Log', 'Diff')
 	begin
-		raiserror('@BackupType must be Full, Log, or Diff', 16, 1)
-		return
+		throw 50000, '@BackupType must be Full, Log, or Diff', 1;
 	end
 	if @BackupCompression is null
 		select @BackupCompression = isnull((select cast(value as int) from sys.configurations where name = 'backup compression default'), 0)
@@ -54,8 +53,7 @@ begin
 	end
 	if @BackupFolder is null
 	begin
-		raiserror('Please specify backup folder', 16, 1)
-		return
+		throw 50000, 'Please specify backup folder', 1;
 	end
 
 	select @BackupFolder = rtrim(@BackupFolder), @FolderSeparator = iif(@@version like '%linux%', '/', '\'), @BackupType = upper(@BackupType), @RetentionHours = abs(@RetentionHours)

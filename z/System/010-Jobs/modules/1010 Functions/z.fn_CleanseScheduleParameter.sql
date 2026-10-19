@@ -22,24 +22,26 @@ Msg 8632, Level 17, State 8, Line 100
 Internal error: An expression services limit has been reached. Please look for potentially complex expressions in your query, and try to simplify them.
 
 	*/
+	-- Schedule vocabulary has fixed case-insensitive semantics; identifiers and command text retain their own collation.
+	select @Frequency = replace(@Frequency, ' ', ''), @IntradayFrequency = replace(@IntradayFrequency, ' ', '');
 	;with x0 as
 	(
 		select 
 				case 
 					--when @Frequency is null then 'Daily'
-					when @Frequency like '%specific%' or @Frequency like '%custom%'  or @Frequency like '%adhoc%' or @Frequency like '%one%'  or @Frequency like '%onc%' then 'Specific'
-					when @Frequency in ('Daily', 'Days', 'Day', 'D', 'DD') then 'Daily'
-					when @Frequency in ('Weekly', 'Weeks', 'Week', 'W', 'WK') then 'Weekly'
-					when @Frequency in ('Monthly', 'Months', 'Month', 'M', 'Mon', 'MM') then 'Monthly'
-					when replace(replace(@Frequency, 'Starts', 'Start'), ' ', '') in ('Start', 'AgentStart', 'SQLAgentStart', 'S') then 'Agent Starts'
-					when @Frequency in ('Idle', 'I') then 'Idle'
+					when @Frequency collate Latin1_General_100_CI_AS like '%specific%' or @Frequency collate Latin1_General_100_CI_AS like '%custom%'  or @Frequency collate Latin1_General_100_CI_AS like '%adhoc%' or @Frequency collate Latin1_General_100_CI_AS like '%one%'  or @Frequency collate Latin1_General_100_CI_AS like '%onc%' then 'Specific'
+					when @Frequency collate Latin1_General_100_CI_AS in ('Daily', 'Days', 'Day', 'D', 'DD') then 'Daily'
+					when @Frequency collate Latin1_General_100_CI_AS in ('Weekly', 'Weeks', 'Week', 'W', 'WK') then 'Weekly'
+					when @Frequency collate Latin1_General_100_CI_AS in ('Monthly', 'Months', 'Month', 'M', 'Mon', 'MM') then 'Monthly'
+					when replace(replace(@Frequency collate Latin1_General_100_CI_AS, 'Starts', 'Start'), ' ', '') in ('Start', 'AgentStart', 'SQLAgentStart', 'S') then 'Agent Starts'
+					when @Frequency collate Latin1_General_100_CI_AS in ('Idle', 'I') then 'Idle'
 				end Frequency,
 				nullif(replace(@ByDay, ' ', ''), '') ByDay,
 				case 
-					when @IntradayFrequency in ('Hourly', 'hours', 'hour', 'h', 'hh') then 'Hourly'
-					when @IntradayFrequency in ('Minutes', 'minute', 'min', 'm', 'mm') then 'Minute'
-					when @IntradayFrequency in ('Seconds', 'Second', 'sec') then 'Second'
-					when @IntradayFrequency like '%specific%' or @IntradayFrequency like '%custom%'  or @IntradayFrequency like '%adhoc%' or @IntradayFrequency like '%one%'  or @IntradayFrequency like '%onc%' then 'Specific'
+					when @IntradayFrequency collate Latin1_General_100_CI_AS in ('Hourly', 'hours', 'hour', 'h', 'hh') then 'Hourly'
+					when @IntradayFrequency collate Latin1_General_100_CI_AS in ('Minutes', 'minute', 'min', 'm', 'mm') then 'Minute'
+					when @IntradayFrequency collate Latin1_General_100_CI_AS in ('Seconds', 'Second', 'sec') then 'Second'
+					when @IntradayFrequency collate Latin1_General_100_CI_AS like '%specific%' or @IntradayFrequency collate Latin1_General_100_CI_AS like '%custom%'  or @IntradayFrequency collate Latin1_General_100_CI_AS like '%adhoc%' or @IntradayFrequency collate Latin1_General_100_CI_AS like '%one%'  or @IntradayFrequency collate Latin1_General_100_CI_AS like '%onc%' then 'Specific'
 				end IntradayFrequency,
 				nullif(replace(@ByTime, ' ', ''), '') ByTime
 				
@@ -82,10 +84,10 @@ Internal error: An expression services limit has been reached. Please look for p
 												when a.Value like '%Sun%' or a.Value like '%7%' then 7
 											end WeekDayID
 									from (
-											select ltrim(rtrim(value)) Value
+											select ltrim(rtrim(value)) collate Latin1_General_100_CI_AS Value
 											from string_split(ByDay, ',') a
 										) a
-									where a.value <> ''
+									where a.Value <> ''
 								) a
 							where a.WeekDayID is not null
 						)
@@ -95,7 +97,7 @@ Internal error: An expression services limit has been reached. Please look for p
 							from (
 									select distinct
 											case 
-												when try_cast(a.Value as int) is not null then a.Value
+												when try_cast(a.Value as int) is not null then convert(varchar(8000), try_cast(a.Value as int))
 												else
 													case
 														when a.Value like '%first%' or a.Value like '%1st%' then 'First'
@@ -141,10 +143,10 @@ Internal error: An expression services limit has been reached. Please look for p
 													end 
 											end MonthDayID
 									from (
-											select ltrim(rtrim(value)) Value
+											select ltrim(rtrim(value)) collate Latin1_General_100_CI_AS Value
 											from string_split(ByDay, ',') a
 										) a
-									where a.value <> ''
+									where a.Value <> ''
 								) a
 							where a.MonthDayID is not null
 						)
@@ -163,7 +165,7 @@ Internal error: An expression services limit has been reached. Please look for p
 								select string_agg(r, ',') within group (order by r)
 								from (
 										select distinct
-												case when charindex('-', Bytime) = 0 and  try_cast(a.Value as time(0)) is not null then cast(cast(Value as time(0)) as varchar(8000)) + '-' + cast(dateadd(second, -1, cast(Value as time(0))) as varchar(8000))
+												case when charindex('-', a.Value) = 0 and  try_cast(a.Value as time(0)) is not null then cast(cast(Value as time(0)) as varchar(8000)) + '-' + cast(dateadd(second, -1, cast(Value as time(0))) as varchar(8000))
 													else (
 																select cast(try_cast(left(v, i -1) as time(0)) as varchar(8000)) + '-' + cast(try_cast(right(v, l-i) as time(0)) as varchar(8000))
 																from (
@@ -204,7 +206,7 @@ Internal error: An expression services limit has been reached. Please look for p
 		select x1.Frequency, x1.Interval, x1.ByDay, x1.IntradayFrequency, x1.IntradayInterval, x1.ByTime, x1.StartDate, x1.EndDate,
 			case x1.Frequency
 				when 'Specific' then 'at time ' + replace(x1.ByDay, ',', ', ')
-				when 'Agent Start' then 'when Agent Starts'
+				when 'Agent Starts' then 'when Agent Starts'
 				when 'Idle' then 'when computer is idle'
 				when 'Daily' then 
 					case 

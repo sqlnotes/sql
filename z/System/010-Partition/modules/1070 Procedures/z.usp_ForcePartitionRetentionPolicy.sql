@@ -6,12 +6,11 @@ create or alter procedure z.usp_ForcePartitionRetentionPolicy
 as
 begin
 	set nocount on;
-	-- RAISERROR deliberately preserves caller transaction ownership and committability.
+	-- Disable XACT_ABORT before rejection to preserve caller transaction committability.
 	if isnull(@ShowPlan, 0) = 0 and (@@trancount > 0 or @@options & 2 = 2)
 	begin
 		set xact_abort off;
-		raiserror('Partition maintenance cannot execute in a caller-owned or implicit transaction.', 16, 1);
-		return;
+		throw 50000, N'Partition maintenance cannot execute in a caller-owned or implicit transaction.', 1;
 	end
 	declare @ImplicitTransactions bit = iif(@@options & 2 = 2, 1, 0), @XactAbort bit = iif(@@options & 16384 = 16384, 1, 0),
 			@FunctionName nvarchar(128), @ActualName nvarchar(128), @Period varchar(20), @Interval int,
@@ -22,8 +21,7 @@ begin
 	if @ShowPlan is null
 	begin
 		set xact_abort off;
-		raiserror('ShowPlan must be specified.', 16, 1);
-		return;
+		throw 50000, N'ShowPlan must be specified.', 1;
 	end
 	-- Preview may run inside a transaction, but must not start an implicit one.
 	if @ShowPlan = 1

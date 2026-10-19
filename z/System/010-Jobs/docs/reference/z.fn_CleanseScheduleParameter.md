@@ -18,6 +18,10 @@ These are the source-declared types and defaults. Table-valued-function callers 
 
 No writes or explicit transaction. Requires function access; schedule conversion does not validate a deployed Agent schedule. See subsystem troubleshooting for known conversion defects.
 
+This is the normalization helper, not the validation boundary. Direct calls can discard unrecognized tokens. Use z.fn_ValidateScheduleParameter for complete-input validation or z.fn_ToSQLAgentSchedule for validated native conversion. Agent Start produces the normalized frequency Agent Starts.
+
+Frequency, intraday and weekday/monthly vocabulary is interpreted using explicit Latin1_General_100_CI_AS comparisons. Letter case therefore does not change accepted schedule meaning, including in case-sensitive or Turkish databases. Accents remain significant. Canonical output spellings and ScheduleID generation are preserved. This does not change database collation, database names or user command text.
+
 ## Dependencies
 
 See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for subsystem-wide constraints.

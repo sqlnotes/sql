@@ -44,7 +44,7 @@ create or alter procedure z.usp_CreatePartitionForDateRange
 
 Use ObjectName or PartitionFunctionName to identify the existing function. Supported key types are date, datetime, datetime2, smalldatetime or bigint System IDs. Date keys require Daily or coarser periods. Default period Monthly, interval 1, DateFrom current UTC time when null, DateTo computed from count when null, count 3, storage default filegroup when null/Default/[Default]. Negative count requests backward boundaries.
 
-Both rounded endpoints are included. The TVF returns Ordinal identity, SQL and Date. Procedure ShowPlan returns Ordinal, Date and SQL in Ordinal order; the default ShowPlan = 0 preserves execution behavior. Each missing boundary emits next-used statements for all schemes, a split and next-used statements again. Validation failures become executable raiserror text in a row. Selecting output does not throw those generated errors.
+Both rounded endpoints are included. The TVF returns Ordinal identity, SQL and Date. Procedure ShowPlan returns Ordinal, Date and SQL in Ordinal order; the default ShowPlan = 0 preserves execution behavior. Each missing boundary emits next-used statements for all schemes, a split and next-used statements again. Validation failures become executable throw text in a row. Selecting output does not throw those generated errors.
 
 ## Execution and limits
 

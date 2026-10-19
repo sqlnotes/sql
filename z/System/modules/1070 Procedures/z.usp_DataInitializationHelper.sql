@@ -45,8 +45,7 @@ begin
 
 	if not exists(select * from #SourceSchema where PrimaryKeyOrder >0)
 	begin
-		raiserror('No primary key found', 16, 1)
-		return
+		throw 50000, 'No primary key found', 1;
 	end
 
 	if exists(select * from #SourceSchema where IsIdentity = 1)

@@ -4,7 +4,7 @@
 
 ## Purpose and behavior
 
-Change only stopped selected traces; require Name or ID. Query parameters execute caller-supplied SQL returning IDs. Comma-list names use substring LIKE matching. Remove selected events; EventList=All selects all catalog events. Query/list results are combined with duplicate IDs ignored. Selection query errors become explanatory raiserror messages. Native changes loop without an explicit transaction.
+Change only stopped selected traces; require Name or ID. Query parameters execute caller-supplied SQL returning IDs. Comma-list names use substring LIKE matching. Remove selected events; EventList=All selects all catalog events. Query/list results are combined with duplicate IDs ignored. Selection query errors become explanatory throw messages. Native changes loop without an explicit transaction.
 
 ## Parameters and defaults
 

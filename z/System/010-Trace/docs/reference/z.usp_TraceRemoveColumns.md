@@ -4,7 +4,7 @@
 
 ## Purpose and behavior
 
-Change only stopped selected traces; require Name or ID. Query parameters execute caller-supplied SQL returning IDs. Comma-list names use substring LIKE matching. Remove selected currently enabled columns except SPID (12). EventColumnList=all does not select all catalog columns; use an explicit ColumnID query. Query/list results are combined with duplicate IDs ignored. Selection query errors become explanatory raiserror messages. Native changes loop without an explicit transaction.
+Change only stopped selected traces; require Name or ID. Query parameters execute caller-supplied SQL returning IDs. Comma-list names use substring LIKE matching. Remove selected currently enabled columns except SPID (12). EventColumnList=all does not select all catalog columns; use an explicit ColumnID query. Query/list results are combined with duplicate IDs ignored. Selection query errors become explanatory throw messages. Native changes loop without an explicit transaction.
 
 ## Parameters and defaults
 

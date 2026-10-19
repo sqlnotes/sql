@@ -4,7 +4,7 @@
 
 ## Purpose and behavior
 
-Ten required int inputs in native order: freq_type, freq_interval, freq_subday_type, freq_subday_interval, freq_relative_interval, freq_recurrence_factor, active_start_date, active_end_date, active_start_time, active_end_time. Return normalized schedule columns through z.fn_CleanseScheduleParameter. Read-only. Weekly bit64 mapping is incorrect.
+Ten required int inputs in native order: freq_type, freq_interval, freq_subday_type, freq_subday_interval, freq_relative_interval, freq_recurrence_factor, active_start_date, active_end_date, active_start_time, active_end_time. Return normalized schedule columns through z.fn_CleanseScheduleParameter. Read-only. Weekly weekday bits decode as Sunday=1, Monday=2, Tuesday=4, Wednesday=8, Thursday=16, Friday=32 and Saturday=64; combined masks preserve each selected weekday.
 
 ## Parameters and defaults
 

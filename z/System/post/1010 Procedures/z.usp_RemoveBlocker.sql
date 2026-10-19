@@ -4,13 +4,11 @@ begin
 	set nocount on
 	if @@trancount > 0
 	begin
-		raiserror('z.usp_RemoveBlocker must not be executed within a transaction.', 16, 1)
-		return;
+		throw 50000, 'z.usp_RemoveBlocker must not be executed within a transaction.', 1;
 	end
 	if z.fn_IsSQLAgentRunning() = 0
 	begin
-		raiserror('SQL Agent is not running.', 16, 1)
-		return
+		throw 50000, 'SQL Agent is not running.', 1;
 	end
 	declare @SQL nvarchar(max), @Proc nvarchar(128)
 	select @Proc = '##usp_RemoveBlocker_'+ cast(@@spid as nvarchar(20))

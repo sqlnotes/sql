@@ -7,15 +7,15 @@ create or alter procedure z.usp_TraceCreate
 )
 as
 begin
-	set nocount on
-	declare @Status varchar(16), @ret int
+	set nocount on;
+	declare @Status varchar(16), @ret int, @Error nvarchar(2048);
 	delete z.v_Trace where Status = 'Not Available'
 	if @TraceName is null
 		return;
 	if exists(select * from z.v_Trace where Name = @TraceName and Status in ('Running'))
 	begin
-		raiserror('Trace %s is running.', 16, 1, @TraceName)
-		return
+		select @Error = replace(formatmessage(N'Trace %s is running.', @TraceName), N'%', N'%%');
+		throw 50000, @Error, 1;
 	end
 	if exists(
 				select *
@@ -50,8 +50,8 @@ begin
 	exec @ret = sp_trace_create @traceid = @TraceID output, @options = 1
 	if @ret <> 0
 	begin
-		raiserror('Failed to create trace %s. Error code %d', 16, 1, @TraceName, @ret)
-		return
+		select @Error = replace(formatmessage(N'Failed to create trace %s. Error code %d', @TraceName, @ret), N'%', N'%%');
+		throw 50000, @Error, 1;
 	end
 	select @ReceivingTable = isnull(@ReceivingTable, 'z.' + quotename('Trace_' + @TraceName))
 	merge z.Trace t

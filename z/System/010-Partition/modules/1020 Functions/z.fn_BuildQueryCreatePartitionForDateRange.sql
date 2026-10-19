@@ -34,7 +34,7 @@ begin
 	if @@rowcount = 0
 	begin
 		insert into @ret(SQL)
-			values('raiserror(''Could not find partition function.'', 16, 1);')
+			values('throw 50000, N''Could not find partition function.'', 1;')
 		return
 	end
 	select @DataType = case DataType
@@ -50,7 +50,7 @@ begin
 	if @@rowcount = 0
 	begin
 		insert into @ret(SQL)
-			values('raiserror(''Partition key data type is not supported.'', 16, 1);')
+			values('throw 50000, N''Partition key data type is not supported.'', 1;')
 		return
 	end
 	if @FileGroup is null or @FileGroup = 'Default' or @FileGroup = '[Default]'
@@ -60,34 +60,34 @@ begin
 	if not exists(select * from sys.filegroups where name = @FileGroup and type = 'FG' and is_read_only = 0)
 	begin
 		insert into @ret(SQL)
-			values('raiserror(''Could not find database file group.'', 16, 1);')
+			values('throw 50000, N''Could not find database file group.'', 1;')
 		return
 	end
 
 	if @DateTo is null and @NumberOfPartitions is null
 	begin
 		insert into @ret(SQL)
-			values('raiserror(''@DateTo and @NumberOfPartitions cannot be both NULLs.'', 16, 1);')
+			values('throw 50000, N''@DateTo and @NumberOfPartitions cannot be both NULLs.'', 1;')
 		return
 	end
 
 	if @PartitionRangeType is null or @PartitionRangeType not in ('Minute','Hourly', 'Daily', 'Weekly', 'Monthly', 'Yearly')
 	begin
 		insert into @ret(SQL)
-			values('raiserror(''Invalid parameter @PartitionRangeType. Supported values Minute, Hourly, Daily, Weekly, Monthly, Yearly.'', 16, 1);')
+			values('throw 50000, N''Invalid parameter @PartitionRangeType. Supported values Minute, Hourly, Daily, Weekly, Monthly, Yearly.'', 1;')
 		return
 	end
 
 	if @DataType = 'date' and @PartitionRangeType in ('Minute', 'Hourly')
 	begin
 		insert into @ret(SQL)
-			values('raiserror(''Date partition keys require Daily or coarser periods.'', 16, 1);')
+			values('throw 50000, N''Date partition keys require Daily or coarser periods.'', 1;')
 		return
 	end
 	if isnull(@PartitionRangeTypeInterval, 0) <= 0
 	begin
 		insert into @ret(SQL)
-			values('raiserror(''Invalid parameter  @PartitionRangeTypeInterval.'', 16, 1);')
+			values('throw 50000, N''Invalid parameter  @PartitionRangeTypeInterval.'', 1;')
 		return
 	end
 	--- End validation ---
