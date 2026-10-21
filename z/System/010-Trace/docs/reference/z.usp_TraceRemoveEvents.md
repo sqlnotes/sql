@@ -4,24 +4,22 @@
 
 ## Purpose and behavior
 
-Change only stopped selected traces; require Name or ID. Query parameters execute caller-supplied SQL returning IDs. Comma-list names use substring LIKE matching. Remove selected events; EventList=All selects all catalog events. Query/list results are combined with duplicate IDs ignored. Selection query errors become explanatory throw messages. Native changes loop without an explicit transaction.
+Remove selected logical events, their output-column bindings and event-specific callback registrations. NULL selects nothing; the whole value all removes all selected events. Complete catalog names are required. Other logical definitions are unaffected.
 
 ## Parameters and defaults
 
 ```text
-@TraceName varchar(128) = null,@TraceID int = null,@TraceEventQuery nvarchar(max) = null,@EventList nvarchar(max) = null
+@TraceName nvarchar(128) = null,
+@TraceID int = null,
+@EventList nvarchar(max) = null
 ```
 
-These are the source-declared types and defaults.
+TraceName/TraceID select one current-session logical definition. When both are supplied they must identify the same owned definition. TraceID is not a native SQL Trace ID.
 
-## Results, permissions, and limits
+## Ownership, results and limits
 
-No defined result set. Requires ALTER TRACE and permission to execute supplied query text; treat query arguments as trusted code. No selection can print a message and return.
+Requires the registered UUID/session/login owner and a Building run; Collecting configuration is frozen. Logical Start does not end Building, so these APIs can still run after enabling a definition. No defined result set. Requires configuration metadata access and catalog visibility; collection separately requires native trace and destination/callback privileges. Use framework procedures instead of direct table DML.
 
 ## Dependencies
 
-Direct SQL object dependencies: `z.v_Trace`, `z.v_TraceEvent`.
-
-Native dependencies: `sys.fn_trace_geteventinfo`.
-
-See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for subsystem-wide constraints.
+z.TraceEvent, z.TraceEventColumn, z.TraceTrigger and z.v_TraceEvent; z.v_TraceOwned and z.usp_TraceAssertOwner. See [architecture](../architecture.md) for ownership, execution and transport limits.

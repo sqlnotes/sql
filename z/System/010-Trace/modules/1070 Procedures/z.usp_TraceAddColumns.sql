@@ -1,75 +1,52 @@
 create or alter procedure z.usp_TraceAddColumns
 (
-	@TraceName varchar(128) = null,
+	@TraceName nvarchar(128) = null,
 	@TraceID int = null,
-	@TraceEventColumnQuery nvarchar(max) = null,
 	@EventColumnList nvarchar(max) = null
 )
 as
 begin
 	set nocount, xact_abort on;
+	exec z.usp_TraceAssertOwner @TraceName, @TraceID;
 	if @TraceName is null and @TraceID is null
 	begin
-		throw 50000, N'Either @TraceName or @TraceID must be provided', 1;
+		throw 50000, N'Either @TraceName or @TraceID must be provided.', 1;
 	end
-
-	declare @Error nvarchar(2048), @EventID int, @ColumnID int
-	declare @Columns table(ColumnID int primary key with(ignore_dup_key=on))
-	begin try
-	insert into @Columns(ColumnID)
-		exec(@TraceEventColumnQuery)
-	if @EventColumnList = 'all'
+	declare @ResolvedTraceID int;
+	select @ResolvedTraceID = TraceID
+	from z.v_TraceOwned
+	where (@TraceName is null or Name = @TraceName) and (@TraceID is null or TraceID = @TraceID);
+	select @TraceID = @ResolvedTraceID;
+	if not exists(select 1 from z.v_TraceOwned where TraceID = @TraceID and State = 'Building')
 	begin
-		insert into @Columns(ColumnID)
-			select ColumnID 
-			from  z.v_TraceColumn
+		throw 50000, N'Trace configuration requires an owned Building collector.', 1;
 	end
+	declare @Columns table(ColumnID int primary key);
 	if @EventColumnList is not null
 	begin
-		select @TraceEventColumnQuery = 'select ColumnID from  z.v_TraceColumn where (0=1)'
-			+ (
-					select ' or (ColumnName like ''%' + replace(ltrim(rtrim(value)), '''', '''''' )+ '%'')'
-					from string_split(@EventColumnList, ',') a
-					for xml path(''), type
-				).value('.', 'nvarchar(max)')
-		insert into @Columns(ColumnID)
-			exec(@TraceEventColumnQuery)	
+		if trim(@EventColumnList) = N'all'
+			insert into @Columns(ColumnID) select ColumnID from z.v_TraceColumn;
+		else
+		begin
+			if trim(@EventColumnList) = N'' or exists
+			(
+				select 1 from string_split(@EventColumnList, N',') s
+				where trim(s.value) = N'' or not exists(select 1 from z.v_TraceColumn v where v.ColumnName = trim(s.value))
+			)
+			begin
+				throw 50000, N'@EventColumnList must contain comma-separated catalog names without empty or unknown values.', 1;
+			end
+			insert into @Columns(ColumnID)
+				select distinct v.ColumnID from z.v_TraceColumn v
+					inner join string_split(@EventColumnList, N',') s on v.ColumnName = trim(s.value);
+		end
 	end
-	end try
-	begin catch
-		select @Error = N'Please ensure you use "select ColumnID from z.v_TraceColumn where ..." as TraceEventColumnQuery
-' + isnull(error_message(), N'');
-		-- Bound the escaped THROW message without splitting a doubled percent.
-		while datalength(replace(convert(nvarchar(max), @Error), N'%', N'%%')) > 4096
-			select @Error = left(@Error, len(@Error) - 1);
-		select @Error = replace(@Error, N'%', N'%%');
-		throw 50000, @Error, 1;
-	end catch
-	delete @Columns where ColumnID = 12
-	if not exists(select 1 from @Columns)
-	begin
-		print 'No columns added.'
-		return
-	end
-	declare c cursor static local for
-		select t.Name, t.TraceID, i.TraceEventID, e.ColumnID
-		from z.v_Trace t
-			cross apply(
-							select distinct eventid TraceEventID
-							from sys.fn_trace_geteventinfo(t.TraceID) i
-						) i
-			inner join z.v_TraceEventColumn ec on ec.TraceEventID = i.TraceEventID
-			inner join @Columns e on e.ColumnID = ec.ColumnID
-		where (@TraceName is null or Name = @TraceName)
-			and (@TraceID is null or TraceID = @TraceID)
-			and Status = 'Stopped'
-	open c
-	fetch next from c into @TraceName, @TraceID, @EventID, @ColumnID
-	while @@fetch_status = 0
-	begin
-		exec sp_trace_setevent @traceid = @TraceID, @eventid = @EventID, @columnid = @ColumnID, @on = 1
-		fetch next from c into @TraceName, @TraceID, @EventID, @ColumnID
-	end
-	close c
-	deallocate c
+	insert into z.TraceEventColumn(TraceID, EventID, ColumnID)
+		select @TraceID, e.EventID, c.ColumnID
+		from z.TraceEvent e cross join @Columns c
+			inner join sys.trace_event_bindings b on b.trace_event_id = e.EventID and b.trace_column_id = c.ColumnID
+		where e.TraceID = @TraceID
+			and not exists(select 1 from z.TraceEventColumn t where t.TraceID = @TraceID and t.EventID = e.EventID and t.ColumnID = c.ColumnID);
+	update z.Trace set ModificationDate = getdate() where TraceID = @TraceID;
 end
+go

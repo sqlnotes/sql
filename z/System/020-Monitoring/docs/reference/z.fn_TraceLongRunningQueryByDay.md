@@ -1,6 +1,6 @@
 # z.fn_TraceLongRunningQueryByDay
 
-[Trace](../readme.md) | [Source](../../modules/1030%20Functions/z.fn_TraceLongRunningQueryByDay.sql)
+[Monitoring](../readme.md) | [Source](../../modules/1030%20Functions/z.fn_TraceLongRunningQueryByDay.sql)
 
 ## Purpose and behavior
 

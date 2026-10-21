@@ -2,26 +2,14 @@
 
 [Trace](../readme.md) | [Source](../../modules/1010%20Functions/z.fn_BuildQueryCreateTrace.sql)
 
-## Purpose and behavior
+Return ordered setup scripts for a logical definition. The TraceID argument is a logical z.Trace identity, not sys.traces.id. Read logical configuration tables without modifying state or allocating a native trace.
 
-Generate ordered creation, event/column, filter, and start script rows from current SQL Trace metadata. A trace without z.Trace metadata uses <TraceName>. Does not execute SQL or reproduce receiving-table/callback metadata.
-
-## Parameters and defaults
-
-```text
-@TraceID int
+```sql
+select Ordinal, Script
+from z.fn_BuildQueryCreateTrace(@TraceID)
+order by Ordinal;
 ```
 
-These are the source-declared types and defaults. Table-valued-function callers must supply arguments or the `default` keyword explicitly.
+Scripts create the definition, add each event's selected columns, reproduce typed filters in FilterOrdinal order, register callbacks and enable the definition when currently enabled. Callbacks must exist in the target database before replay. Scripts use the logical name, so replay builds configuration in the executing session's run. They do not start collection or export persisted event data.
 
-## Results, permissions, and limits
-
-Returns Ordinal and Script. Read-only; requires trace/catalog visibility. Review filter order and escaping before replay; explicit order by Ordinal is required.
-
-## Dependencies
-
-Direct SQL object dependencies: `z.Trace`, `z.usp_TraceAddEvents`, `z.usp_TraceAddFilter`, `z.usp_TraceCreate`, `z.usp_TraceStart`.
-
-Native dependencies: `sys.fn_trace_geteventinfo`, `sys.fn_trace_getfilterinfo`, `sys.trace_columns`, `sys.trace_events`, `sys.traces`.
-
-See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for subsystem-wide constraints.
+Requires configuration/catalog visibility. No matching logical definition returns no rows. Use the generated native definition view for native trace inspection. A native trace can no longer be exported through this function merely by passing its native numeric ID.

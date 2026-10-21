@@ -4,22 +4,17 @@
 
 ## Purpose and behavior
 
-Select z.v_Trace by optional Name/ID and, by default, CreatorSessionID=@@spid. Start every available selected trace. Null name and ID select all traces within session scope. CurrentSessionOnly=0 widens selection across creators. No explicit transaction or catch.
+Enable matching logical definitions in the current Building run by setting IsEnabled=1. With neither selector supplied, enable all current-run definitions. Allocate no native trace and start no reader. Events, columns, filters and callbacks may still be configured while Building. Collect creates the shared physical trace later.
 
 ## Parameters and defaults
 
 ```text
-@TraceName varchar(128) = null,@TraceID int = null,@CurrentSessionOnly bit = 1
+@TraceName nvarchar(128) = null,
+@TraceID int = null
 ```
 
-These are the source-declared types and defaults.
+## Results, permissions and limits
 
-## Results, permissions, and limits
+No defined result set. Requires registered owner and metadata access. Collecting runs are frozen.
 
-No defined result set. Requires ALTER TRACE and applicable metadata access. Native trace changes are server-level resources; do not confuse this selector with database isolation.
-
-## Dependencies
-
-Direct SQL object dependencies: `z.v_Trace`.
-
-See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for subsystem-wide constraints.
+See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for run ownership, schema compatibility and known transport limits.

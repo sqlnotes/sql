@@ -4,24 +4,22 @@
 
 ## Purpose and behavior
 
-Change only stopped selected traces; require Name or ID. Query parameters execute caller-supplied SQL returning IDs. Comma-list names use substring LIKE matching. Remove selected currently enabled columns except SPID (12). EventColumnList=all does not select all catalog columns; use an explicit ColumnID query. Query/list results are combined with duplicate IDs ignored. Selection query errors become explanatory throw messages. Native changes loop without an explicit transaction.
+Remove selected output-column bindings, preserving SPID (column 12). NULL selects nothing; the whole value all removes removable output columns. Complete catalog names are required. Existing logical filters remain and their inputs are captured separately during collection.
 
 ## Parameters and defaults
 
 ```text
-@TraceName varchar(128) = null,@TraceID int = null,@TraceEventColumnQuery nvarchar(max) = null,@EventColumnList nvarchar(max) = null
+@TraceName nvarchar(128) = null,
+@TraceID int = null,
+@EventColumnList nvarchar(max) = null
 ```
 
-These are the source-declared types and defaults.
+TraceName/TraceID select one current-session logical definition. When both are supplied they must identify the same owned definition. TraceID is not a native SQL Trace ID.
 
-## Results, permissions, and limits
+## Ownership, results and limits
 
-No defined result set. Requires ALTER TRACE and permission to execute supplied query text; treat query arguments as trusted code. No selection can print a message and return.
+Requires the registered UUID/session/login owner and a Building run; Collecting configuration is frozen. Logical Start does not end Building, so these APIs can still run after enabling a definition. No defined result set. Requires configuration metadata access and catalog visibility; collection separately requires native trace and destination/callback privileges. Use framework procedures instead of direct table DML.
 
 ## Dependencies
 
-Direct SQL object dependencies: `z.v_Trace`, `z.v_TraceColumn`.
-
-Native dependencies: `sys.fn_trace_geteventinfo`.
-
-See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for subsystem-wide constraints.
+z.TraceEventColumn and z.v_TraceColumn; z.v_TraceOwned and z.usp_TraceAssertOwner. See [architecture](../architecture.md) for ownership, execution and transport limits.

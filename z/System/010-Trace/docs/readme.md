@@ -2,7 +2,7 @@
 
 [System documentation](../../docs/readme.md)
 
-Configure SQL Trace, collect its rowset stream into partitioned tables, and capture related active-request snapshots.
+Build logical SQL Trace definitions through framework procedures. Each collector session merges its enabled definitions into one physical SQL Trace and routes matching events to their destination tables and callbacks.
 
 ## Start here
 
@@ -13,11 +13,13 @@ Configure SQL Trace, collect its rowset stream into partitioned tables, and capt
 
 ## Operational scope
 
-The implementation uses SQL Trace, including sp_trace_getdata, rather than Extended Events. Collection is synchronous and bound to the session that created the trace. Configure, start, and collect on that same connection. The default preset collector can run indefinitely in operational terms; use the [bounded custom example](usage.md#bounded-custom-trace) during development.
+Configure and collect on one dedicated connection and database. Different sessions have independent runs and may use identical logical names. Creation and logical Start allocate no native trace; Collect allocates one for the run. Collection is synchronous and reuses a static API cursor with CLOSE/OPEN over bounded one-frame sp_trace_getdata reads. This backend can lose events even with zero native drops; merging does not establish complete reception or a callback latency guarantee. Raw saving and parsing remain combined. Use the [bounded custom example](usage.md#bounded-custom-trace).
+
+This initial schema redesign changes table shapes and logical ID semantics. Baseline guards do not migrate existing tables: use a fresh installation or explicitly recreate the development schema. No version increment or migration is supplied.
 
 ## Prerequisites
 
-System supplies z.SeqGeneralID, ID/date helpers, z.usp_ForceNamingConvention, and PS_SchemaZPartitionGeneric. Monitoring supplies z.v_ActiveSessions. SQL Trace system catalogs and sp_trace_* procedures are required.
+System supplies z.SeqGeneralID, ID/date helpers, z.usp_ForceNamingConvention, and PS_SchemaZPartitionGeneric. SQL Trace system catalogs and sp_trace_* procedures are required.
 
 ## Platform direction
 

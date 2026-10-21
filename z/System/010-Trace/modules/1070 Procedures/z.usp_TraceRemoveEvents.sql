@@ -1,80 +1,50 @@
 create or alter procedure z.usp_TraceRemoveEvents
 (
-	@TraceName varchar(128) = null,
+	@TraceName nvarchar(128) = null,
 	@TraceID int = null,
-	@TraceEventQuery nvarchar(max) = null,
 	@EventList nvarchar(max) = null
 )
 as
 begin
 	set nocount, xact_abort on;
+	exec z.usp_TraceAssertOwner @TraceName, @TraceID;
 	if @TraceName is null and @TraceID is null
 	begin
-		throw 50000, N'Either @TraceName or @TraceID must be provided', 1;
+		throw 50000, N'Either @TraceName or @TraceID must be provided.', 1;
 	end
-	declare @Error nvarchar(2048), @EventID int, @ColumnID int
-	declare @Events table(EventID int primary key with(ignore_dup_key=on))
-	begin try
-	insert into @Events(EventID)
-		exec(@TraceEventQuery)
+	declare @ResolvedTraceID int;
+	select @ResolvedTraceID = TraceID
+	from z.v_TraceOwned
+	where (@TraceName is null or Name = @TraceName) and (@TraceID is null or TraceID = @TraceID);
+	select @TraceID = @ResolvedTraceID;
+	if not exists(select 1 from z.v_TraceOwned where TraceID = @TraceID and State = 'Building')
+	begin
+		throw 50000, N'Trace configuration requires an owned Building collector.', 1;
+	end
+	declare @Events table(EventID int primary key);
 	if @EventList is not null
 	begin
-		select @TraceEventQuery =	case when @EventList <> 'All' then 'select TraceEventID from  z.v_TraceEvent where (0=1)'
-			+ (
-					select ' or (EventName like ''%' + replace(ltrim(rtrim(value)), '''', '''''' )+ '%'')'
-					from string_split(@EventList, ',') a
-					for xml path(''), type
-				).value('.', 'nvarchar(max)')
-										else 'select TraceEventID from  z.v_TraceEvent'
-									end
-		insert into @Events(EventID)
-		exec(@TraceEventQuery)	
+		if trim(@EventList) = N'all'
+			insert into @Events(EventID) select TraceEventID from z.v_TraceEvent;
+		else
+		begin
+			if trim(@EventList) = N'' or exists
+			(
+				select 1 from string_split(@EventList, N',') s
+				where trim(s.value) = N'' or not exists(select 1 from z.v_TraceEvent v where v.EventName = trim(s.value))
+			)
+			begin
+				throw 50000, N'@EventList must contain comma-separated catalog names without empty or unknown values.', 1;
+			end
+			insert into @Events(EventID)
+				select distinct v.TraceEventID from z.v_TraceEvent v
+					inner join string_split(@EventList, N',') s on v.EventName = trim(s.value);
+		end
 	end
-	end try
-	begin catch
-		select @Error = N'Please ensure you use "select TraceEventID from  z.v_TraceEvent where ..." as TraceEventQuery
-' + isnull(error_message(), N'');
-		-- Bound the escaped THROW message without splitting a doubled percent.
-		while datalength(replace(convert(nvarchar(max), @Error), N'%', N'%%')) > 4096
-			select @Error = left(@Error, len(@Error) - 1);
-		select @Error = replace(@Error, N'%', N'%%');
-		throw 50000, @Error, 1;
-	end catch
-	if not exists(select 1 from @Events)
-	begin
-		print 'No events removed.'
-		return
-	end
-	declare c cursor static local for
-		select distinct t.Name, t.TraceID, e.EventID
-		from z.v_Trace t
-			cross apply sys.fn_trace_geteventinfo(t.TraceID) i
-			inner join @Events e on e.EventID = i.eventid
-		where (@TraceName is null or Name = @TraceName)
-			and (@TraceID is null or TraceID = @TraceID)
-			and Status = 'Stopped'
-	open c
-	fetch next from c into @TraceName, @TraceID, @EventID
-	while @@fetch_status = 0
-	begin
-		exec sp_trace_setevent @traceid = @TraceID, @eventid = @EventID, @columnid = null, @on = 0
-		fetch next from c into @TraceName, @TraceID, @EventID
-	end
-	close c
-	deallocate c
+	delete t from z.TraceEventColumn t inner join @Events e on e.EventID = t.EventID where t.TraceID = @TraceID;
+	delete t from z.TraceTrigger t inner join z.v_TraceEvent v on v.EventName = t.EventName
+		inner join @Events e on e.EventID = v.TraceEventID where t.TraceID = @TraceID;
+	delete t from z.TraceEvent t inner join @Events e on e.EventID = t.EventID where t.TraceID = @TraceID;
+	update z.Trace set ModificationDate = getdate() where TraceID = @TraceID;
 end
 go
---exec z.usp_TraceCreate 'abc'
---select * from z.v_Trace
---exec z.usp_TraceRemoveEvents @TraceName = 'abc', @TraceEventQuery = 'select TraceEventID
---from  z.v_TraceEvent 
---where EventName in (''SQL:BatchCompleted'', ''SQL:BatchStarting'')', @EventList = 'Assembly Load'
-
---exec z.usp_TraceRemoveEvents @TraceName = 'abc',@EventList = 'Assembly Load'
-
-
---exec z.usp_TraceRemoveEvents @TraceName = 'abc', @EventList = 'Assembly Load'
---select * from z.v_TraceDefinition where TraceID = 3 and IsEventSelected = 1
-
-
-

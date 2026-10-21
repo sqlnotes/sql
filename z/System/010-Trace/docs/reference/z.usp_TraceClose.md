@@ -4,22 +4,17 @@
 
 ## Purpose and behavior
 
-Select z.v_Trace by optional Name/ID and, by default, CreatorSessionID=@@spid. Stop running traces, close available traces and delete unavailable metadata rows (cascading callbacks). Null name and ID select all traces within session scope. CurrentSessionOnly=0 widens selection across creators. No explicit transaction or catch.
+In Building, remove selected current-run logical definitions and their configuration. With neither selector, close the whole run. In Collecting, individual selectors are rejected: close the whole run and its single physical trace. Verify native expiry/start-time identity before stopping/closing; preserve a reused native ID and ownership for review. Remove output bindings, event selections, filters, callbacks and definitions transactionally, then release an empty registry/context. Destination tables and event data remain. Ambient transactions are rejected.
 
 ## Parameters and defaults
 
 ```text
-@TraceName varchar(128) = null,@TraceID int = null,@CurrentSessionOnly bit = 1
+@TraceName nvarchar(128) = null,
+@TraceID int = null
 ```
 
-These are the source-declared types and defaults.
+## Results, permissions and limits
 
-## Results, permissions, and limits
+No defined result set. Native cleanup is not rolled back with metadata. On failure, retained ownership permits cleanup/review. Requires native trace privileges when a physical trace exists.
 
-No defined result set. Requires ALTER TRACE and applicable metadata access. Native trace changes are server-level resources; do not confuse this selector with database isolation.
-
-## Dependencies
-
-Direct SQL object dependencies: `z.v_Trace`.
-
-See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for subsystem-wide constraints.
+See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for run ownership, schema compatibility and known transport limits.

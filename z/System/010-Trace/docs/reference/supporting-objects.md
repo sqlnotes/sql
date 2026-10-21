@@ -10,457 +10,49 @@ Views/functions here read data without modifying it. Table access requires the c
 
 [Source](../../baseline/2020%20Tables/z.Trace.sql)
 
-TraceID primary key; Name unique; Description, CreationDate, ModificationDate, ReceivingTable, CreatorSessionID. Times default getdate; creator defaults @@spid. Metadata persists until unavailable/closed entries are deleted.
+Run-owned logical definitions. TraceID is an identity primary key; (CollectorUUID, Name) is unique. Store Description, CreationDate, ModificationDate, ReceivingTable, CreatorSessionID and IsEnabled (default 0). Dates default to local getdate; creator defaults to @@spid. A logical ID is distinct from a native trace ID. Create/Start do not allocate native resources. Run closure removes configuration while destination data remains.
 
-Column definitions (including source defaults):
+## z.TraceEvent
 
-```text
-TraceID int,
-Name nvarchar(128) not null,
-Description nvarchar(max),
-CreationDate datetime not null constraint DF_z_Trace_CreationDate default(getdate()),
-ModificationDate datetime not null constraint DF_z_Trace_ModificationDate default(getdate()),
-ReceivingTable nvarchar(128) not null,
-CreatorSessionID int not null constraint DF_z_Trace_CreatorSessionID default(@@spid),
-```
+[Source](../../baseline/2020%20Tables/z.TraceEvent.sql)
 
+Selected logical event IDs, keyed by (TraceID, EventID). Event IDs reference the SQL Trace catalog by framework-managed convention, without a foreign key.
 
+## z.TraceEventColumn
 
-## z.TraceBlockedProcessReport
+[Source](../../baseline/2020%20Tables/z.TraceEventColumn.sql)
 
-[Source](../../baseline/2020%20Tables/z.TraceBlockedProcessReport.sql)
+Output-column bindings keyed by (TraceID, EventID, ColumnID). Bindings must be supported by the native catalog. SPID is preserved where supported. Physical capture also includes filter inputs, which need not be output columns.
 
-Event storage: TraceSequence bigint primary key (UTC seconds plus z.SeqGeneralID), EventID int, EventName nvarchar(128), plus nullable SQL Trace column payloads. Duration is microseconds for collected duration events; other metrics retain SQL Trace units. Page compression and PS_SchemaZPartitionGeneric(TraceSequence). No FK to trace metadata: records can remain after trace closes. See source column inventory below for exact types.
+## z.TraceFilter
 
-Column definitions (including source defaults):
+[Source](../../baseline/2020%20Tables/z.TraceFilter.sql)
 
-```text
-TraceSequence bigint not null constraint DF_z_TraceBlockedProcessReport_TraceSequence  default(datediff_big(second,'1900-01-01',getutcdate())*(268435456)|next value for z.SeqGeneralID),
-EventID int not null,
-EventName nvarchar(128) not null,
-TextData nvarchar(max),
-BinaryData varbinary(max),
-DatabaseID int,
-TransactionID bigint,
-LineNumber int,
-NTUserName nvarchar(512),
-NTDomainName nvarchar(512),
-HostName nvarchar(512),
-ClientProcessID int,
-ApplicationName nvarchar(512),
-LoginName nvarchar(512),
-SPID int,
-Duration bigint,
-StartTime datetime,
-EndTime datetime,
-Reads bigint,
-Writes bigint,
-CPU int,
-Permissions bigint,
-Severity int,
-EventSubClass int,
-ObjectID int,
-Success int,
-IndexID int,
-IntegerData int,
-ServerName nvarchar(512),
-EventClass int,
-ObjectType int,
-NestLevel int,
-State int,
-Error int,
-Mode int,
-Handle int,
-ObjectName nvarchar(512),
-DatabaseName nvarchar(512),
-FileName nvarchar(512),
-OwnerName nvarchar(512),
-RoleName nvarchar(512),
-TargetUserName nvarchar(512),
-DBUserName nvarchar(512),
-LoginSid varbinary(max),
-TargetLoginName nvarchar(512),
-TargetLoginSid varbinary(max),
-ColumnPermissions int,
-LinkedServerName nvarchar(512),
-ProviderName nvarchar(512),
-MethodName nvarchar(512),
-RowCounts bigint,
-RequestID int,
-XactSequence bigint,
-EventSequence bigint,
-BigintData1 bigint,
-BigintData2 bigint,
-GUID uniqueidentifier,
-IntegerData2 int,
-ObjectID2 bigint,
-Type int,
-OwnerID int,
-ParentName nvarchar(512),
-IsSystem int,
-Offset int,
-SourceDatabaseID int,
-SqlHandle varbinary(max),
-SessionLoginName nvarchar(512),
-PlanHandle varbinary(max),
-GroupID int,
-```
-
-
-
-## z.TraceBlockedProcessReportActiveSessions
-
-[Source](../../baseline/2020%20Tables/z.TraceBlockedProcessReportActiveSessions.sql)
-
-Active-request snapshot correlated by TraceSequence; key (TraceSequence, SnapshotDate, SessionID, ActiveSessionID). SnapshotDate defaults local getdate; ActiveSessionID defaults UTC/sequence encoding. Page compression and PS_SchemaZPartitionGeneric(TraceSequence). Columns match Monitoring request snapshots; callbacks leave QueryPlan null. No FK to event table.
-
-Column definitions (including source defaults):
-
-```text
-TraceSequence bigint not null,
-SnapshotDate datetime not null constraint DF_z_TraceBlockedProcessReportActiveSessions_SnapshotDate  default(getdate()),
-SessionID smallint not null,
-ActiveSessionID bigint not null constraint DF_z_TraceBlockedProcessReportActiveSessions_ActiveSessionID  default(datediff_big(second,'1900-01-01',getutcdate())*(268435456)|next value for z.SeqGeneralID),
-StartDate datetime not null,
-BlockingSessionID smallint,
-DurationInSecond int,
-Status nvarchar(30) not null,
-Command nvarchar(32) not null,
-WaitType nvarchar(60),
-WaitTime int not null,
-WaitResource nvarchar(256) not null,
-LastWaitType nvarchar(60) not null,
-CPU int not null,
-Reads bigint not null,
-Writes bigint not null,
-LogicalReads bigint not null,
-TotalElapsedTime int not null,
-DatabaseName nvarchar(128),
-SQLText nvarchar(max),
-QueryPlan xml,
-GrantedMemory int not null,
-NestedLevel int not null,
-OpenTranCount int not null,
-TransactionIsolationLevel smallint not null,
-LoginName nvarchar(128),
-HostName nvarchar(128),
-HostAddress nvarchar(48),
-ApplicationName nvarchar(128),
-```
-
-
-
-## z.TraceError
-
-[Source](../../baseline/2020%20Tables/z.TraceError.sql)
-
-Event storage: TraceSequence bigint primary key (UTC seconds plus z.SeqGeneralID), EventID int, EventName nvarchar(128), plus nullable SQL Trace column payloads. Duration is microseconds for collected duration events; other metrics retain SQL Trace units. Page compression and PS_SchemaZPartitionGeneric(TraceSequence). No FK to trace metadata: records can remain after trace closes. See source column inventory below for exact types.
-
-Column definitions (including source defaults):
-
-```text
-TraceSequence bigint not null constraint DF_z_TraceError_TraceSequence default(datediff_big(second,'1900-01-01',getutcdate())*(268435456)|next value for z.SeqGeneralID),
-EventID int not null,
-EventName nvarchar(128) not null,
-TextData nvarchar(max),
-BinaryData varbinary(max),
-DatabaseID int,
-TransactionID bigint,
-LineNumber int,
-NTUserName nvarchar(512),
-NTDomainName nvarchar(512),
-HostName nvarchar(512),
-ClientProcessID int,
-ApplicationName nvarchar(512),
-LoginName nvarchar(512),
-SPID int,
-Duration bigint,
-StartTime datetime,
-EndTime datetime,
-Reads bigint,
-Writes bigint,
-CPU int,
-Permissions bigint,
-Severity int,
-EventSubClass int,
-ObjectID int,
-Success int,
-IndexID int,
-IntegerData int,
-ServerName nvarchar(512),
-EventClass int,
-ObjectType int,
-NestLevel int,
-State int,
-Error int,
-Mode int,
-Handle int,
-ObjectName nvarchar(512),
-DatabaseName nvarchar(512),
-FileName nvarchar(512),
-OwnerName nvarchar(512),
-RoleName nvarchar(512),
-TargetUserName nvarchar(512),
-DBUserName nvarchar(512),
-LoginSid varbinary(max),
-TargetLoginName nvarchar(512),
-TargetLoginSid varbinary(max),
-ColumnPermissions int,
-LinkedServerName nvarchar(512),
-ProviderName nvarchar(512),
-MethodName nvarchar(512),
-RowCounts bigint,
-RequestID int,
-XactSequence bigint,
-EventSequence bigint,
-BigintData1 bigint,
-BigintData2 bigint,
-GUID uniqueidentifier,
-IntegerData2 int,
-ObjectID2 bigint,
-Type int,
-OwnerID int,
-ParentName nvarchar(512),
-IsSystem int,
-Offset int,
-SourceDatabaseID int,
-SqlHandle varbinary(max),
-SessionLoginName nvarchar(512),
-PlanHandle varbinary(max),
-GroupID int,
-```
-
-
-
-## z.TraceFileAutoGrow
-
-[Source](../../baseline/2020%20Tables/z.TraceFileAutoGrow.sql)
-
-Event storage: TraceSequence bigint primary key (UTC seconds plus z.SeqGeneralID), EventID int, EventName nvarchar(128), plus nullable SQL Trace column payloads. Duration is microseconds for collected duration events; other metrics retain SQL Trace units. Page compression and PS_SchemaZPartitionGeneric(TraceSequence). No FK to trace metadata: records can remain after trace closes. See source column inventory below for exact types.
-
-Column definitions (including source defaults):
-
-```text
-TraceSequence bigint not null constraint DF_z_TraceFileAutoGrow_TraceSequence  default(datediff_big(second,'1900-01-01',getutcdate())*(268435456)|next value for z.SeqGeneralID),
-EventID int not null,
-EventName nvarchar(128) not null,
-TextData nvarchar(max),
-BinaryData varbinary(max),
-DatabaseID int,
-TransactionID bigint,
-LineNumber int,
-NTUserName nvarchar(512),
-NTDomainName nvarchar(512),
-HostName nvarchar(512),
-ClientProcessID int,
-ApplicationName nvarchar(512),
-LoginName nvarchar(512),
-SPID int,
-Duration bigint,
-StartTime datetime,
-EndTime datetime,
-Reads bigint,
-Writes bigint,
-CPU int,
-Permissions bigint,
-Severity int,
-EventSubClass int,
-ObjectID int,
-Success int,
-IndexID int,
-IntegerData int,
-ServerName nvarchar(512),
-EventClass int,
-ObjectType int,
-NestLevel int,
-State int,
-Error int,
-Mode int,
-Handle int,
-ObjectName nvarchar(512),
-DatabaseName nvarchar(512),
-FileName nvarchar(512),
-OwnerName nvarchar(512),
-RoleName nvarchar(512),
-TargetUserName nvarchar(512),
-DBUserName nvarchar(512),
-LoginSid varbinary(max),
-TargetLoginName nvarchar(512),
-TargetLoginSid varbinary(max),
-ColumnPermissions int,
-LinkedServerName nvarchar(512),
-ProviderName nvarchar(512),
-MethodName nvarchar(512),
-RowCounts bigint,
-RequestID int,
-XactSequence bigint,
-EventSequence bigint,
-BigintData1 bigint,
-BigintData2 bigint,
-GUID uniqueidentifier,
-IntegerData2 int,
-ObjectID2 bigint,
-Type int,
-OwnerID int,
-ParentName nvarchar(512),
-IsSystem int,
-Offset int,
-SourceDatabaseID int,
-SqlHandle varbinary(max),
-SessionLoginName nvarchar(512),
-PlanHandle varbinary(max),
-GroupID int,
-```
-
-
-
-## z.TraceFileAutoGrowActiveSessions
-
-[Source](../../baseline/2020%20Tables/z.TraceFileAutoGrowActiveSessions.sql)
-
-Active-request snapshot correlated by TraceSequence; key (TraceSequence, SnapshotDate, SessionID, ActiveSessionID). SnapshotDate defaults local getdate; ActiveSessionID defaults UTC/sequence encoding. Page compression and PS_SchemaZPartitionGeneric(TraceSequence). Columns match Monitoring request snapshots; callbacks leave QueryPlan null. No FK to event table.
-
-Column definitions (including source defaults):
-
-```text
-TraceSequence bigint not null,
-SnapshotDate datetime not null constraint DF_z_TraceFileAutoGrowActiveSessions_SnapshotDate  default(getdate()),
-SessionID smallint not null,
-ActiveSessionID bigint not null constraint DF_z_TraceFileAutoGrowActiveSessions_ActiveSessionID  default(datediff_big(second,'1900-01-01',getutcdate())*(268435456)|next value for z.SeqGeneralID),
-StartDate datetime not null,
-BlockingSessionID smallint,
-DurationInSecond int,
-Status nvarchar(30) not null,
-Command nvarchar(32) not null,
-WaitType nvarchar(60),
-WaitTime int not null,
-WaitResource nvarchar(256) not null,
-LastWaitType nvarchar(60) not null,
-CPU int not null,
-Reads bigint not null,
-Writes bigint not null,
-LogicalReads bigint not null,
-TotalElapsedTime int not null,
-DatabaseName nvarchar(128),
-SQLText nvarchar(max),
-QueryPlan xml,
-GrantedMemory int not null,
-NestedLevel int not null,
-OpenTranCount int not null,
-TransactionIsolationLevel smallint not null,
-LoginName nvarchar(128),
-HostName nvarchar(128),
-HostAddress nvarchar(48),
-ApplicationName nvarchar(128),
-```
-
-
-
-## z.TraceLongRunningQuery
-
-[Source](../../baseline/2020%20Tables/z.TraceLongRunningQuery.sql)
-
-Event storage: TraceSequence bigint primary key (UTC seconds plus z.SeqGeneralID), EventID int, EventName nvarchar(128), plus nullable SQL Trace column payloads. Duration is microseconds for collected duration events; other metrics retain SQL Trace units. Page compression and PS_SchemaZPartitionGeneric(TraceSequence). No FK to trace metadata: records can remain after trace closes. See source column inventory below for exact types.
-
-Column definitions (including source defaults):
-
-```text
-TraceSequence bigint not null constraint DF_z_TraceLongRunningQuery_TraceSequence  default(datediff_big(second,'1900-01-01',getutcdate())*(268435456)|next value for z.SeqGeneralID),
-EventID int not null,
-EventName nvarchar(128) not null,
-TextData nvarchar(max),
-BinaryData varbinary(max),
-DatabaseID int,
-TransactionID bigint,
-LineNumber int,
-NTUserName nvarchar(512),
-NTDomainName nvarchar(512),
-HostName nvarchar(512),
-ClientProcessID int,
-ApplicationName nvarchar(512),
-LoginName nvarchar(512),
-SPID int,
-Duration bigint,
-StartTime datetime,
-EndTime datetime,
-Reads bigint,
-Writes bigint,
-CPU int,
-Permissions bigint,
-Severity int,
-EventSubClass int,
-ObjectID int,
-Success int,
-IndexID int,
-IntegerData int,
-ServerName nvarchar(512),
-EventClass int,
-ObjectType int,
-NestLevel int,
-State int,
-Error int,
-Mode int,
-Handle int,
-ObjectName nvarchar(512),
-DatabaseName nvarchar(512),
-FileName nvarchar(512),
-OwnerName nvarchar(512),
-RoleName nvarchar(512),
-TargetUserName nvarchar(512),
-DBUserName nvarchar(512),
-LoginSid varbinary(max),
-TargetLoginName nvarchar(512),
-TargetLoginSid varbinary(max),
-ColumnPermissions int,
-LinkedServerName nvarchar(512),
-ProviderName nvarchar(512),
-MethodName nvarchar(512),
-RowCounts bigint,
-RequestID int,
-XactSequence bigint,
-EventSequence bigint,
-BigintData1 bigint,
-BigintData2 bigint,
-GUID uniqueidentifier,
-IntegerData2 int,
-ObjectID2 bigint,
-Type int,
-OwnerID int,
-ParentName nvarchar(512),
-IsSystem int,
-Offset int,
-SourceDatabaseID int,
-SqlHandle varbinary(max),
-SessionLoginName nvarchar(512),
-PlanHandle varbinary(max),
-GroupID int,
-```
-
-
+Ordered predicates keyed by (TraceID, FilterOrdinal), storing ColumnID, LogicOperator, ComparisonOperator and typed sql_variant Value. AND across column groups; ordered left-fold AND/OR within each group, ignoring the first operator. NULL/missing fields do not match. Definitions retain independent filters even though native capture is shared.
 
 ## z.TraceTrigger
 
 [Source](../../baseline/2020%20Tables/z.TraceTrigger.sql)
 
-Callback metadata, not a SQL DML trigger. Key (TraceID, EventName); ProcedureName names callback. FK to z.Trace with on delete cascade. EventName=all callback receives positional TraceSequence only; event-specific callbacks receive TraceSequence, TraceID, EventName. No callback existence/signature check at insert.
+Procedural callback registration, not a DML trigger. Key (TraceID, EventName); ProcedureName holds a quoted schema-qualified current-database procedure name (nvarchar(517)). Register/remove through framework procedures. EventName all overrides the event-specific registration. Every callback receives named TraceSequence, logical TraceID and EventName arguments and shares the event's transaction. No foreign key is defined.
 
-Column definitions (including source defaults):
+## z.TraceCollector and z.TraceCollectorTrace
 
-```text
-TraceID int,
-EventName varchar(128) not null,
-ProcedureName nvarchar(128) not null
-```
+[Collector source](../../baseline/2020%20Tables/z.TraceCollector.sql) | [Physical mapping source](../../baseline/2020%20Tables/z.TraceCollectorTrace.sql)
 
+Collector stores UUID, owner session/login generation, creation time and Building/Collecting state. Each run owns zero native traces during setup and one during collection. The mapping stores the native TraceID, nullable start time, far-future native expiry generation tag and run name. It is not a logical-to-native per-definition mapping. All definitions obtain their shared native identity through CollectorUUID. Internal relationships are managed by procedures without foreign keys; do not populate these tables manually.
 
+## z.v_TraceOwned
+
+[Source](../../modules/1020%20Views/z.v_TraceOwned.sql)
+
+Current UUID/session/login restricts logical metadata to its owner. Includes logical TraceID, enabled/state information, destination and shared NativeTraceID. Before collection, native identity is NULL. Logical Running status during Building means enabled, not a running native trace. Generation tags restrict native status to the recorded resource.
 
 ## z.v_Trace
 
 [Source](../../modules/1020%20Views/z.v_Trace.sql)
 
-z.Trace plus derived Status from sys.traces: Stopped, Running, or Not Available. Metadata-only traces can outlive native traces.
-
-
+Unscoped logical diagnostic catalog, including CollectorUUID, IsEnabled, State and shared NativeTraceID. TraceID remains logical. Inspect IsEnabled and State as well as Status to distinguish enabled setup from native collection.
 
 ## z.v_TraceColumn
 
@@ -492,8 +84,8 @@ Generated by [z.usp_TraceRefreshMetaData](z.usp_TraceRefreshMetaData.md). Event/
 
 ## z.v_TraceDefinition
 
-Generated by [z.usp_TraceRefreshMetaData](z.usp_TraceRefreshMetaData.md). TraceID, IsActive, CategoryName, EventName, TraceEventID, IsEventSelected plus one selection/filter string per trace column. Empty strings can mean a selected column without a filter; null can mean unselected. Server trace visibility controls rows.
+Generated by [z.usp_TraceRefreshMetaData](z.usp_TraceRefreshMetaData.md). Native TraceID, IsActive, CategoryName, EventName, TraceEventID, IsEventSelected plus one native selection/filter string per trace column. This is a physical trace/event matrix, not a logical destination/filter listing. Empty strings can mean a selected column without a filter; null can mean unselected. Server trace visibility controls rows.
 
 ## Generated receiving tables
 
-[z.usp_TraceCollectAndClose](z.usp_TraceCollectAndClose.md) creates a missing receiving table from TraceSequence/EventID/EventName and then adds nullable columns from z.v_TraceColumn. Existing columns are not altered or type-validated. Tables survive trace closure; no per-trace DML trigger is generated. z.TraceTrigger configures procedural callbacks instead.
+[z.usp_TraceCollectAndClose](z.usp_TraceCollectAndClose.md) creates a missing receiving table from TraceSequence/EventID/EventName and then adds nullable columns from z.v_TraceColumn. Existing tables must have nonnullable, nonidentity, noncomputed TraceSequence bigint, EventID int and EventName nvarchar(128) or wider before any columns are added. Other existing trace columns are not altered or type-validated. Tables survive trace closure; no per-trace DML trigger is generated. z.TraceTrigger configures procedural callbacks instead.

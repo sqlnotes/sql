@@ -4,7 +4,7 @@
 
 ## Purpose and behavior
 
-Generate z.v_TraceMetaData (event/column capability matrix) and z.v_TraceDefinition (live trace selections/filters). Compare generated MD5 against each view Code Hash extended property; alter/add property only when hash differs. Trace post stage calls this procedure. Catch rolls back any open transaction and rethrows, though no transaction is started here.
+Generate z.v_TraceMetaData (event/column capability matrix) and z.v_TraceDefinition (live native trace selections/filters). Compare generated MD5 against each view Code Hash extended property; alter/add property only when hash differs. Trace post stage calls this procedure. Catch rolls back any open transaction and rethrows, though no transaction is started here.
 
 ## Parameters and defaults
 
@@ -21,3 +21,5 @@ No parameters or defined result set. Requires view DDL, trace/catalog visibility
 Native dependencies: `sys.fn_listextendedproperty`, `sys.fn_trace_geteventinfo`, `sys.fn_trace_getfilterinfo`, `sys.sp_addextendedproperty`, `sys.sp_dropextendedproperty`, `sys.trace_categories`, `sys.trace_columns`, `sys.trace_event_bindings`, `sys.trace_events`, `sys.traces`.
 
 See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for subsystem-wide constraints.
+
+These generated views retain their existing native/catalog layouts. TraceID in z.v_TraceDefinition is sys.traces.id; inspect logical destinations and independent filters through z.v_TraceOwned and the logical configuration tables instead.

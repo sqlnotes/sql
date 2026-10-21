@@ -4,24 +4,23 @@
 
 ## Purpose and behavior
 
-Change only stopped selected traces; require Name or ID. Query parameters execute caller-supplied SQL returning IDs. Comma-list names use substring LIKE matching. Select event/column bindings, inherit existing columns when EventColumnList is null, and always include SPID column 12. Query/list results are combined with duplicate IDs ignored. Selection query errors become explanatory throw messages. Native changes loop without an explicit transaction.
+Add explicit events and supported output-column bindings to one owned logical definition. NULL EventList does nothing; NULL EventColumnList inherits existing output columns. SPID is included where supported. Lists use complete catalog names, trim whitespace, deduplicate values and reject unknown/empty entries before writes. The whole value all is supported for columns, not event names. Configuration changes metadata only; it does not allocate or configure a native trace.
 
 ## Parameters and defaults
 
 ```text
-@TraceName varchar(128) = null,@TraceID int = null,@TraceEventQuery nvarchar(max) = null,@EventList nvarchar(max) = null,@TraceEventColumnQuery nvarchar(max) = null,@EventColumnList nvarchar(max) = null
+@TraceName nvarchar(128) = null,
+@TraceID int = null,
+@EventList nvarchar(max) = null,
+@EventColumnList nvarchar(max) = null
 ```
 
-These are the source-declared types and defaults.
+TraceName/TraceID select one current-session logical definition. When both are supplied they must identify the same owned definition. TraceID is not a native SQL Trace ID.
 
-## Results, permissions, and limits
+## Ownership, results and limits
 
-No defined result set. Requires ALTER TRACE and permission to execute supplied query text; treat query arguments as trusted code. No selection can print a message and return.
+Requires the registered UUID/session/login owner and a Building run; Collecting configuration is frozen. Logical Start does not end Building, so these APIs can still run after enabling a definition. No defined result set. Requires configuration metadata access and catalog visibility; collection separately requires native trace and destination/callback privileges. Use framework procedures instead of direct table DML.
 
 ## Dependencies
 
-Direct SQL object dependencies: `z.v_TraceColumn`, `z.v_TraceEvent`, `z.v_trace`.
-
-Native dependencies: `sys.fn_trace_geteventinfo`, `sys.trace_event_bindings`.
-
-See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for subsystem-wide constraints.
+z.TraceEvent, z.TraceEventColumn, z.v_TraceEvent, z.v_TraceColumn and sys.trace_event_bindings; z.v_TraceOwned and z.usp_TraceAssertOwner. See [architecture](../architecture.md) for ownership, execution and transport limits.

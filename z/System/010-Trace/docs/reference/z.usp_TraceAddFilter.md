@@ -4,24 +4,30 @@
 
 ## Purpose and behavior
 
-Find a stopped selected trace and filterable selected column. Null Value returns without a filter. Accept and/or and =, !=, <>, >, <, >=, <=, like, notlike (spaces stripped). Convert sql_variant to the trace column type and invoke sp_trace_setfilter; add the column if not already enabled. Values for max-length fields are placed in a 256-length variable.
+Append a typed predicate with a per-definition FilterOrdinal. NULL Value adds nothing. ColumnName/ColumnID must identify the same filterable catalog column. Accept and/or and =, !=, <>, >, <, >=, <=, like, not like; normalize != to <>. LIKE requires character data. Convert the value to its catalog type before storing sql_variant; reject character truncation and Unicode values over 4000 characters.
+
+Evaluate filters locally: AND across column groups; ordered left-fold AND/OR within each column group, ignoring its first operator. SQL NULL/missing fields yield UNKNOWN and do not match. Separate logical definitions retain independent predicates. Filter inputs join the physical capture union without forcing them into the output selection. Only a universally safe common SPID predicate can be pushed down.
 
 ## Parameters and defaults
 
 ```text
-@TraceName varchar(128) = null,@TraceID int = null,@ColumnName varchar(128) = null,@ColumnID int = null,@LogicOperator varchar(3) = 'and', @ComparisonOperator varchar(7) = '=', @Value sql_variant
+@TraceName nvarchar(128) = null,
+@TraceID int = null,
+@ColumnName nvarchar(128) = null,
+@ColumnID int = null,
+@LogicOperator varchar(3) = 'and',
+@ComparisonOperator varchar(8) = '=',
+@Value sql_variant
 ```
 
-These are the source-declared types and defaults.
+TraceName/TraceID select one current-session logical definition. When both are supplied they must identify the same owned definition. TraceID is not a native SQL Trace ID.
 
-## Results, permissions, and limits
+## Ownership, results and limits
 
-No defined result set. Requires ALTER TRACE; errors use throw or native failures. No explicit transaction. A filter does not start a trace.
+Requires the registered UUID/session/login owner and a Building run; Collecting configuration is frozen. Logical Start does not end Building, so these APIs can still run after enabling a definition. No defined result set. Requires configuration metadata access and catalog visibility; collection separately requires native trace and destination/callback privileges. Use framework procedures instead of direct table DML.
 
 ## Dependencies
 
-Direct SQL object dependencies: `z.usp_TraceAddColumns`, `z.v_Trace`, `z.v_TraceColumn`.
+z.TraceFilter and z.v_TraceColumn; z.v_TraceOwned and z.usp_TraceAssertOwner. See [architecture](../architecture.md) for ownership, execution and transport limits.
 
-Native dependencies: `sys.fn_trace_geteventinfo`.
-
-See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for subsystem-wide constraints.
+Local character comparisons use the database collation. Values that exceed the selected text-column length are rejected before filter metadata is written.

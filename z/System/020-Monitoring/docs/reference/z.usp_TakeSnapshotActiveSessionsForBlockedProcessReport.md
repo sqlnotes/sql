@@ -1,6 +1,6 @@
 # z.usp_TakeSnapshotActiveSessionsForBlockedProcessReport
 
-[Trace](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_TakeSnapshotActiveSessionsForBlockedProcessReport.sql)
+[Monitoring](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_TakeSnapshotActiveSessionsForBlockedProcessReport.sql)
 
 ## Purpose and behavior
 
@@ -9,7 +9,9 @@ Append z.v_ActiveSessions rows into z.TraceBlockedProcessReportActiveSessions co
 ## Parameters and defaults
 
 ```text
-@TraceSequence bigint,@TraceID int = null,@EventName nvarchar(128) = null
+@TraceSequence bigint,
+@TraceID int = null,
+@EventName nvarchar(128) = null
 ```
 
 These are the source-declared types and defaults.

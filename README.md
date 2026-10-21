@@ -8,7 +8,7 @@ Start with the [System developer guide](z/System/docs/readme.md). It links to
 shared utilities, object references, and the seven feature subsystems:
 
 - [Partition](z/System/010-Partition/docs/readme.md): boundaries and retention.
-- [Monitoring](z/System/020-Monitoring/docs/readme.md): sessions and resource information.
+- [Monitoring](z/System/020-Monitoring/docs/readme.md): sessions, diagnostic trace presets and resource information.
 - [Trace](z/System/010-Trace/docs/readme.md): SQL Trace configuration and collection.
 - [Jobs](z/System/010-Jobs/docs/readme.md): SQL Agent jobs and schedule helpers.
 - [Backup](z/System/020-Backup/docs/readme.md): backups and database snapshots.

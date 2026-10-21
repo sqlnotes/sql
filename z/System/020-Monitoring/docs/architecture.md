@@ -4,7 +4,7 @@
 
 ## Dependencies and installation
 
-System supplies z.SeqGeneralID and PS_SchemaZPartitionGeneric. Server DMVs, Extended Events, and msdb Database Mail supply external data. System orchestration can schedule collection through Jobs.
+System supplies z.SeqGeneralID and PS_SchemaZPartitionGeneric. Server DMVs, Extended Events, and msdb Database Mail supply external data. System orchestration can schedule collection through Jobs. [Trace](../../010-Trace/docs/readme.md) supplies the SQL Trace framework for monitoring presets and installs before Monitoring.
 
 The numbered folder installs in System's alphabetical child order. Shared System modules run before feature children; System post scripts run after all children. See [System documentation](../../docs/readme.md) for deployment and orchestration. Baseline tables use existence guards; they do not reconcile an existing table schema. Module definitions use create or alter.
 
@@ -19,3 +19,11 @@ Each callable reference describes writes, generated SQL, transaction boundaries,
 ## Integration constraints
 
 Empty request snapshots can be normal: the collector excludes its own session. Check DMV visibility before assuming there are no other requests. Missing ring-buffer events can mean system_health is absent, has no ring-buffer target, or has already overwritten events. Persisted duplicate keys can occur under concurrent collectors; the System Health insert uses a not-exists predicate without serialization. z.v_IndexSpaceUsage uses 8.192 / 1024 per page for columns labelled MB, rather than the usual 8 / 1024; use raw page counts when exact units matter.
+
+## SQL Trace monitoring
+
+`z.usp_CollectTrace` configures blocking, long-running query, exception and file-growth presets through the Trace framework. Monitoring owns their six event/snapshot tables, both active-request snapshot callbacks and `z.fn_TraceLongRunningQueryByDay`. The preset builds four logical definitions through framework APIs and registers callbacks with `z.usp_TraceSetTrigger`. One Collect call merges enabled definitions into one physical trace for its session, preserving independent filters, destinations and callbacks. Other sessions can run their own identically named definitions independently. Installation does not start collection.
+
+Create/Start allocate no native trace. Collection freezes the run and closes/removes its configuration afterward; destination data remains. The bounded one-frame rowset backend retains known event-loss limits, including with zero native drops. Consolidation does not prove complete reception or a performance gain. Raw saving and parsing remain combined.
+
+Moving guarded baselines preserves existing tables and data; SQL object names and versions stay the same. A versioned Monitoring installation skips baseline replay and needs separate guarded-baseline execution if these tables are missing.
