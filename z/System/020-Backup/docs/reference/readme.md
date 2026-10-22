@@ -9,5 +9,8 @@ Exact SQL identifiers link to behavior and source. Native system dependencies ar
 | `z.usp_BackupDatabase_Full` | [Reference](z.usp_BackupDatabase_Full.md) | [SQL](../../modules/1070%20Procedures/z.usp_BackupDatabase_Full.sql) |
 | `z.usp_BackupDatabase_Log` | [Reference](z.usp_BackupDatabase_Log.md) | [SQL](../../modules/1070%20Procedures/z.usp_BackupDatabase_Log.sql) |
 | `z.usp_BackupDatabase` | [Reference](z.usp_BackupDatabase.md) | [SQL](../../modules/1070%20Procedures/z.usp_BackupDatabase.sql) |
+| `z.usp_CleanupDatabaseBackups` | [Reference](z.usp_CleanupDatabaseBackups.md) | [SQL](../../modules/1070%20Procedures/z.usp_CleanupDatabaseBackups.sql) |
 | `z.usp_CreateDatabaseSnapshot` | [Reference](z.usp_CreateDatabaseSnapshot.md) | [SQL](../../modules/1070%20Procedures/z.usp_CreateDatabaseSnapshot.sql) |
 | `z.v_BackupRestore` | [Reference](supporting-objects.md#zv_backuprestore) | [SQL](../../modules/1020%20Views/z.v_BackupRestore.sql) |
+| `z.v_DatabaseBackupStatus` | [Reference](z.v_DatabaseBackupStatus.md) | [SQL](../../modules/1020%20Views/z.v_DatabaseBackupStatus.sql) |
+| `z.TRI_v_DatabaseBackupStatus` | [Reference](z.v_DatabaseBackupStatus.md#trigger) | [SQL](../../modules/1080%20Triggers/z.TRI_v_DatabaseBackupStatus.sql) |

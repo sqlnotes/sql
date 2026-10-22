@@ -1,6 +1,7 @@
 -- Triggers
 
 -- Procedures
+exec z.usp_DropObject @ObjectName = N'z.usp_BackupDatabaseWork';
 exec z.usp_DropObject @ObjectName = N'z.usp_DataInitialization_DatabaseSchemas';
 exec z.usp_DropObject @ObjectName = N'z.usp_CollectInfo';
 exec z.usp_DropObject @ObjectName = N'z.usp_DatabaseBackup';
