@@ -3,7 +3,7 @@ as
 begin
 	exec z.usp_BackupDatabase	@Databases = 'AllDatabases', @BackupType = 'Log', 
 								@BackupFolder = '\\Share\backup\MSSQL\', 
-								@BackupCompression = 1, @RetentionHours = 50, @OtherBackupOptions = null
+								@BackupCompression = 1, @OtherBackupOptions = null
 end
 GO
 

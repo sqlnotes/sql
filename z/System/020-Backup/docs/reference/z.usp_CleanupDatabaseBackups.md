@@ -22,7 +22,7 @@ Positive retention hours define a cutoff. `NULL` disables cleanup; zero and nega
 
 The folder input is checked against the 4,000 UTF-16 code-unit internal path limit before conversion; longer inputs are rejected.
 
-Native backup paths have a smaller limit: the complete filename must fit within 259 UTF-16 code units. The backup procedure rejects longer generated filenames before creating directories. Filename mode preserves individual files with unsupported path lengths or wildcard/control characters. In header mode those files prevent cleanup for the whole inventory. Folder inputs reject wildcard/control characters, dot segments, repeated separators and Windows trailing-dot/space aliases.
+Native backup paths have a smaller limit: the complete filename must fit within 259 UTF-16 code units. The backup procedure leaves unusable paths to native directory and backup operations. Filename mode preserves individual files with unsupported path lengths or wildcard/control characters. In header mode those files prevent cleanup for the whole inventory. Folder inputs reject wildcard/control characters, dot segments, repeated separators and Windows trailing-dot/space aliases.
 
 ## Default: filename-based cleanup
 
@@ -56,6 +56,6 @@ Retention is conservative and may keep files longer than the requested hours. It
 
 ## Coordination and failures
 
-Backup and cleanup coordinate through a session application lock on the managed database folder. FULL, DIFF and LOG backups hold it shared while writing; this helper requires exclusive access. The main backup procedure releases its shared lock before trying cleanup and defers cleanup if the folder is busy. A direct helper call reports the busy-lock failure without deleting files. Call outside a transaction. Filesystem actions cannot be rolled back. Treat managed folders as trusted storage: application locks coordinate participating calls in the same SQL Server database, not arbitrary filesystem writers or other servers.
+This helper uses an exclusive session application lock on the managed database folder to coordinate cleanup calls. The backup procedure does not hold that lock while writing. Schedule cleanup separately from active backups. A competing cleanup call reports a busy-lock failure without deleting files. Call outside a transaction. Filesystem actions cannot be rolled back. Treat managed folders as trusted storage: application locks coordinate participating calls in the same SQL Server database, not arbitrary filesystem writers or other servers.
 
 Requires database catalog access, directory enumeration and file deletion rights. Header mode additionally requires backup metadata permissions; SQL Server 2019 through 2025 header layouts are handled explicitly, and unsupported layouts must not produce deletion candidates. Filename mode does not execute header or label reads.

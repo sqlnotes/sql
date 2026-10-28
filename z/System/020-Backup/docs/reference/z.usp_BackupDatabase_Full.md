@@ -4,7 +4,7 @@
 
 ## Purpose and behavior
 
-Call z.usp_BackupDatabase for AllDatabases, FULL, compression enabled, retention 50 hours, stats = 1, and the fixed path shown in source.
+Call z.usp_BackupDatabase for AllDatabases, FULL, compression enabled, stats = 1, and the fixed path shown in source.
 
 ## Parameters and defaults
 
@@ -14,7 +14,7 @@ These are the source-declared types and defaults.
 
 ## Results, permissions, and limits
 
-No parameters or defined result set. Inherits backup permissions, file creation/deletion, and error behavior.
+No parameters or defined result set. Inherits backup permissions, file creation, and error behavior.
 
 ## Dependencies
 

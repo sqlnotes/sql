@@ -1,4 +1,5 @@
 -- Triggers
+exec z.usp_DropObject @ObjectName = N'z.TRI_v_DatabaseBackupStatus';
 
 -- Procedures
 exec z.usp_DropObject @ObjectName = N'z.usp_BackupDatabaseWork';
@@ -8,6 +9,7 @@ exec z.usp_DropObject @ObjectName = N'z.usp_DatabaseBackup';
 exec z.usp_DropObject @ObjectName = N'z.usp_RemoveZSchema';
 
 -- Views
+exec z.usp_DropObject @ObjectName = N'z.v_DatabaseBackupStatus';
 exec z.usp_DropObject @ObjectName = N'z.v_ObjectSpaceUsage';
 
 -- Functions

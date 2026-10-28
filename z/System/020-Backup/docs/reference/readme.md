@@ -12,5 +12,8 @@ Exact SQL identifiers link to behavior and source. Native system dependencies ar
 | `z.usp_CleanupDatabaseBackups` | [Reference](z.usp_CleanupDatabaseBackups.md) | [SQL](../../modules/1070%20Procedures/z.usp_CleanupDatabaseBackups.sql) |
 | `z.usp_CreateDatabaseSnapshot` | [Reference](z.usp_CreateDatabaseSnapshot.md) | [SQL](../../modules/1070%20Procedures/z.usp_CreateDatabaseSnapshot.sql) |
 | `z.v_BackupRestore` | [Reference](supporting-objects.md#zv_backuprestore) | [SQL](../../modules/1020%20Views/z.v_BackupRestore.sql) |
-| `z.v_DatabaseBackupStatus` | [Reference](z.v_DatabaseBackupStatus.md) | [SQL](../../modules/1020%20Views/z.v_DatabaseBackupStatus.sql) |
-| `z.TRI_v_DatabaseBackupStatus` | [Reference](z.v_DatabaseBackupStatus.md#trigger) | [SQL](../../modules/1080%20Triggers/z.TRI_v_DatabaseBackupStatus.sql) |
+| `z.usp_CreateS3BackupCredential` | [Reference](z.usp_CreateS3BackupCredential.md) | [SQL](../../modules/1070%20Procedures/z.usp_CreateS3BackupCredential.sql) |
+| `z.usp_ReadBackupHeader` | [Reference](z.usp_ReadBackupHeader.md) | [SQL](../../modules/1070%20Procedures/z.usp_ReadBackupHeader.sql) |
+| `z.usp_ReadBackupFileList` | [Reference](z.usp_ReadBackupFileList.md) | [SQL](../../modules/1070%20Procedures/z.usp_ReadBackupFileList.sql) |
+| `z.fn_DecodeBackupHeader` | [Reference](z.fn_DecodeBackupHeader.md) | [SQL](../../modules/1010%20Functions/z.fn_DecodeBackupHeader.sql) |
+| `z.fn_DecodeBackupFileList` | [Reference](z.fn_DecodeBackupFileList.md) | [SQL](../../modules/1010%20Functions/z.fn_DecodeBackupFileList.sql) |
