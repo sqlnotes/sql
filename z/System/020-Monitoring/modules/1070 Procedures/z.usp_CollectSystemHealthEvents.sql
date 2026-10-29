@@ -12,7 +12,8 @@ begin
 
 	;with x as
 	(
-		select EventDateUTC, EventName, EventHash, EventBody
+		select EventDateUTC, EventName, EventHash, EventBody,
+			row_number() over(partition by EventDateUTC, EventName, EventHash order by EventDateUTC) EventOrdinal
 		from z.fn_ExtractSystemHealthEvent(@TargetData)
 		where EventName not in (
 			'security_error_ring_buffer_recorded', 'connectivity_ring_buffer_recorded',
@@ -23,7 +24,7 @@ begin
 	insert into z.SystemHealthEvent(EventDateUTC, EventName, EventHash, EventBody)
 		select EventDateUTC, EventName, EventHash, EventBody
 		from x
-		where not exists (
+		where EventOrdinal = 1 and not exists (
 			select 1 from z.SystemHealthEvent e
 			where e.EventDateUTC = x.EventDateUTC and e.EventName = x.EventName and e.EventHash = x.EventHash
 		);

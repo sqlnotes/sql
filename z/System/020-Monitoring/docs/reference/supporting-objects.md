@@ -104,7 +104,7 @@ same as [z.v_ActiveSessions](#zv_activesessions).
 
 CPU/memory history with one stored row per local second. Columns are Date
 datetime, SystemIdle int, SQLProcessUtilization int, Other int, UserModeTime
-bigint, KernelModeTime bigint, PageFaults int, WorkingSetDelta int and
+bigint, KernelModeTime bigint, PageFaults int, WorkingSetDelta bigint and
 MemoryUtilizationPercentage int. Date is required; measurements are nullable.
 No RecordID or SQLServerStartTime is stored.
 

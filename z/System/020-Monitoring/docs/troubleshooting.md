@@ -8,6 +8,12 @@ Empty request snapshots can be normal: the collector excludes its own session. C
 
 ## Permission and partial-operation failures
 
+CPU WorkingSetDelta is bigint in both the ring-buffer view and history table.
+If an older table still has int, run the eligible Monitoring baseline to widen
+it before collection. A Monitoring version above 0.0.0 skips that baseline.
+System Health collection deduplicates identical keys within one ring-buffer
+snapshot; concurrent collectors still need caller coordination.
+
 System supplies z.SeqGeneralID, PS_SchemaZPartitionGeneric and PS_SchemaZPartitionGenericDateTime. Server DMVs, Extended Events, and msdb Database Mail supply external data. System orchestration can schedule collection through Jobs.
 
 Read the relevant callable reference before retrying a failed write. Some procedures roll back any open transaction, including a caller's transaction; others leave earlier operations committed. Native server resources and filesystem actions do not share a single database rollback boundary. Catalog/DMV access is evaluated on the deployed server and depends on SQL Server version and caller context.

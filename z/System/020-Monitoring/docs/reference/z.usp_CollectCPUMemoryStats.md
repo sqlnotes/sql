@@ -32,6 +32,8 @@ to that newly calculated second. The table stores the latest collected reading
 for each second, rather than preserving ring-buffer record identity across reads.
 UserModeTime and KernelModeTime retain 100-nanosecond units. Percentages and
 other measurements are copied without averaging or conversion.
+WorkingSetDelta is decoded and stored as bigint so native values above the int
+range are preserved.
 
 The ring buffer is finite; collection cannot recover overwritten observations.
 History is for the current source server, not a multi-server repository.
@@ -43,5 +45,8 @@ SQL Server 2019 requires VIEW SERVER STATE; SQL Server 2022 and later requires
 VIEW SERVER PERFORMANCE STATE for these diagnostic DMVs. Destination
 insert/update/select access is required; the procedure grants no privileges.
 
-The guarded baseline only creates a missing table. No existing-table migration
-or subsystem version increase is supplied.
+The guarded baseline creates a missing table and widens an existing int
+WorkingSetDelta column to nullable bigint without replacing rows. The installer
+runs this baseline while Monitoring is at version 0.0.0; installed versions above
+0.0.0 skip baselines and require a separate upgrade path. No version increase is
+supplied.
