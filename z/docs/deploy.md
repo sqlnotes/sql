@@ -4,7 +4,9 @@
 
 ## Prerequisites
 
-Use PowerShell 7 (the traversal uses modern .NET path APIs) with the `SqlServer` PowerShell module available. Use a login allowed to create a database if needed, create/alter schema and module/table objects, maintain deployment metadata and execute the supplied administrative post scripts. Feature use may require separate Agent, Broker, server DMV, backup or security rights.
+Use PowerShell 7 (the traversal uses modern .NET path APIs). If the `SqlServer` PowerShell module is missing, the installer automatically downloads it from PSGallery using `Install-Module -Scope CurrentUser`; this requires PowerShellGet and gallery access, but no administrator elevation. An available module is reused. Download or import failures stop before database access. `-ShowPlan` does not install or import the module.
+
+Use a login allowed to create a database if needed, create/alter schema and module/table objects, maintain deployment metadata and execute the supplied administrative post scripts. Feature use may require separate Agent, Broker, server DMV, backup or security rights.
 
 The minimum supported version is SQL Server 2019 (15.x). [Compatibility limits](../System/docs/troubleshooting.md).
 

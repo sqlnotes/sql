@@ -20,6 +20,10 @@ if ($ShowPlan) { $plan; return }
 if ([string]::IsNullOrWhiteSpace($DatabaseName) -or $DatabaseName.Length -gt 128 -or $DatabaseName -match "['\]\r\n\$\(\)]") {
     throw 'DatabaseName must be 1-128 characters and cannot contain SQLcmd substitution delimiters, quotes, closing brackets, or line breaks.'
 }
+if (-not (Get-Module -ListAvailable -Name SqlServer)) {
+    Write-Host 'Installing the SqlServer PowerShell module for the current user...'
+    Install-Module -Name SqlServer -Scope CurrentUser -Repository PSGallery -Force -ErrorAction Stop
+}
 Import-Module SqlServer -ErrorAction Stop
 $connectionString = New-DeployConnectionString $ServerName $DatabaseName $UserName $Password (-not $DisableTrustServerCertificate)
 $bootstrapConnectionString = New-DeployConnectionString $ServerName 'master' $UserName $Password (-not $DisableTrustServerCertificate)
