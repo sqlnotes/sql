@@ -200,12 +200,9 @@ begin try
 	begin
 		select @ReadEvents = 0, @EventID = null, @EventName = null,
 			@ScrollOption = 8, @Concurrency = 1, @CursorRows = 0;
-		if @CursorHandle = 0
-		begin
-			exec sys.sp_cursoropen @CursorHandle output, @ReadSQL, @ScrollOption output, @Concurrency output, @CursorRows output;
-			exec sys.sp_cursoroption @CursorHandle, 2, N''__z_ApiTraceBuffer__'';
-		end
-		else open global __z_ApiTraceBuffer__;
+		-- A fresh API cursor avoids SET-option checks when reopening a closed cursor.
+		exec sys.sp_cursoropen @CursorHandle output, @ReadSQL, @ScrollOption output, @Concurrency output, @CursorRows output;
+		exec sys.sp_cursoroption @CursorHandle, 2, N''__z_ApiTraceBuffer__'';
 		fetch next from global __z_ApiTraceBuffer__ into @ColumnID, @FrameLength, @Data;
 		select @FetchStatus = @@fetch_status;
 		while @FetchStatus = 0
@@ -238,7 +235,8 @@ begin try
 				end;
 			end;
 		end;
-		close global __z_ApiTraceBuffer__;
+		exec sys.sp_cursorclose @CursorHandle;
+		select @CursorHandle = 0;
 		if @ReadEvents = 0
 		begin
 			if @@trancount > 0 commit;

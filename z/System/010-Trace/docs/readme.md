@@ -13,7 +13,7 @@ Build logical SQL Trace definitions through framework procedures. Each collector
 
 ## Operational scope
 
-Configure and collect on one dedicated connection and database. Different sessions have independent runs and may use identical logical names. Creation and logical Start allocate no native trace; Collect allocates one for the run. Collection is synchronous and reuses a static API cursor with CLOSE/OPEN over bounded one-frame sp_trace_getdata reads. This backend can lose events even with zero native drops; merging does not establish complete reception or a callback latency guarantee. Raw saving and parsing remain combined. Use the [bounded custom example](usage.md#bounded-custom-trace).
+Configure and collect on one dedicated connection and database. Different sessions have independent runs and may use identical logical names. Creation and logical Start allocate no native trace; Collect allocates one for the run. Collection is synchronous and creates a fresh static API cursor for each bounded one-frame sp_trace_getdata read. This backend can lose events even with zero native drops; merging does not establish complete reception or a callback latency guarantee. Raw saving and parsing remain combined. Use the [bounded custom example](usage.md#bounded-custom-trace).
 
 This initial schema redesign changes table shapes and logical ID semantics. Baseline guards do not migrate existing tables: use a fresh installation or explicitly recreate the development schema. No version increment or migration is supplied.
 
