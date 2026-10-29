@@ -10,7 +10,7 @@ Each folder visits pre → baseline → versions → modules → direct SQL file
 
 Only nonreserved children of subsystem roots become separately owned/versioned systems. Reserved names are pre, baseline, versions, modules, post, tests, docs. Descendants within a reserved stage organize that stage's files. Docs are excluded. Linked/reparse-point folders and invalid version paths are rejected.
 
-Children run sequentially: 010-Jobs, 010-Partition, 010-Security, 010-Trace, 020-Backup, 020-Monitoring, then 070-Async. A shared numeric prefix groups children with no installation ordering dependency among themselves; the installer still sorts their complete folder names alphabetically. System modules precede children and System post follows them.
+Children run sequentially: 010-Jobs, 010-Partition, 010-Security, 010-Trace, 020-Backup, then 020-Monitoring. A shared numeric prefix groups children with no installation ordering dependency among themselves; the installer still sorts their complete folder names alphabetically. System modules precede children and System post follows them.
 
 ## Baselines and identities
 

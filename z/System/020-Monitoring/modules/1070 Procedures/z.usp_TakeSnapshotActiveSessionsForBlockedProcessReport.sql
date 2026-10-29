@@ -40,9 +40,8 @@ begin
 	exec sp_set_session_context N'z.usp_TakeSnapshotActiveSessionsForBlockedProcessReport-2', @Date
 	
 
-	insert into z.TraceBlockedProcessReportActiveSessions(TraceSequence, SessionID, StartDate, BlockingSessionID, DurationInSecond, Status, Command, WaitType, WaitTime, WaitResource, LastWaitType, CPU, Reads, Writes, LogicalReads, TotalElapsedTime, DatabaseName, SQLText, /*QueryPlan,*/ GrantedMemory, NestedLevel, [RowCount], OpenTranCount, TransactionIsolationLevel, LoginName, HostName, HostAddress, ApplicationName)
-		select  @TraceSequence, SessionID, StartDate, BlockingSessionID, DurationInSecond, Status, Command, WaitType, WaitTime, WaitResource, LastWaitType, CPU, Reads, Writes, LogicalReads, TotalElapsedTime, DatabaseName, SQLText, /*QueryPlan,*/ GrantedMemory, NestedLevel, [RowCount], OpenTranCount, TransactionIsolationLevel, LoginName, HostName, HostAddress, ApplicationName
+	insert into z.TraceBlockedProcessReportActiveSessions(TraceSequence, SessionID, StartDate, BlockerSessionID, DurationInSecond, Status, Command, WaitType, WaitTime, WaitResource, LastWaitType, CPU, Reads, Writes, LogicalReads, TotalElapsedTime, DatabaseName, SQLText, /*QueryPlan,*/ GrantedMemory, NestedLevel, [RowCount], OpenTranCount, TransactionIsolationLevel, ExecutingManagedCode, MaxVersionTraversed, AverageVersionChainTraversed, TranDurationInSecond, LoginName, HostName, HostAddress, ApplicationName, BlockerLoginName, BlockerHostName, BlockerAddress, BlockerApplicationName, BlockerQuery, BlockerLastExecutedCommand)
+		select  @TraceSequence, SessionID, StartDate, BlockerSessionID, DurationInSecond, Status, Command, WaitType, WaitTime, WaitResource, LastWaitType, CPU, Reads, Writes, LogicalReads, TotalElapsedTime, DatabaseName, SQLText, /*QueryPlan,*/ GrantedMemory, NestedLevel, [RowCount], OpenTranCount, TransactionIsolationLevel, ExecutingManagedCode, MaxVersionTraversed, AverageVersionChainTraversed, TranDurationInSecond, LoginName, HostName, HostAddress, ApplicationName, BlockerLoginName, BlockerHostName, BlockerAddress, BlockerApplicationName, BlockerQuery, BlockerLastExecutedCommand
 	from z.v_ActiveSessions
 end
 GO
-

@@ -1,0 +1,25 @@
+create or alter view z.v_ActiveSessionsNoPlan
+as
+	select  r.Session_ID SessionID, r.start_time StartDate,r.blocking_session_id BlockerSessionID, datediff(second,r.start_time, getdate()) DurationInSecond,
+		r.status Status, r.command Command,
+		r.wait_type WaitType, r.wait_time WaitTime, r.wait_resource WaitResource, r.last_wait_type LastWaitType,
+		r.cpu_time CPU, r.reads Reads, r.writes Writes, r.logical_reads LogicalReads, r.total_elapsed_time TotalElapsedTime,
+		db_name(r.database_id) DatabaseName,
+		t.text SQLText, cast(null as xml) QueryPlan,
+		r.granted_query_memory GrantedMemory, r.nest_level NestedLevel, r.row_count [RowCount], r.open_transaction_count OpenTranCount, r.transaction_isolation_level TransactionIsolationLevel,
+		r.executing_managed_code ExecutingManagedCode,
+		a.max_version_chain_traversed MaxVersionTraversed, a.average_version_chain_traversed AverageVersionChainTraversed, a.elapsed_time_seconds TranDurationInSecond,
+		s.login_name LoginName, s.host_name HostName, c.client_net_address HostAddress,s.program_name ApplicationName,
+		bs.login_name BlockerLoginName, bs.host_name BlockerHostName, bc.client_net_address BlockerAddress, bs.program_name BlockerApplicationName, bt.text BlockerQuery,
+		bi.event_info BlockerLastExecutedCommand
+	from sys.dm_exec_requests r
+		left outer loop join sys.dm_exec_sessions s on r.session_id = s.session_id
+		left outer loop join sys.dm_exec_connections c on c.session_id = s.session_id
+		left outer loop join sys.dm_tran_active_snapshot_database_transactions a on a.session_id = r.session_id
+		left outer loop join sys.dm_exec_sessions bs on bs.session_id = r.blocking_session_id
+		left outer loop join sys.dm_exec_connections bc on bc.session_id = bs.session_id
+		left outer loop join sys.dm_exec_requests br on br.session_id = bs.session_id
+		outer apply sys.dm_exec_sql_text(r.sql_handle) t
+		outer apply sys.dm_exec_sql_text(coalesce(br.sql_handle, bc.most_recent_sql_handle)) bt
+		outer apply sys.dm_exec_input_buffer(bs.session_id, null) bi
+	where r.session_id not in (@@SPID)

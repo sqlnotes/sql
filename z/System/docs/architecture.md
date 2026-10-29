@@ -36,10 +36,12 @@ Retired names and their current replacements:
 | --- | --- |
 | `z.DatabaseSchemas` | Explicit `@SchemaNames`/`@TableNames` arguments to `z.usp_ForceNamingConvention` |
 | `z.usp_DataInitialization_DatabaseSchemas` | No initialization needed; callers select naming scope explicitly |
-| `z.usp_CollectInfo` | Call `z.usp_CheckSystemHealthTrace` and `z.usp_TakeSnapshotActiveSessions` directly as needed |
+| `z.usp_CheckSystemHealthTrace` | `z.usp_CollectSystemHealthEvents` |
+| `z.usp_CollectInfo` | Call `z.usp_CollectSystemHealthEvents` and `z.usp_TakeSnapshotActiveSessions` directly as needed |
 | `z.usp_DatabaseBackup` | `z.usp_BackupDatabase` |
 | `z.usp_RemoveZSchema` | `z.usp_RemoveSchemaZ` |
-| `z.v_ObjectSpaceUsage` | `z.v_IndexSpaceUsage` |
+| `z.v_ObjectSpaceUsage` | `z.v_IndexSpaceUsed` |
+| `z.v_IndexSpaceUsage` | `z.v_IndexSpaceUsed` |
 | `z._fn_SecondToTimeString` | `z.fn_FormatDurationSeconds` |
 | `z.fn_ConvertToSQLAgentSchedule` | `z.fn_ToSQLAgentSchedule`, `z.fn_FromSQLAgentSchedule` |
 | `z.fn_CopyTableSchema` | `z.usp_CopyTableSchema` |

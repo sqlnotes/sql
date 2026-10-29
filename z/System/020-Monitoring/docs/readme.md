@@ -8,6 +8,7 @@ Inspect current requests, persist diagnostic snapshots, collect selected system_
 
 - [Usage and examples](usage.md)
 - [Architecture and dependencies](architecture.md)
+- [Error and long-running query Extended Events](reference/extended-events.md)
 - [Object reference](reference/readme.md)
 - [Troubleshooting and current limitations](troubleshooting.md)
 
@@ -17,4 +18,4 @@ Snapshots capture requests at collection time, not a full session history. Query
 
 ## Prerequisites
 
-System supplies z.SeqGeneralID and PS_SchemaZPartitionGeneric. Server DMVs, Extended Events, and msdb Database Mail supply external data. System orchestration can schedule collection through Jobs. [Trace](../../010-Trace/docs/readme.md) supplies the SQL Trace framework for monitoring presets and installs before Monitoring.
+System supplies z.SeqGeneralID, PS_SchemaZPartitionGeneric and PS_SchemaZPartitionGenericDateTime. Server DMVs, Extended Events, and msdb Database Mail supply external data. System orchestration can schedule collection through Jobs. [Trace](../../010-Trace/docs/readme.md) supplies the SQL Trace framework for monitoring presets and installs before Monitoring.

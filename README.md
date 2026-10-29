@@ -5,7 +5,7 @@ features. SQL objects use the `z` schema. Numbered subsystem folders establish
 deployment order and independent deployment histories.
 
 Start with the [System developer guide](z/System/docs/readme.md). It links to
-shared utilities, object references, and the seven feature subsystems:
+shared utilities, object references, and the six feature subsystems:
 
 - [Partition](z/System/010-Partition/docs/readme.md): boundaries and retention.
 - [Monitoring](z/System/020-Monitoring/docs/readme.md): sessions, diagnostic trace presets and resource information.
@@ -13,7 +13,6 @@ shared utilities, object references, and the seven feature subsystems:
 - [Jobs](z/System/010-Jobs/docs/readme.md): SQL Agent jobs and schedule helpers.
 - [Backup](z/System/020-Backup/docs/readme.md): backups and database snapshots.
 - [Security](z/System/010-Security/docs/readme.md): permission generators and user utilities.
-- [Async](z/System/070-Async/docs/readme.md): Service Broker sender infrastructure.
 
 Read [deployment](z/docs/deploy.md) before running `z/Deploy.ps1`. Review each
 feature's prerequisites and limitations before using its examples. Installation

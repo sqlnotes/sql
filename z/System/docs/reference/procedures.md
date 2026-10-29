@@ -204,7 +204,7 @@ create or alter procedure z.usp_RemoveSchemaZ
 )
 ```
 
-Confirm=1 attempts destructive removal of z plan guides/objects, generic partitions, itself/schema. Completion is not reliable: the Async service blocks its queue drop, dependency ordering is incomplete, and types/XML schema collections are omitted. No transaction or safe progress guarantee; errors print and retry, and it removes itself before the final schema drop. Agent/Broker artifacts are not comprehensively removed. Needs broad DDL. See [removal limitations](../troubleshooting.md#removal).
+Confirm=1 attempts destructive removal of z plan guides/objects, generic partitions, itself/schema. Completion is not reliable: a retained Async service can block its queue drop on older installations, dependency ordering is incomplete, and types/XML schema collections are omitted. No transaction or safe progress guarantee; errors print and retry, and it removes itself before the final schema drop. Agent/Broker artifacts are not comprehensively removed. Needs broad DDL. See [removal limitations](../troubleshooting.md#removal).
 
 ## z.usp_SetLargeValueOutOfRow
 

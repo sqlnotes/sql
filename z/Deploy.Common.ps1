@@ -3,7 +3,7 @@ Set-StrictMode -Version Latest
 
 function Get-DeployChildren {
     param([string] $Path, [switch] $Files)
-    $items = if ($Files) { @(Get-ChildItem -LiteralPath $Path -File -Filter '*.sql') } else { @(Get-ChildItem -LiteralPath $Path -Directory) }
+    $items = if ($Files) { @(Get-ChildItem -LiteralPath $Path -File -Filter '*.sql') } else { @(Get-ChildItem -LiteralPath $Path -Directory | Where-Object Name -NE '.vs') }
     $names = [string[]]@($items | ForEach-Object Name)
     [Array]::Sort($names, [StringComparer]::OrdinalIgnoreCase)
     foreach ($name in $names) { $items | Where-Object Name -CEQ $name }

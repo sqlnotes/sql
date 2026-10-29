@@ -1,6 +1,7 @@
 create or alter view z.v_ObjectSpaceUsed
 as
-select 
+select
+	a1.object_id ObjectID,
 	object_schema_name(a1.object_id) SchemaName, object_name(a1.object_id) TableName,
 	a1.rows [RowCount],
 	(a1.reserved + isnull(a4.reserved,0))* 8 as ReservedKB,

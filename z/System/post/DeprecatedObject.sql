@@ -2,6 +2,7 @@
 exec z.usp_DropObject @ObjectName = N'z.TRI_v_DatabaseBackupStatus';
 
 -- Procedures
+exec z.usp_DropObject @ObjectName = N'z.usp_CheckSystemHealthTrace';
 exec z.usp_DropObject @ObjectName = N'z.usp_BackupDatabaseWork';
 exec z.usp_DropObject @ObjectName = N'z.usp_DataInitialization_DatabaseSchemas';
 exec z.usp_DropObject @ObjectName = N'z.usp_CollectInfo';
@@ -9,6 +10,7 @@ exec z.usp_DropObject @ObjectName = N'z.usp_DatabaseBackup';
 exec z.usp_DropObject @ObjectName = N'z.usp_RemoveZSchema';
 
 -- Views
+exec z.usp_DropObject @ObjectName = N'z.v_IndexSpaceUsage';
 exec z.usp_DropObject @ObjectName = N'z.v_DatabaseBackupStatus';
 exec z.usp_DropObject @ObjectName = N'z.v_ObjectSpaceUsage';
 

@@ -4,20 +4,35 @@
 
 ## Purpose and behavior
 
-Read the system_health ring_buffer target and shred each event XML. Date converts timestamps using the current server UTC offset; DateUTC preserves the parsed UTC value. The computed row_number is not filtered, so this function does not deduplicate events.
+Inline table-valued XML decoder, following the same input/return structure as
+z.fn_ExtractErrorEvent and z.fn_ExtractLongRunningQueryEvent. Shreds each event
+under RingBufferTarget in the supplied XML. It does not read server DMVs, convert
+to local time, filter event names or deduplicate rows. The collector owns server
+access, event filtering and persistence.
 
 ## Parameters and defaults
 
-None.
+```text
+@TargetData xml
+```
 
-These are the source-declared types and defaults. Table-valued-function callers must supply arguments or the `default` keyword explicitly.
+No default. Callers supply the target XML explicitly; null or empty XML returns
+no events.
 
 ## Results, permissions, and limits
 
-Returns Date datetime, EventName varchar(128), EventBody xml, DateUTC datetime. No write side effects; no inputs.
+Returns EventDateUTC datetime, EventName nvarchar(128), EventHash uniqueidentifier,
+and EventBody xml in that order. UTC timestamps use the same offset normalization
+as the other event extractors. EventHash is the MD5 of the original event XML
+converted to varbinary(max). EventBody retains the full original timestamp;
+EventDateUTC has SQL datetime precision. No write side effects or server access.
 
-## Dependencies
+The former no-argument function and Date/DateUTC outputs are replaced by this
+XML-input interface. Update external callers together with the collector.
 
-Native dependencies: `sys.dm_xe_session_targets`, `sys.dm_xe_sessions`.
+## Dependencies and deployment
 
-See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for subsystem-wide constraints.
+No native DMV dependencies. XML methods and built-in time/hash functions are used.
+
+See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md)
+for subsystem-wide constraints.
