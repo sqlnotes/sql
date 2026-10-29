@@ -109,8 +109,8 @@ MemoryUtilizationPercentage int. Date is required; measurements are nullable.
 No RecordID or SQLServerStartTime is stored.
 
 The page-compressed primary key is Date on
-PS_SchemaZPartitionGenericDateTime(Date). CK_z_CPUMemoryStats_DateSecond requires
-zero milliseconds. The collector truncates Date to seconds, chooses the latest
+PS_SchemaZPartitionGenericDateTime(Date). There is no whole-second CHECK on Date;
+direct writes may contain fractional seconds. The collector truncates Date to seconds, chooses the latest
 source reading within each second, updates matching rows and inserts missing
 seconds. It does not generate missing observations or perform metric averaging.
 See [the collector](z.usp_CollectCPUMemoryStats.md) for permissions and behavior.

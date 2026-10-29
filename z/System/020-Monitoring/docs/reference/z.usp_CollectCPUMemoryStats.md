@@ -17,8 +17,9 @@ native sampling interval. It installs no polling job or automatic retention.
 
 The collector uses READ COMMITTED and serializes its writes using an exclusive
 transaction-owned application lock with a 10-second timeout. The MERGE matches
-only Date and uses HOLDLOCK. The primary key and whole-second check enforce one
-stored row per second. The collector opens/commits a transaction and rethrows
+only Date and uses HOLDLOCK. The collector's rounding and the Date primary key
+produce one stored row per collected second. The table does not validate whole
+seconds on direct writes. The collector opens/commits a transaction and rethrows
 failures after rollback. Caller transactions are allowed; a successful nested
 call leaves the caller transaction open and holds its locks until that outer
 transaction ends. The catch can roll back the entire caller transaction on failure.
