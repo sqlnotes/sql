@@ -69,6 +69,11 @@ begin
 								@EventList = 'Data File Auto Grow,Log File Auto Grow',
 								@EventColumnList = 'DatabaseID,NTDomainName,HostName,ClientProcessID,ApplicationName,LoginName,SPID,Duration,StartTime,EndTime,IntegerData,ServerName,EventClass,DatabaseName,FileName,LoginSid,EventSequence,IsSystem,SessionLoginName'
 	 
+	exec z.usp_TraceAddFilter @TraceName = @TraceName,
+								@ColumnName = 'SPID',
+								@LogicOperator = 'and',
+								@ComparisonOperator = '<>',
+								@Value = @@spid
 	exec z.usp_TraceSetTrigger @TraceID = @TraceID, @EventName = N'all', @ProcedureName = N'z.usp_TakeSnapshotActiveSessionsForFileAutoGrow';
 	exec z.usp_TraceStart @TraceName = @TraceName
 

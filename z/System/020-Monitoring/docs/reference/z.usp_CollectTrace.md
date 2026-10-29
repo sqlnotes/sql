@@ -4,7 +4,7 @@
 
 ## Purpose and behavior
 
-Build/enable four logical presets: BlockedProcessReport, LongRunningQueryTrace, TraceErrors, FileAutoGrowTrace. Exclude collector SPID where configured; long-running duration threshold is 1300000 microseconds. Register all-event snapshot callbacks through z.usp_TraceSetTrigger for blocking and growth, then invoke z.usp_TraceCollectAndClose with its long default duration. Create/Start allocate no native trace. Collect merges the enabled logical definitions into one physical trace for this session and keeps their filters/destinations independent.
+Build/enable four logical presets: BlockedProcessReport, LongRunningQueryTrace, TraceErrors, FileAutoGrowTrace. Exclude the collector SPID in all four presets, enabling the shared native SPID exclusion and avoiding capture of the collector's own decoding statements. Collector-owned file growth is excluded; long-running duration threshold is 1300000 microseconds. Register all-event snapshot callbacks through z.usp_TraceSetTrigger for blocking and growth, then invoke z.usp_TraceCollectAndClose with its long default duration. Create/Start allocate no native trace. Collect captures the enabled definitions through overlapping physical generations for this session, materializes each rowset directly into a temporary table, and processes it with one receiving connection. Filters and destinations remain independent.
 
 ## Parameters and defaults
 
@@ -26,4 +26,4 @@ Startup first calls z.usp_TraceCleanupCollectors. TraceCreate registers this ses
 
 Cleanup preserves idle Building runs while their original session exists, and Collecting runs while the original owner has any active request. Full server session/request visibility and a dedicated connection/database are required. Callbacks receive named TraceSequence, logical TraceID and EventName parameters; all-event callbacks override event-specific registrations.
 
-The retained one-frame bounded rowset backend can lose unread events despite zero native drops. Merging does not establish losslessness, a callback deadline or a performance winner. Raw saving and parsing are not separated.
+A generation is received without a record quota into a temporary table, then processed while other generations continue capturing. Internal EventSequence deduplicates overlap. Native expiry/EOF and callback timing are soft; snapshot callbacks read current sessions when processing runs. Native buffers and overlap remain finite, so successful completion does not certify completeness under every load.

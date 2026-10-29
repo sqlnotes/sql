@@ -8,9 +8,9 @@ TraceID identifies a logical definition. Inspect NativeTraceID in z.v_TraceOwned
 
 An idle Building run is preserved while its original owner exists. An abandoned Collecting run is eligible when its owner has no active request; run cleanup from a separate privileged connection. Native generation mismatches remain registered for manual review. Different sessions can use identical logical names independently.
 
-Callback failure rolls back the current batch; prior commits survive. One-frame bounded reads can lose unread events with zero native drops. The collector does not poll native counters or raise its own exceptions for dropped or missing events. Genuine SQL/API and callback errors still propagate; successful return does not prove completeness. Blocking reads and slow callbacks can exceed time budgets. Separate raw saving and parsing are not implemented.
+Callback failure rolls back the current batch; prior commits survive. Native expiry/EOF supplies periodic temp-buffer processing while overlapping generations capture. SQL and callback errors propagate, but the generated loop adds no custom completeness errors. Expiry scheduling, blocking reads and slow callbacks can exceed time budgets. Snapshot callbacks observe current sessions when their buffer is processed. Finite native buffers and processing that exhausts overlap can still lose events; successful return and zero native drops are not completeness proofs.
 
-This initial redesign has no migration: guarded baselines do not update existing table shapes. Install fresh or explicitly recreate the development schema. Collect no longer accepts TraceName/TraceID selectors.
+When its baseline is eligible, the physical-mapping definition upgrades the original single-generation primary key while preserving rows. Other existing table shapes are not reconciled; those require a fresh installation or an explicit schema transition. Collect no longer accepts TraceName/TraceID selectors.
 
 ## Permission and partial-operation failures
 

@@ -1,6 +1,7 @@
 create or alter procedure z.usp_TraceOpenPhysical
 (
-	@NativeTraceID int output
+	@NativeTraceID int output,
+	@StopAt datetime = null
 )
 as
 begin
@@ -12,26 +13,42 @@ begin
 	end;
 	exec z.usp_TraceAssertOwner;
 	declare @CollectorUUID uniqueidentifier = try_convert(uniqueidentifier, session_context(N'Schema z.TraceCollector.UUID')),
-		@NativeStopTime datetime, @TraceFile nvarchar(256) = null, @MaxFileSize bigint = 5,
+		@NativeStopTime datetime, @TraceFile nvarchar(256) = null, @MaxFileSize bigint = 5, @State varchar(10),
 		@ReturnCode int, @EventID int, @ColumnID int, @SPIDValue int, @ComparisonOperator varchar(8), @ComparisonInt int;
 	select @NativeTraceID = null;
-	if not exists(select 1 from z.TraceCollector where CollectorUUID = @CollectorUUID and State = 'Building')
-		throw 50000, N'The current collector is already collecting.', 1;
+	select @State = State from z.TraceCollector where CollectorUUID = @CollectorUUID;
+	if @State is null or @State not in ('Building', 'Collecting')
+		throw 50000, N'The current collector cannot allocate a physical generation.', 1;
 	if not exists(select 1 from z.Trace where CollectorUUID = @CollectorUUID and IsEnabled = 1)
+	begin
+		if @State = 'Collecting' return;
 		throw 50000, N'Enable at least one logical trace before collecting.', 1;
+	end;
+	if @StopAt is not null and @StopAt <= getdate()
+		throw 50000, N'The native trace stop time must be in the future.', 1;
 	if exists
 	(
 		select 1 from z.Trace t where t.CollectorUUID = @CollectorUUID and t.IsEnabled = 1
 			and not exists(select 1 from z.TraceEvent e where e.TraceID = t.TraceID)
 	)
 		throw 50000, N'Every enabled logical trace must select at least one event.', 1;
+	if exists
+	(
+		select 1 from z.Trace t inner join z.TraceEvent e on e.TraceID = t.TraceID
+		where t.CollectorUUID = @CollectorUUID and t.IsEnabled = 1
+			and not exists(select 1 from sys.trace_event_bindings b where b.trace_event_id = e.EventID and b.trace_column_id = 51)
+	)
+		throw 50000, N'Every selected event must support EventSequence for generation handoff.', 1;
 	-- Freeze the run before any nontransactional native allocation.
-	update z.TraceCollector set State = 'Collecting' where CollectorUUID = @CollectorUUID and State = 'Building';
-	if @@rowcount <> 1 throw 50000, N'The collector state changed before native allocation.', 1;
+	if @State = 'Building'
+	begin
+		update z.TraceCollector set State = 'Collecting' where CollectorUUID = @CollectorUUID and State = 'Building';
+		if @@rowcount <> 1 throw 50000, N'The collector state changed before native allocation.', 1;
+	end;
 	begin try
 		-- Expiry distinguishes a recycled native ID even before the first start.
-		select @NativeStopTime = dateadd(millisecond, convert(int, abs(convert(bigint, checksum(newid()))) % 86400000),
-			dateadd(day, convert(int, abs(convert(bigint, checksum(newid()))) % 36500), convert(datetime, '22000101')));
+		select @NativeStopTime = isnull(@StopAt, dateadd(millisecond, convert(int, abs(convert(bigint, checksum(newid()))) % 86400000),
+			dateadd(day, convert(int, abs(convert(bigint, checksum(newid()))) % 36500), convert(datetime, '22000101'))));
 		exec @ReturnCode = sys.sp_trace_create @traceid = @NativeTraceID output, @options = 1, @tracefile = @TraceFile,
 			@maxfilesize = @MaxFileSize, @stoptime = @NativeStopTime;
 		if @ReturnCode <> 0 throw 50000, N'Failed to allocate the physical trace.', 1;
@@ -46,7 +63,7 @@ begin
 				inner join z.TraceEvent e on e.TraceID = t.TraceID
 				inner join sys.trace_event_bindings b on b.trace_event_id = e.EventID
 			where t.CollectorUUID = @CollectorUUID and t.IsEnabled = 1
-				and (b.trace_column_id = 12
+				and (b.trace_column_id in (12, 51)
 					or exists(select 1 from z.TraceEventColumn c where c.TraceID = t.TraceID and c.EventID = e.EventID and c.ColumnID = b.trace_column_id)
 					or exists(select 1 from z.TraceFilter f where f.TraceID = t.TraceID and f.ColumnID = b.trace_column_id))
 			order by e.EventID, b.trace_column_id;
@@ -81,22 +98,27 @@ begin
 		if @ReturnCode <> 0 throw 50000, N'Failed to start the physical trace.', 1;
 		update m set NativeStartTime = n.start_time
 		from z.TraceCollectorTrace m inner join sys.traces n on n.id = m.TraceID and n.stop_time = m.NativeStopTime
-		where m.CollectorUUID = @CollectorUUID;
+		where m.CollectorUUID = @CollectorUUID and m.TraceID = @NativeTraceID and m.NativeStopTime = @NativeStopTime;
 		if @@rowcount <> 1 throw 50000, N'Physical trace start ownership could not be recorded.', 1;
 	end try
 	begin catch
 		-- Cover registration failures before a mapping exists without touching an ID's other generation.
 		begin try
-			if @NativeTraceID is not null and not exists(select 1 from z.TraceCollectorTrace where CollectorUUID = @CollectorUUID)
+			if @NativeTraceID is not null and not exists(select 1 from z.TraceCollectorTrace where CollectorUUID = @CollectorUUID and TraceID = @NativeTraceID and NativeStopTime = @NativeStopTime)
 				and exists(select 1 from sys.traces where id = @NativeTraceID and stop_time = @NativeStopTime)
 			begin
 				exec @ReturnCode = sys.sp_trace_setstatus @NativeTraceID, 2;
 				if @ReturnCode <> 0 throw 50000, N'Unregistered physical trace cleanup failed; manual review is required.', 1;
 			end;
+		end try
+		begin catch
+			print N'Unregistered physical trace cleanup failed; the native allocation requires review.';
+		end catch;
+		begin try
 			exec z.usp_TraceClose;
 		end try
 		begin catch
-			print N'Physical trace setup cleanup failed; retained ownership or the native allocation requires review.';
+			print N'Physical trace setup cleanup failed; retained ownership requires review.';
 		end catch;
 		throw;
 	end catch;

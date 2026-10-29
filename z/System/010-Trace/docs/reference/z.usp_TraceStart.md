@@ -4,7 +4,7 @@
 
 ## Purpose and behavior
 
-Enable matching logical definitions in the current Building run by setting IsEnabled=1. With neither selector supplied, enable all current-run definitions. Allocate no native trace and start no reader. Events, columns, filters and callbacks may still be configured while Building. Collect creates the shared physical trace later.
+Enable matching logical definitions in the current Building run by setting IsEnabled=1. With neither selector supplied, enable all current-run definitions. Allocate no native trace and start no reader. Events, columns, filters and callbacks may still be configured while Building. Collect creates the overlapping physical generations later. Stop and Close may select logical definitions across owners; Start still requires its owning session.
 
 ## Parameters and defaults
 

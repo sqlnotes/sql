@@ -2,7 +2,7 @@
 
 [System documentation](../../docs/readme.md)
 
-Build logical SQL Trace definitions through framework procedures. Each collector session merges its enabled definitions into one physical SQL Trace and routes matching events to their destination tables and callbacks.
+Build logical SQL Trace definitions through framework procedures. Each collector session shares their event-column union across overlapping physical rowset generations and routes matching events to destination tables and callbacks using one receiving connection.
 
 ## Start here
 
@@ -13,9 +13,9 @@ Build logical SQL Trace definitions through framework procedures. Each collector
 
 ## Operational scope
 
-Configure and collect on one dedicated connection and database. Different sessions have independent runs and may use identical logical names. Creation and logical Start allocate no native trace; Collect allocates one for the run. Collection is synchronous and creates a fresh static API cursor for each bounded one-frame sp_trace_getdata read. This backend can lose events even with zero native drops; merging does not establish complete reception or a callback latency guarantee. Raw saving and parsing remain combined. Use the [bounded custom example](usage.md#bounded-custom-trace).
+Configure and collect on one dedicated connection and database. Sessions have independent runs and may use identical logical names. Create/Start allocate no native trace. Collect keeps overlapping generations capturing while it receives each uninterrupted rowset directly into a temp table and processes that buffer in order. EventSequence deduplicates overlap; output masking is preserved. Native expiry and processing timing are soft, and complete reception is not guaranteed under every load. No API cursor or additional receiving worker is used. See the [bounded custom example](usage.md#bounded-custom-trace).
 
-This initial schema redesign changes table shapes and logical ID semantics. Baseline guards do not migrate existing tables: use a fresh installation or explicitly recreate the development schema. No version increment or migration is supplied.
+Logical IDs remain distinct from native generation IDs. The eligible physical-mapping baseline upgrades its original single-generation primary key. Other existing table shapes are not reconciled. No version increment or new migration is supplied.
 
 ## Prerequisites
 

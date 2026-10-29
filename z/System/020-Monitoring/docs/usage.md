@@ -80,7 +80,7 @@ and XML truncation can leave gaps between polls.
 
 ## SQL Trace diagnostics
 
-Read [the preset collector reference](reference/z.usp_CollectTrace.md) before running it: it builds/enables four logical definitions, merges them into one physical trace for the collector session, and enters synchronous collection with a long default duration. Configure and collect on the same connection. For a bounded custom trace, see [Trace usage](../../010-Trace/docs/usage.md#bounded-custom-trace).
+Read [the preset collector reference](reference/z.usp_CollectTrace.md) before running it: it builds/enables four logical definitions, captures their union through overlapping physical rowset generations with one receiving connection, and enters synchronous collection with a long default duration. Configure and collect on the same connection. For a bounded custom trace, see [Trace usage](../../010-Trace/docs/usage.md#bounded-custom-trace).
 
 Read retained daily summaries without starting collection:
 

@@ -11,7 +11,7 @@ select TraceID, Name, IsEnabled, State, NativeTraceID, ReceivingTable
 from z.v_TraceOwned;
 ```
 
-Build all logical definitions and collect on one dedicated connection. Start only enables each logical definition. Collect freezes the run and creates one physical trace for all enabled definitions; other sessions remain independent. Diagnostic presets and daily reports belong to [Monitoring](../../020-Monitoring/docs/usage.md). Use the bounded custom example below during development.
+Build all logical definitions and collect on one dedicated connection. Start only enables each logical definition. Collect freezes the run and uses overlapping physical generations for all enabled definitions; one receiving connection processes their temp buffers and other sessions remain independent. Diagnostic presets and daily reports belong to [Monitoring](../../020-Monitoring/docs/usage.md). Use the bounded custom example below during development.
 
 ## Bounded custom trace
 

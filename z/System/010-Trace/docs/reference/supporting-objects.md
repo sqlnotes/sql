@@ -40,7 +40,7 @@ Procedural callback registration, not a DML trigger. Key (TraceID, EventName); P
 
 [Collector source](../../baseline/2020%20Tables/z.TraceCollector.sql) | [Physical mapping source](../../baseline/2020%20Tables/z.TraceCollectorTrace.sql)
 
-Collector stores UUID, owner session/login generation, creation time and Building/Collecting state. Each run owns zero native traces during setup and one during collection. The mapping stores the native TraceID, nullable start time, far-future native expiry generation tag and run name. It is not a logical-to-native per-definition mapping. All definitions obtain their shared native identity through CollectorUUID. Internal relationships are managed by procedures without foreign keys; do not populate these tables manually.
+Collector stores UUID, owner session/login generation, creation time and Building/Collecting state. Each run owns zero native traces during setup and multiple overlapping generations during collection. The composite key is (CollectorUUID, TraceID, NativeStopTime); each mapping also stores native start time and run name. Expiry can be a short scheduled handoff time. The eligible baseline upgrades the original CollectorUUID-only key. It is not a logical-to-native per-definition mapping. All definitions obtain their shared native identity through CollectorUUID. Internal relationships are managed by procedures without foreign keys; do not populate these tables manually.
 
 ## z.v_TraceOwned
 
