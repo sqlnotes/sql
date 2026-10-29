@@ -4,13 +4,21 @@
 
 ## Purpose and behavior
 
-Read the running system_health ring_buffer target, pass its XML to z.fn_ExtractSystemHealthEvent(@TargetData), exclude five noisy event names, and insert keys absent from z.SystemHealthEvent. The decoder supplies UTC EventDateUTC and MD5 EventHash. An absent/stopped session or missing target yields no rows. It has no explicit transaction or catch. This replaces z.usp_CheckSystemHealthTrace; update external jobs and callers to the new name. Central deployment cleanup removes the retired procedure.
+Read the running system_health ring_buffer target, pass its XML to z.fn_ExtractSystemHealthEvent(@TargetData), exclude seven noisy event names, and insert keys absent from z.SystemHealthEvent. The decoder supplies UTC EventDateUTC and MD5 EventHash. An absent/stopped session or missing target yields no rows. It has no explicit transaction or catch. This replaces z.usp_CheckSystemHealthTrace; update external jobs and callers to the new name. Central deployment cleanup removes the retired procedure.
 
 Within each input snapshot, the collector keeps one row per
 (EventDateUTC, EventName, EventHash) before checking the stored keys. Repeated
 source events therefore do not cause duplicate inserts in a single call. The
 decoder continues to return every source event. Concurrent calls are not
 serialized and can still race against the destination primary key.
+
+Excluded event names are `security_error_ring_buffer_recorded`,
+`connectivity_ring_buffer_recorded`,
+`scheduler_monitor_system_health_ring_buffer_recorded`,
+`sp_server_diagnostics_component_result`, `memory_broker_ring_buffer_recorded`,
+`wait_info`, and `scheduler_monitor_deadlock_ring_buffer_recorded`.
+Filtering applies to new collection; it does not delete stored events or change
+the server's system_health session.
 
 ## Parameters and defaults
 

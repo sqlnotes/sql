@@ -18,7 +18,7 @@ begin
 		where EventName not in (
 			'security_error_ring_buffer_recorded', 'connectivity_ring_buffer_recorded',
 			'scheduler_monitor_system_health_ring_buffer_recorded', 'sp_server_diagnostics_component_result',
-			'memory_broker_ring_buffer_recorded'
+			'memory_broker_ring_buffer_recorded', 'wait_info', 'scheduler_monitor_deadlock_ring_buffer_recorded'
 		)
 	)
 	insert into z.SystemHealthEvent(EventDateUTC, EventName, EventHash, EventBody)
