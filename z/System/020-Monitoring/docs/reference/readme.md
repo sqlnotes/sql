@@ -18,6 +18,8 @@ Exact SQL identifiers link to behavior and source. Native system dependencies ar
 | `z.usp_CollectCPUMemoryStats` | [Reference](z.usp_CollectCPUMemoryStats.md) | [SQL](../../modules/1070%20Procedures/z.usp_CollectCPUMemoryStats.sql) |
 | `z.v_CPUMemoryStats` | [Reference](supporting-objects.md#zv_cpumemorystats) | [SQL](../../modules/1020%20Views/z.v_CPUMemoryStats.sql) |
 | `z.v_IndexSpaceUsed` | [Reference](supporting-objects.md#zv_indexspaceused) | [SQL](../../modules/1020%20Views/z.v_IndexSpaceUsed.sql) |
+| `z.PerformanceCounters` | [Reference](z.usp_CollectPerformanceCounters.md) | [SQL](../../baseline/2020%20Tables/z.PerformanceCounters.sql) |
+| `z.usp_CollectPerformanceCounters` | [Reference](z.usp_CollectPerformanceCounters.md) | [SQL](../../modules/1070%20Procedures/z.usp_CollectPerformanceCounters.sql) |
 | `z.v_PerformanceCounters` | [Reference](supporting-objects.md#zv_performancecounters) | [SQL](../../modules/1030%20Views/z.v_PerformanceCounters.sql) |
 | `z.v_PerformanceCountersDefault` | [Reference](supporting-objects.md#zv_performancecountersdefault) | [SQL](../../modules/1030%20Views/z.v_PerformanceCountersDefault.sql) |
 | `z.v_PerformanceCounterTypes` | [Reference](supporting-objects.md#zv_performancecountertypes) | [SQL](../../modules/1020%20Views/z.v_PerformanceCounterTypes.sql) |

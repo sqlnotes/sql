@@ -35,6 +35,22 @@ seconds are inserted. The table does not store RecordID or server startup time. 
 [collector reference](reference/z.usp_CollectCPUMemoryStats.md) for transaction
 behavior, permissions and bounded-source limits.
 
+## Performance counter history
+
+```sql
+exec z.usp_CollectPerformanceCounters @Interval = 1, @Duration = 60;
+select Date, ObjectName, CounterName, InstanceName, CounterValue
+from z.PerformanceCounters
+order by Date desc, ObjectName, CounterName, InstanceName;
+```
+
+The collector persists each interval to the shared datetime partition scheme,
+using UTC sample times. Gauges store the latest reading, cumulative counts become
+per-second rates, and ratio/average counters use their matching bases. Raw values
+and actual elapsed seconds are retained. The default duration is 2147483647
+seconds; use an explicit duration for a bounded run. See the
+[collector and table reference](reference/z.usp_CollectPerformanceCounters.md).
+
 ## Performance counter types
 
 ```sql

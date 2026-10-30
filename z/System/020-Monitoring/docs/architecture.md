@@ -41,3 +41,12 @@ partition key on PS_SchemaZPartitionGenericDateTime. The System Health collector
 reads the native buffer before calling its XML-input inline extractor, which
 returns EventDateUTC directly. All three extractors are pure XML decoders; the
 original event XML retains the full timestamp precision.
+
+## Performance counter history
+
+`z.usp_CollectPerformanceCounters` samples `z.v_PerformanceCountersDefault` and
+persists latest gauges and calculated interval values to `z.PerformanceCounters`.
+UTC Date partitions share `PS_SchemaZPartitionGenericDateTime` and its existing
+maintenance policy. Short per-sample transactions commit before waits; no job or
+collection starts during installation. The [reference](reference/z.usp_CollectPerformanceCounters.md)
+describes timing, matching bases, missing values and transaction behavior.
