@@ -3,3 +3,6 @@
 *.user
 *.userosscache
 *.sln.docstates
+
+# Local System folders.
+/z/System/900-*/
