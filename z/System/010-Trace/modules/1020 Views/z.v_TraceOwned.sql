@@ -1,3 +1,9 @@
+/*
+Author: John Huang
+Author blog: https://www.sqlnotes.info/
+Repository: https://github.com/sqlnotes/sql
+Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Trace/modules/1020%20Views/z.v_TraceOwned.sql
+*/
 create or alter view z.v_TraceOwned
 as
 	select t.TraceID, t.Name, t.Description, t.CreationDate, t.ModificationDate, t.CreatorSessionID, t.ReceivingTable,

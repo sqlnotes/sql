@@ -1,3 +1,9 @@
+/*
+Author: John Huang
+Author blog: https://www.sqlnotes.info/
+Repository: https://github.com/sqlnotes/sql
+Source: https://github.com/sqlnotes/sql/blob/main/z/System/020-Backup/modules/1070%20Procedures/z.usp_BackupDatabase.sql
+*/
 create or alter procedure z.usp_BackupDatabase
 (
 	@Databases nvarchar(max) = 'AllDatabases', --'AllDatabases', 'UserDatabases', 'SystemDatabases', 'Database1,Dabase2...'

@@ -1,3 +1,9 @@
+/*
+Author: John Huang
+Author blog: https://www.sqlnotes.info/
+Repository: https://github.com/sqlnotes/sql
+Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Jobs/modules/1010%20Functions/z.fn_CleanseScheduleParameter.sql
+*/
 create or alter function z.fn_CleanseScheduleParameter
 (
 	@Frequency varchar(20) = 'Daily', --Monthly, Weekly, Daily, Agent Start, idle, Specific

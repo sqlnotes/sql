@@ -1,3 +1,9 @@
+/*
+Author: John Huang
+Author blog: https://www.sqlnotes.info/
+Repository: https://github.com/sqlnotes/sql
+Source: https://github.com/sqlnotes/sql/blob/main/z/System/modules/1010%20Functions/z.fn_FormatDurationSeconds.sql
+*/
 create or alter function z.fn_FormatDurationSeconds(@Seconds bigint)
 returns varchar(30)
 as

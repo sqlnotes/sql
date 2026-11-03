@@ -1,3 +1,9 @@
+<#
+Author: John Huang
+Author blog: https://www.sqlnotes.info/
+Repository: https://github.com/sqlnotes/sql
+Source: https://github.com/sqlnotes/sql/blob/main/z/Deploy.Common.ps1
+#>
 # Shared traversal and connection helpers for deployment and test execution.
 Set-StrictMode -Version Latest
 

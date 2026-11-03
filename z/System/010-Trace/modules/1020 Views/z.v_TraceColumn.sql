@@ -1,3 +1,9 @@
+/*
+Author: John Huang
+Author blog: https://www.sqlnotes.info/
+Repository: https://github.com/sqlnotes/sql
+Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Trace/modules/1020%20Views/z.v_TraceColumn.sql
+*/
 create or alter view z.v_TraceColumn
 as
 	select	c.trace_column_id ColumnID, c.name ColumnName, type_name SystemDataType,

@@ -1,3 +1,9 @@
+/*
+Author: John Huang
+Author blog: https://www.sqlnotes.info/
+Repository: https://github.com/sqlnotes/sql
+Source: https://github.com/sqlnotes/sql/blob/main/z/System/020-Backup/modules/1020%20Views/z.v_BackupRestore.sql
+*/
 create or alter view z.v_BackupRestore
 as
 select	bs.backup_set_id BackupSetID,

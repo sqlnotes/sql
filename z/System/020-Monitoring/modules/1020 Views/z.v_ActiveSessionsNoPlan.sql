@@ -1,3 +1,9 @@
+/*
+Author: John Huang
+Author blog: https://www.sqlnotes.info/
+Repository: https://github.com/sqlnotes/sql
+Source: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/modules/1020%20Views/z.v_ActiveSessionsNoPlan.sql
+*/
 create or alter view z.v_ActiveSessionsNoPlan
 as
 	select  r.Session_ID SessionID, r.start_time StartDate,r.blocking_session_id BlockerSessionID, datediff(second,r.start_time, getdate()) DurationInSecond,

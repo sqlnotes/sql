@@ -1,3 +1,9 @@
+<#
+Author: John Huang
+Author blog: https://www.sqlnotes.info/
+Repository: https://github.com/sqlnotes/sql
+Source: https://github.com/sqlnotes/sql/blob/main/z/Deploy.ps1
+#>
 [CmdletBinding()]
 param (
     [Parameter(Mandatory=$true)][string] $ServerName,

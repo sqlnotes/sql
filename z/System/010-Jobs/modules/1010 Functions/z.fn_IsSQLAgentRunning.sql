@@ -1,3 +1,9 @@
+/*
+Author: John Huang
+Author blog: https://www.sqlnotes.info/
+Repository: https://github.com/sqlnotes/sql
+Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Jobs/modules/1010%20Functions/z.fn_IsSQLAgentRunning.sql
+*/
 create or alter function z.fn_IsSQLAgentRunning()
 returns int -- use int for future extension.
 as

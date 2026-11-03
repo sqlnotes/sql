@@ -1,3 +1,9 @@
+/*
+Author: John Huang
+Author blog: https://www.sqlnotes.info/
+Repository: https://github.com/sqlnotes/sql
+Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Partition/modules/1070%20Procedures/z.usp_CreatePartitionForDateRange.sql
+*/
 create or alter procedure z.usp_CreatePartitionForDateRange
 (
 	@ObjectName nvarchar(300) = null,

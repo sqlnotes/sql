@@ -1,3 +1,9 @@
+/*
+Author: John Huang
+Author blog: https://www.sqlnotes.info/
+Repository: https://github.com/sqlnotes/sql
+Source: https://github.com/sqlnotes/sql/blob/main/z/System/baseline/2010%20Partitions/SchemaZPartitionGeneric.sql
+*/
 if not exists(select * from sys.partition_functions where name = 'PF_SchemaZPartitionGeneric')
 	create partition function PF_SchemaZPartitionGeneric (bigint) as range left for values();
 go
