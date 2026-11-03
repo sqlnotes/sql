@@ -11,13 +11,14 @@ Declarations show required parameters, defaults and output parameters. Unless sp
 ```sql
 create or alter procedure z.usp_AcquireSemaphore
 (
-	@SemaphoreName nvarchar(200), -- Name of the semaphore
-	@TotalCount int = 1, -- Size of the semaphore, default it's binary semaphore
-	@LockOwner varchar(32) = 'Transaction'
+	@SemaphoreName nvarchar(200),
+	@TotalCount int = 1,
+	@LockOwner varchar(32) = 'Transaction',
+	@LockTimeout int = -1
 )
 ```
 
-Acquires resource/slot application locks; returns a positive slot number and stores session context, or prints a message and returns -1 for detected repeated acquisition. No internal transaction/result set. Transaction ownership needs caller transaction; no timeout/capacity validation. See coordination.
+Acquires a capacity slot through native locks; returns a positive slot or negative failure. If the same database, session and owner already hold it, returns the existing slot without another native acquisition or reference-count increment. Validates inputs and bounds waits with @LockTimeout. The outer acquisition owns release. No internal transaction/result set. See coordination.
 
 ## z.usp_CopyTableSchema
 
@@ -47,23 +48,23 @@ Generates schema-copy DDL and executes it without copying rows, or returns order
 
 ## z.usp_CreateAllServiceJobs
 
-[Source](../../post/1010%20Procedures/z.usp_CreateAllServiceJobs.sql)
+[Source](../../890-SystemBeforePost/1010%20Procedures/z.usp_CreateAllServiceJobs.sql)
 
 ```sql
 create or alter procedure z.usp_CreateAllServiceJobs
 ```
 
-Defined in System post after the Jobs subsystem is installed. Calling it creates General DailyMaintenance hourly/interval 1 via z.usp_CreateServiceJob, then removes orphaned schedules. Deployment defines the procedure but does not invoke it automatically. Needs Agent/msdb rights; no encompassing transaction.
+Defined in 890-SystemBeforePost after the Jobs subsystem is installed. System root post invokes it on every deployment to create or reconcile General DailyMaintenance hourly/interval 1 via z.usp_CreateServiceJob, then remove orphaned schedules. New jobs are enabled; existing job enabled state is preserved. Installation therefore requires Agent/msdb job and schedule permissions, including the default job-owner change to sa. No encompassing transaction.
 
 ## z.usp_DataInitialization_PartitionedTableDataRetention
 
-[Source](../../modules/1070%20Procedures/z.usp_DataInitialization_PartitionedTableDataRetention.sql)
+[Source](../../890-SystemBeforePost/1010%20Procedures/z.usp_DataInitialization_PartitionedTableDataRetention.sql)
 
 ```sql
 create or alter procedure z.usp_DataInitialization_PartitionedTableDataRetention
 ```
 
-Merge-inserts/updates generic policy: Monthly/1, forward 3, Default, keep 6, archive 0. Repeats can overwrite custom values. Needs Partition table writes; no explicit transaction/result set.
+Inserts missing generic bigint/datetime policies: Monthly/1, forward 3, Default, keep 6, archive 0. Repeats preserve existing custom values. Needs Partition table writes; no explicit transaction/result set.
 
 ## z.usp_DataInitializationHelper
 
@@ -186,12 +187,12 @@ Name is spelled Refesh. Refreshes all visible current-database modules with defi
 ```sql
 create or alter procedure z.usp_ReleaseSemaphore
 (
-	@SemaphoreName nvarchar(200), --name of the semaphore
+	@SemaphoreName nvarchar(200),
 	@LockOwner varchar(32) = 'Transaction'
 )
 ```
 
-Releases resource/slot locks from session context. No transaction/result set or return-code validation. Does not clear context.
+Retrieves the slot from session context and releases one acquisition reference. A missing or nonpositive stored slot raises error 50000; native failures return a negative status. Clears context after the final release. No internal transaction/result set.
 
 ## z.usp_RemoveSchemaZ
 

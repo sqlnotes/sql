@@ -47,7 +47,7 @@ Creates a batch when BatchID=-1, creates file log when BatchLogID=-1, otherwise 
 create or alter procedure z.usp_AcquireDeploymentLock
 ```
 
-No arguments/result set. Session-owned exclusive z.Deploy application lock, timeout 0. Negative/null result throws 51000.
+No arguments/result set. Session-owned binary z.Deploy semaphore through z.usp_AcquireSemaphore, timeout 0. A nonpositive/null acquisition result throws 51000.
 
 ### z.usp_ReleaseDeploymentLock
 

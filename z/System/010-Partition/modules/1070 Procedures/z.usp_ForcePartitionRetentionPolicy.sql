@@ -72,8 +72,8 @@ begin
 			select @LockResource = N'SchemaZ.Partition:' + isnull(@ActualName, @FunctionName);
 			if @ShowPlan = 0
 			begin
-				exec @LockResult = sys.sp_getapplock @Resource = @LockResource, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = 0;
-				if @LockResult < 0 throw 50001, N'Partition function maintenance lock is unavailable.', 1;
+				exec @LockResult = z.usp_AcquireSemaphore @SemaphoreName = @LockResource, @TotalCount = 1, @LockOwner = 'Session', @LockTimeout = 0;
+				if @LockResult <= 0 throw 50001, N'Partition function maintenance lock is unavailable.', 1;
 				select @Locked = 1;
 			end
 			while 1 = 1
@@ -142,7 +142,7 @@ begin
 		end catch
 		if @Locked = 1
 		begin
-			exec @LockResult = sys.sp_releaseapplock @Resource = @LockResource, @LockOwner = 'Session';
+			exec @LockResult = z.usp_ReleaseSemaphore @SemaphoreName = @LockResource, @LockOwner = 'Session';
 			select @Locked = 0;
 		end
 		fetch next from f into @FunctionName, @Period, @Interval, @Forward, @FileGroup, @Keep, @Retain;

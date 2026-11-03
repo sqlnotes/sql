@@ -70,8 +70,8 @@ begin
 		begin
 			select @Resource = N'Schema z.TraceReceiver:' + convert(nvarchar(20), checksum(@ReceivingTable collate database_default));
 			begin tran;
-			exec @LockResult = sys.sp_getapplock @Resource = @Resource, @LockMode = N'Exclusive', @LockOwner = N'Transaction', @LockTimeout = 30000;
-			if @LockResult < 0 throw 50000, N'Could not prepare the trace receiving table.', 1;
+			exec @LockResult = z.usp_AcquireSemaphore @SemaphoreName = @Resource, @TotalCount = 1, @LockOwner = N'Transaction', @LockTimeout = 30000;
+			if @LockResult <= 0 throw 50000, N'Could not prepare the trace receiving table.', 1;
 			if object_id(@ReceivingTable) is not null and object_id(@ReceivingTable, N'U') is null
 				throw 50000, N'A trace receiving destination must be a table.', 1;
 			if object_id(@ReceivingTable, N'U') is not null and

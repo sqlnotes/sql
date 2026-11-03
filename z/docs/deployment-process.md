@@ -12,6 +12,8 @@ Only nonreserved children of subsystem roots become separately owned/versioned s
 
 Children run sequentially: 010-Jobs, 010-Partition, 010-Security, 010-Trace, 020-Backup, then 020-Monitoring. A shared numeric prefix groups children with no installation ordering dependency among themselves; the installer still sorts their complete folder names alphabetically. System modules precede children and System post follows them.
 
+The existing `890-SystemBeforePost/1010 Procedures` helpers are installed after the feature children and before System root post. Ordinary child discovery gives `890-SystemBeforePost` and its procedure folder separate deployment identities. Root post invokes general-maintenance job setup on each deployment.
+
 ## Baselines and identities
 
 Installed version >0.0.0 excludes the owning subsystem's entire baseline subtree, even with hash checking disabled. Unversioned/new systems at 0.0.0 remain eligible. Children without migrations can remain 0.0.0, using hashes for repeat skipping.
@@ -30,7 +32,9 @@ Logs reference owner/hash and retain failure text/times. Pruning deactivates obs
 
 ## Transactions, locking and failures
 
-Bootstrap table creation is transactional; individual metadata begin/complete operations are transactional. The metadata connection holds session-owned exclusive application lock `z.Deploy` with zero wait; a competing installer fails promptly. Bootstrap precedes this lock, so it does not serialize the complete bootstrap phase.
+Bootstrap table creation is transactional; individual metadata begin/complete operations are transactional. The metadata connection holds session-owned binary semaphore `z.Deploy` with zero wait; a competing installer fails promptly. Bootstrap installs the shared semaphore helpers before the deployment-lock procedures. Bootstrap precedes this semaphore acquisition, so it does not serialize the complete bootstrap phase.
+
+Before installing this synchronization update, stop active installers and drain affected Session-owned routines. Older callers may hold native locks without shared-helper context; replacing their release procedures mid-run cannot release those old holds through the new protocol. Let the old operation release them first, or close its physical connection before updating.
 
 Product files execute through separate SQL execution connections. Each starts with standard session options/open-transaction guard and ends with an open-transaction rollback/error guard. A file manages its own transaction. Entire deployment is not atomic; successful prior files/children remain after a later failure.
 

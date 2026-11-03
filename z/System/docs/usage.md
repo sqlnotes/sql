@@ -87,4 +87,4 @@ end
 commit;
 ```
 
-Default ownership requires an open transaction. All callers must agree on capacity and resource. Production callers should add error handling; acquisition has no overall timeout. [Coordination details](reference/coordination.md).
+Default ownership requires an open transaction. All callers must agree on capacity and resource. Production callers should add error handling; use `@LockTimeout` in milliseconds to bound acquisition (-1 waits indefinitely, 0 polls once). [Coordination details](reference/coordination.md).

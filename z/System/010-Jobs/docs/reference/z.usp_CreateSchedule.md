@@ -38,6 +38,6 @@ ScheduleNames is a Unicode comma-joined display string of actual resolved names.
 
 Direct SQL object dependencies: `z.fn_GetScheduleNamePrefix`, `z.fn_ValidateScheduleParameter`, `z.fn_ResourceSQLScheduleOperation`, `z.fn_ToSQLAgentSchedule`.
 
-Native dependencies: `sys.sp_getapplock`, `msdb.dbo.sp_add_schedule`, `msdb.dbo.sp_help_schedule`.
+Shared dependency: `z.usp_AcquireSemaphore`. Native dependencies: `msdb.dbo.sp_add_schedule`, `msdb.dbo.sp_help_schedule`.
 
 See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for subsystem-wide constraints.

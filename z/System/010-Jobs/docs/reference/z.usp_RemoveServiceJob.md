@@ -20,6 +20,6 @@ No defined result set. Requires applicable msdb Agent permissions. Schedule rows
 
 ## Dependencies
 
-Direct SQL object dependencies: `z.fn_GetServiceJobID`, `z.fn_ResourceSQLScheduleOperation`. Native dependencies: `sys.sp_getapplock`, `msdb.dbo.sp_delete_job`.
+Direct SQL object dependencies: `z.fn_GetServiceJobID`, `z.fn_ResourceSQLScheduleOperation`. Shared dependency: `z.usp_AcquireSemaphore`. Native dependencies: `msdb.dbo.sp_delete_job`.
 
 See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for subsystem-wide constraints.

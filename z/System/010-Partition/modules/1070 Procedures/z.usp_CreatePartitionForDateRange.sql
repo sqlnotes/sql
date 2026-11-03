@@ -68,8 +68,8 @@ begin
 	if @FunctionName is null throw 50000, 'Could not find partition function.', 1;
 	select @Resource = N'SchemaZ.Partition:' + @FunctionName;
 	begin try
-		exec @LockResult = sys.sp_getapplock @Resource = @Resource, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = 0;
-		if @LockResult < 0 throw 50000, 'Another session is managing this partition function.', 1;
+		exec @LockResult = z.usp_AcquireSemaphore @SemaphoreName = @Resource, @TotalCount = 1, @LockOwner = 'Session', @LockTimeout = 0;
+		if @LockResult <= 0 throw 50000, 'Another session is managing this partition function.', 1;
 		select @LockHeld = 1;
 		declare c cursor local static for
 			select SQL
@@ -86,11 +86,11 @@ begin
 		close c;
 		deallocate c;
 		commit;
-		exec sys.sp_releaseapplock @Resource = @Resource, @LockOwner = 'Session';
+		exec z.usp_ReleaseSemaphore @SemaphoreName = @Resource, @LockOwner = 'Session';
 	end try
 	begin catch
 		if @@trancount > 0 rollback;
-		if @LockHeld = 1 exec sys.sp_releaseapplock @Resource = @Resource, @LockOwner = 'Session';
+		if @LockHeld = 1 exec z.usp_ReleaseSemaphore @SemaphoreName = @Resource, @LockOwner = 'Session';
 		throw;
 	end catch
 end

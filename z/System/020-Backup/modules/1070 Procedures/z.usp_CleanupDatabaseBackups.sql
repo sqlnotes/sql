@@ -110,8 +110,8 @@ begin
 		);
 	end
 	begin try
-		exec @LockResult = sys.sp_getapplock @Resource = @LockName, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = 0, @DbPrincipal = 'public';
-		if @LockResult < 0 throw 50000, 'A backup or cleanup is already active for this database folder.', 1;
+		exec @LockResult = z.usp_AcquireSemaphore @SemaphoreName = @LockName, @TotalCount = 1, @LockOwner = 'Session', @LockTimeout = 0;
+		if @LockResult <= 0 throw 50000, 'A backup or cleanup is already active for this database folder.', 1;
 		select @LockHeld = 1;
 		declare Folders cursor local fast_forward for select Name from (values(N'FULL'),(N'DIFF'),(N'LOG')) f(Name);
 		open Folders;
@@ -323,12 +323,12 @@ begin
 			close Deletions;
 			deallocate Deletions;
 		end
-		exec sys.sp_releaseapplock @Resource = @LockName, @LockOwner = 'Session', @DbPrincipal = 'public';
+		exec z.usp_ReleaseSemaphore @SemaphoreName = @LockName, @LockOwner = 'Session';
 		select @LockHeld = 0;
 		if @ShowPlan = 1 select Path, BackupType, BackupFinishDate, Action, Reason from #Files order by Path;
 	end try
 	begin catch
-		if @LockHeld = 1 exec sys.sp_releaseapplock @Resource = @LockName, @LockOwner = 'Session', @DbPrincipal = 'public';
+		if @LockHeld = 1 exec z.usp_ReleaseSemaphore @SemaphoreName = @LockName, @LockOwner = 'Session';
 		throw;
 	end catch;
 end

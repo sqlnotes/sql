@@ -25,8 +25,8 @@ begin
 		@NativeTraceID int, @NativeStartTime datetime, @NativeStopTime datetime, @ReturnCode int, @OwnerResumed bit;
 	begin try
 		begin tran;
-		exec @LockResult = sys.sp_getapplock @Resource = N'Schema z.TraceCollector', @LockMode = N'Exclusive', @LockOwner = N'Transaction', @LockTimeout = 5000;
-		if @LockResult < 0 throw 50000, N'Trace collector coordination lock could not be acquired.', 1;
+		exec @LockResult = z.usp_AcquireSemaphore @SemaphoreName = N'Schema z.TraceCollector', @TotalCount = 1, @LockOwner = N'Transaction', @LockTimeout = 5000;
+		if @LockResult <= 0 throw 50000, N'Trace collector coordination lock could not be acquired.', 1;
 		declare r cursor local static for select CollectorUUID, OwnerSessionID, OwnerLoginTime, State from z.TraceCollector;
 		open r;
 		fetch next from r into @CollectorUUID, @OwnerSessionID, @OwnerLoginTime, @State;

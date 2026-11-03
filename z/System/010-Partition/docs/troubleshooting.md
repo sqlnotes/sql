@@ -22,6 +22,6 @@ All tables and indexes affected by the function must satisfy alignment and SQL S
 
 Execute with no caller transaction and implicit_transactions off. A competing maintenance session causes a lock error; no blocking session is killed. Recovery and each expired boundary commit separately. Earlier successful operations remain committed when a later operation fails. Other functions can still complete, followed by an overall failure report.
 
-Preview does not reserve a plan for future execution. Explicitly create/enable the maintenance job through the job factory; deployment only defines it. Initialization preserves customized policies rather than restoring shipped values.
+Preview does not reserve a plan for future execution. Installation and updates invoke the job factory to create or reconcile the hourly maintenance job. New jobs are enabled; existing job enabled state is preserved. Ensure the installer has Agent/msdb job and schedule permissions. Initialization preserves customized policies rather than restoring shipped values.
 
 For RIGHT expiration, the retained upper partition is also held temporarily while empty neighbors merge. The empty destination's per-index compression is restored before switching retained rows back. Adjacent partitions with different filegroups for any index are rejected before DDL because preserving that placement would require data movement. Temporary merge holders use the _Partition_MergeHold suffix and must not already exist.

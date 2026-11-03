@@ -24,8 +24,8 @@ begin
 
 	begin tran;
 	begin try
-		exec @LockResult = sys.sp_getapplock @Resource = N'z.usp_CollectErrorEvents', @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 10000;
-		if @LockResult < 0 throw 51000, 'Unable to acquire the Extended Events collection lock.', 1;
+		exec @LockResult = z.usp_AcquireSemaphore @SemaphoreName = N'z.usp_CollectErrorEvents', @TotalCount = 1, @LockOwner = 'Transaction', @LockTimeout = 10000;
+		if @LockResult <= 0 throw 51000, 'Unable to acquire the Extended Events collection lock.', 1;
 
 		;with x as
 		(

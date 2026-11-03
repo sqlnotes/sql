@@ -121,8 +121,8 @@ end
 			join @ManagedStepNames n on n.ParameterOrdinal = c.ParameterOrdinal
 	begin try
 	begin tran
-	exec @LockResult = sys.sp_getapplock @Resource = @Resource, @LockMode = N'Exclusive', @LockOwner = N'Transaction', @LockTimeout = 15000;
-	if @LockResult < 0 throw 51001, 'Could not acquire the database schedule operation lock.', 1;
+	exec @LockResult = z.usp_AcquireSemaphore @SemaphoreName = @Resource, @TotalCount = 1, @LockOwner = N'Transaction', @LockTimeout = 15000;
+	if @LockResult <= 0 throw 51001, 'Could not acquire the database schedule operation lock.', 1;
 	exec z.usp_CreateSchedule @Frequency = @Frequency, @Interval = @Interval, @ByDay = @ByDay, @IntradayFrequency = @IntradayFrequency, @IntradayInterval = @IntradayInterval, @ByTime = @ByTime, @StartDate = @StartDate, @EndDate = @EndDate, @ScheduleNames = @ScheduleNames output, @ScheduleIDs = @ScheduleIDs output, @OperationDate = @Today
 	if nullif(@ScheduleNames, '') is null throw 51000, 'The schedule definition did not produce any schedules; database-prefixed schedule names must fit the 128-character limit.', 1;
 	insert into #ScheduleIDs(ScheduleID)

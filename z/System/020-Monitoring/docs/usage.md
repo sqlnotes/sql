@@ -98,10 +98,11 @@ and XML truncation can leave gaps between polls.
 
 Read [the preset collector reference](reference/z.usp_CollectTrace.md) before running it: it builds/enables four logical definitions, captures their union through overlapping physical rowset generations with one receiving connection, and enters synchronous collection with a long default duration. Configure and collect on the same connection. For a bounded custom trace, see [Trace usage](../../010-Trace/docs/usage.md#bounded-custom-trace).
 
-Read retained daily summaries without starting collection:
+Read retained daily or hourly summaries for the same day-based lookback without starting collection:
 
 ```sql
 select * from z.fn_TraceLongRunningQueryByDay(7);
+select * from z.fn_TraceLongRunningQueryByHour(7) order by Date;
 ```
 
 Collector failures may leave owned native resources open; inspect `z.v_Trace` using NativeTraceID and run generation-safe framework cleanup from a separate privileged connection when eligible. Idle Building configuration is preserved; abandoned Collecting configuration is eligible when its owner has no active request. Native zero-drop counters do not establish complete reception.

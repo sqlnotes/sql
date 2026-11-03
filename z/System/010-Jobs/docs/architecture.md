@@ -4,7 +4,7 @@
 
 ## Dependencies and installation
 
-System supplies z.fn_SplitString. SQL Server Agent, msdb job/schedule procedures and sys.sp_getapplock are required. The helpers do not start the Agent service.
+System supplies z.fn_SplitString. SQL Server Agent, msdb job/schedule procedures and z.usp_AcquireSemaphore are required. The helpers do not start the Agent service.
 
 The numbered folder installs in System's alphabetical child order. Shared System modules run before feature children; System post scripts run after all children. See [System documentation](../../docs/readme.md) for deployment and orchestration. Baseline tables use existence guards; they do not reconcile an existing table schema. Module definitions use create or alter.
 

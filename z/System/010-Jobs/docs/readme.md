@@ -17,4 +17,4 @@ Schedules reside in msdb and are logically database-scoped by name. Jobs in the 
 
 ## Prerequisites
 
-System supplies z.fn_SplitString. SQL Server Agent, msdb job/schedule procedures and sys.sp_getapplock are required. The helpers do not start the Agent service.
+System supplies z.fn_SplitString. SQL Server Agent, msdb job/schedule procedures and z.usp_AcquireSemaphore are required. The helpers do not start the Agent service.

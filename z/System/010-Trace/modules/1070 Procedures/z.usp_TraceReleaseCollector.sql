@@ -20,8 +20,8 @@ begin
 	declare @CollectorUUID uniqueidentifier = try_convert(uniqueidentifier, session_context(N'Schema z.TraceCollector.UUID')), @LockResult int;
 	begin try
 		begin tran;
-		exec @LockResult = sys.sp_getapplock @Resource = N'Schema z.TraceCollector', @LockMode = N'Exclusive', @LockOwner = N'Transaction', @LockTimeout = 5000;
-		if @LockResult < 0 throw 50000, N'Trace collector admission or cleanup is already in progress.', 1;
+		exec @LockResult = z.usp_AcquireSemaphore @SemaphoreName = N'Schema z.TraceCollector', @TotalCount = 1, @LockOwner = N'Transaction', @LockTimeout = 5000;
+		if @LockResult <= 0 throw 50000, N'Trace collector admission or cleanup is already in progress.', 1;
 		if not exists(select 1 from z.TraceCollectorTrace where CollectorUUID = @CollectorUUID)
 			and not exists(select 1 from z.Trace where CollectorUUID = @CollectorUUID)
 		begin

@@ -6,7 +6,7 @@
 
 Use PowerShell 7 (the traversal uses modern .NET path APIs). If the `SqlServer` PowerShell module is missing, the installer automatically downloads it from PSGallery using `Install-Module -Scope CurrentUser`; this requires PowerShellGet and gallery access, but no administrator elevation. An available module is reused. Download or import failures stop before database access. `-ShowPlan` does not install or import the module.
 
-Use a login allowed to create a database if needed, create/alter schema and module/table objects, maintain deployment metadata and execute the supplied administrative post scripts. Feature use may require separate Agent, Broker, server DMV, backup or security rights.
+Use a login allowed to create a database if needed, create/alter schema and module/table objects, maintain deployment metadata and execute the supplied administrative post scripts. System root post creates or reconciles the hourly general-maintenance SQL Agent job and removes orphaned schedules on every deployment. The installer needs the corresponding msdb job/schedule and default sa job-owner permissions; SQL Agent must be available for this operational setup. New jobs are enabled, while existing enabled state is preserved. Other feature use may require Broker, server DMV, backup or security rights.
 
 The minimum supported version is SQL Server 2019 (15.x). [Compatibility limits](../System/docs/troubleshooting.md).
 
@@ -42,6 +42,6 @@ Connections encrypt; certificate trust is enabled by default. Supply SQL credent
 
 Current-schema bootstrap is repeatable and retains existing metadata. It does not upgrade older incompatible metadata schemas. Numbered child paths gain independent histories: moved guarded baselines replay under the new child owner while earlier System history remains.
 
-Root post executes on repeats: initialization can reset the generic retention policy and naming enforcement can rename existing objects. This is consequential even when shared module hashes are unchanged.
+Root post executes on repeats: initialization preserves existing generic retention policies, naming enforcement can rename existing objects, and service-job setup reconciles the hourly maintenance job and removes orphaned schedules. This is consequential even when shared module hashes are unchanged.
 
 Review [execution semantics](deployment-process.md) and take an appropriate recovery path before applying changes to an important database. A failed deployment is not automatically rolled back as a whole.

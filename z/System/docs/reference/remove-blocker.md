@@ -1,6 +1,6 @@
 # z.usp_RemoveBlocker
 
-[Object index](readme.md) · [Source](../../post/1010%20Procedures/z.usp_RemoveBlocker.sql)
+[Object index](readme.md) · [Source](../../890-SystemBeforePost/1010%20Procedures/z.usp_RemoveBlocker.sql)
 
 ## Interface
 

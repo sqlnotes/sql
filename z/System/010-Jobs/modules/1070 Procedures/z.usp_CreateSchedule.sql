@@ -57,8 +57,8 @@ begin
 	if @@cursor_rows =0
 		throw 51000, 'The schedule definition did not produce any schedules; database-prefixed schedule names must fit the 128-character limit.', 1;
 	begin tran
-	exec @LockResult = sys.sp_getapplock @Resource = @Resource, @LockMode = N'Exclusive', @LockOwner = N'Transaction', @LockTimeout = 15000;
-	if @LockResult < 0 throw 51001, 'Could not acquire the database schedule operation lock.', 1;
+	exec @LockResult = z.usp_AcquireSemaphore @SemaphoreName = @Resource, @TotalCount = 1, @LockOwner = N'Transaction', @LockTimeout = 15000;
+	if @LockResult <= 0 throw 51001, 'Could not acquire the database schedule operation lock.', 1;
 	insert into #ExistingSchedules(schedule_id, schedule_uid, schedule_name, enabled, freq_type, freq_interval, freq_subday_type, freq_subday_interval, freq_relative_interval, freq_recurrence_factor, active_start_date, active_end_date, active_start_time, active_end_time, date_created, schedule_description, job_count)
 		exec msdb.dbo.sp_help_schedule -- do not directly access tables in MSDB, no access on AWS RDS.
 	-- Check the whole requested set before creating any schedules. Enabled state is operator-owned.

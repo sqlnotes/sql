@@ -22,6 +22,6 @@ No defined result set. Requires msdb schedule-deletion authority. Cleanup is lim
 
 Direct SQL object dependencies: `z.fn_ResourceSQLScheduleOperation`, `z.fn_GetScheduleNamePrefix`.
 
-Native dependencies: `sys.sp_getapplock`, `msdb.dbo.sp_delete_schedule`, `msdb.dbo.sp_help_schedule`.
+Shared dependency: `z.usp_AcquireSemaphore`. Native dependencies: `msdb.dbo.sp_delete_schedule`, `msdb.dbo.sp_help_schedule`.
 
 See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for subsystem-wide constraints.

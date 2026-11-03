@@ -57,8 +57,8 @@ begin
 
 			-- Match explicit ratio names or the conventional exact counter-name + Base name; absent bases remain NULL.
 			begin tran;
-			exec @LockResult = sys.sp_getapplock @Resource = N'z.usp_CollectPerformanceCounters', @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 10000;
-			if @LockResult < 0 throw 51000, 'Unable to acquire the performance counter write lock.', 1;
+			exec @LockResult = z.usp_AcquireSemaphore @SemaphoreName = N'z.usp_CollectPerformanceCounters', @TotalCount = 1, @LockOwner = 'Transaction', @LockTimeout = 10000;
+			if @LockResult <= 0 throw 51000, 'Unable to acquire the performance counter write lock.', 1;
 			;with s as
 			(
 				select @Date Date, c.ObjectName, c.CounterName, c.InstanceName, c.CounterType,

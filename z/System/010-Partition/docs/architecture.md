@@ -26,6 +26,6 @@ The maintenance executor serializes by partition function with a session applica
 
 `@ShowPlan = 1` inspects metadata and returns ordered SQL without executing copies or DDL. Preview is a snapshot; execution generates a fresh plan under its lock. Manual DDL outside these procedures still needs coordination. No blocker-killing service is started.
 
-The existing job factory remains explicit. Defining or deploying it does not create or enable hourly maintenance jobs.
+System root post invokes the job factory to create or reconcile hourly general maintenance, including partition retention. Newly created jobs are enabled; existing enabled state is preserved. Installation requires Agent/msdb job and schedule permissions.
 
 For RIGHT expiration, the retained upper partition is also held temporarily while empty neighbors merge. The empty destination's per-index compression is restored before switching retained rows back. Adjacent partitions with different filegroups for any index are rejected before DDL because preserving that placement would require data movement. Temporary merge holders use the _Partition_MergeHold suffix and must not already exist.

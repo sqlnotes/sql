@@ -66,4 +66,4 @@ The standalone builder includes both endpoints; its count means interval increme
 
 ## Scheduling
 
-Call the existing `z.usp_CreateAllServiceJobs` explicitly when job setup is desired. Deployment does not create or enable jobs. Review [transactions and permissions](reference/readme.md) before execution.
+System root post calls `z.usp_CreateAllServiceJobs` during installation and updates. It creates or reconciles the hourly general-maintenance Agent job; new jobs are enabled, while existing enabled state is preserved. Review [transactions and permissions](reference/readme.md) before execution.

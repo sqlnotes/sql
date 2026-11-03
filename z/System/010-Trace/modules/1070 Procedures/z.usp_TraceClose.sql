@@ -102,8 +102,8 @@ begin
 	deallocate n;
 	begin try
 		begin tran;
-		exec @LockResult = sys.sp_getapplock @Resource = N'Schema z.TraceCollector', @LockMode = N'Exclusive', @LockOwner = N'Transaction', @LockTimeout = 5000;
-		if @LockResult < 0 throw 50000, N'Trace collector admission or cleanup is already in progress.', 1;
+		exec @LockResult = z.usp_AcquireSemaphore @SemaphoreName = N'Schema z.TraceCollector', @TotalCount = 1, @LockOwner = N'Transaction', @LockTimeout = 5000;
+		if @LockResult <= 0 throw 50000, N'Trace collector admission or cleanup is already in progress.', 1;
 		delete c from z.TraceCollector c inner join @Runs r on r.CollectorUUID = c.CollectorUUID
 		where not exists(select 1 from z.Trace t where t.CollectorUUID = c.CollectorUUID)
 			and not exists(select 1 from z.TraceCollectorTrace m where m.CollectorUUID = c.CollectorUUID)

@@ -24,8 +24,8 @@ begin
 	declare @LoginTime datetime = (select login_time from sys.dm_exec_sessions where session_id = @@spid), @LockResult int;
 	begin try
 		begin tran;
-		exec @LockResult = sys.sp_getapplock @Resource = N'Schema z.TraceCollector', @LockMode = N'Exclusive', @LockOwner = N'Transaction', @LockTimeout = 5000;
-		if @LockResult < 0 throw 50000, N'Trace collector admission or cleanup is already in progress.', 1;
+		exec @LockResult = z.usp_AcquireSemaphore @SemaphoreName = N'Schema z.TraceCollector', @TotalCount = 1, @LockOwner = N'Transaction', @LockTimeout = 5000;
+		if @LockResult <= 0 throw 50000, N'Trace collector admission or cleanup is already in progress.', 1;
 		select @CollectorUUID = null;
 		select @CollectorUUID = CollectorUUID from z.TraceCollector where OwnerSessionID = @@spid and OwnerLoginTime = @LoginTime;
 		if @CollectorUUID is null

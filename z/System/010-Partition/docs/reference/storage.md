@@ -20,6 +20,6 @@
 | PartitionsToKeep | int, not null, 12 | Nonnegative cutoff distance in period increments; -1 disables expiration |
 | ArchivedSwappedPartitions | bit, nullable, 1 | 1 keeps switched tables; 0 drops them; NULL is rejected by maintenance |
 
-System [initializer](../../../modules/1070%20Procedures/z.usp_DataInitialization_PartitionedTableDataRetention.sql) inserts missing generic bigint and datetime rows with monthly/1, forward 3, Default, keep 6, archive 0. Deployment root post repeats this initialization without updating existing policies. These shipped values differ from table defaults.
+System [initializer](../../../890-SystemBeforePost/1010%20Procedures/z.usp_DataInitialization_PartitionedTableDataRetention.sql) inserts missing generic bigint and datetime rows with monthly/1, forward 3, Default, keep 6, archive 0. Deployment root post repeats this initialization without updating existing policies. These shipped values differ from table defaults.
 
 Retention horizon is based on period starts and boundary selection, not row timestamps independently. Shared function, range direction and index topology affect the actual plan.
