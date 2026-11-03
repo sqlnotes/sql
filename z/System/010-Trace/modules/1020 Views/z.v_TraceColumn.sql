@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Trace/modules/1020%20Views/z.v_TraceColumn.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Trace/docs/reference/supporting-objects.md#zv_tracecolumn
+
+Lists SQL Trace column metadata and filtering capabilities.
 */
 create or alter view z.v_TraceColumn
 as

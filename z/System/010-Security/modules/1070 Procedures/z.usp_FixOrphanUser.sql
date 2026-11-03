@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Security/modules/1070%20Procedures/z.usp_FixOrphanUser.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Security/docs/reference/z.usp_FixOrphanUser.md
+
+Remaps SQL users with mismatched SIDs to same-named existing server logins.
 */
 create or alter procedure z.usp_FixOrphanUser
 (

@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Partition/baseline/2020%20Tables/z.PartitionedTableDataRetention.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Partition/docs/reference/storage.md#zpartitionedtabledataretention
+
+Stores partition-boundary creation, retention and archive policies by partition function.
 */
 if object_id('z.PartitionedTableDataRetention') is null
 begin

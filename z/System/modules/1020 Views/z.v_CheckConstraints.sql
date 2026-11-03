@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/modules/1020%20Views/z.v_CheckConstraints.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/docs/reference/catalog.md#catalog-views
+
+Exposes check-constraint definitions, parent objects and disabled, system-named and trust flags.
 */
 create or alter view z.v_CheckConstraints
 as

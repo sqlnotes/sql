@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/modules/1010%20Functions/z.fn_ExtractSystemHealthEvent.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/docs/reference/z.fn_ExtractSystemHealthEvent.md
+
+Decodes system_health ring-buffer XML into timestamped event rows and hashes.
 */
 create or alter function z.fn_ExtractSystemHealthEvent
 (

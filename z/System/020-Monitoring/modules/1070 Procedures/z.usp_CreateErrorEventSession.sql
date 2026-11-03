@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/modules/1070%20Procedures/z.usp_CreateErrorEventSession.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/docs/reference/extended-events.md#zusp_createerroreventsession
+
+Creates and starts the framework's error-event Extended Events session when needed.
 */
 create or alter procedure z.usp_CreateErrorEventSession
 as

@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/020-Backup/modules/1070%20Procedures/z.usp_CreateDatabaseSnapshot.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/020-Backup/docs/reference/z.usp_CreateDatabaseSnapshot.md
+
+Creates a database snapshot using the source database's data-file definitions.
 */
 create or alter procedure z.usp_CreateDatabaseSnapshot
 (

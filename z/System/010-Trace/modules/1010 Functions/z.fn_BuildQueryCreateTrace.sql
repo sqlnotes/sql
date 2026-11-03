@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Trace/modules/1010%20Functions/z.fn_BuildQueryCreateTrace.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Trace/docs/reference/z.fn_BuildQueryCreateTrace.md
+
+Generates SQL to recreate a logical trace definition and its configuration.
 */
 create or alter function z.fn_BuildQueryCreateTrace
 (

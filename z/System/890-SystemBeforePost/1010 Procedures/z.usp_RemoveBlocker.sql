@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/890-SystemBeforePost/1010%20Procedures/z.usp_RemoveBlocker.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/docs/reference/remove-blocker.md#behavior-and-generated-objects
+
+Starts a SQL Agent worker that repeatedly terminates user sessions blocking the caller.
 */
 create or alter procedure z.usp_RemoveBlocker
 as

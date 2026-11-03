@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/baseline/2020%20Tables/z.CPUMemoryStats.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/docs/reference/supporting-objects.md#zcpumemorystats
+
+Stores CPU and memory measurements with at most one row per local second.
 */
 if object_id(N'z.CPUMemoryStats') is null
 begin

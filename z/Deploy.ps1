@@ -3,6 +3,10 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/Deploy.ps1
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/docs/deploy.md#commands
+
+Plans and executes recursive Schema Z installation or reserved test scripts with bootstrap,
+deployment locking, hashes and execution logs.
 #>
 [CmdletBinding()]
 param (

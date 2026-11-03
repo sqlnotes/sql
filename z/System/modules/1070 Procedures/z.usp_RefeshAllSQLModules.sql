@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/modules/1070%20Procedures/z.usp_RefeshAllSQLModules.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/docs/reference/procedures.md#zusp_refeshallsqlmodules
+
+Refreshes visible current-database SQL modules in name order for the requested number of passes.
 */
 create or alter procedure z.usp_RefeshAllSQLModules @RefreshTimes int = 1
 as

@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/baseline/2020%20Tables/z.TraceError.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/docs/reference/supporting-objects.md#ztraceerror
+
+Stores collected SQL Trace error events.
 */
 if object_id('z.TraceError') is null
 begin

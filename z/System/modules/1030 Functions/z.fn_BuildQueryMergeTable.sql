@@ -3,6 +3,10 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/modules/1030%20Functions/z.fn_BuildQueryMergeTable.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/docs/reference/functions.md#zfn_buildquerymergetable
+
+Builds a metadata-driven MERGE template and its key, insert and update fragments without
+executing it.
 */
 create or alter function z.fn_BuildQueryMergeTable
 (

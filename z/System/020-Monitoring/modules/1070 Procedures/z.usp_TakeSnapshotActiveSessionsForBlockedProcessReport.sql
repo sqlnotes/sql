@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/modules/1070%20Procedures/z.usp_TakeSnapshotActiveSessionsForBlockedProcessReport.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/docs/reference/z.usp_TakeSnapshotActiveSessionsForBlockedProcessReport.md
+
+Stores active-request snapshots correlated with a blocked-process trace event.
 */
 create or alter procedure z.usp_TakeSnapshotActiveSessionsForBlockedProcessReport
 (

@@ -3,6 +3,10 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/modules/1070%20Procedures/z.usp_ForceNamingConvention.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/docs/reference/procedures.md#zusp_forcenamingconvention
+
+Validates table and schema selectors and renames selected indexes and constraints to expected
+names or previews the changes.
 */
 create or alter procedure z.usp_ForceNamingConvention
 (

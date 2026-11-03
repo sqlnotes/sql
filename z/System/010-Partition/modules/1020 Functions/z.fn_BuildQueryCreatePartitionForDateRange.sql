@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Partition/modules/1020%20Functions/z.fn_BuildQueryCreatePartitionForDateRange.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Partition/docs/reference/boundaries.md#zfn_buildquerycreatepartitionfordaterange
+
+Generates ordered SQL to add missing partition boundaries for a date range.
 */
 create or alter function z.fn_BuildQueryCreatePartitionForDateRange
 (

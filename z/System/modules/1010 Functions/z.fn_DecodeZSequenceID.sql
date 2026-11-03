@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/modules/1010%20Functions/z.fn_DecodeZSequenceID.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/docs/reference/functions.md#zfn_decodezsequenceid
+
+Decodes a datetime-encoded bigint identifier into its timestamp and low-bit sequence components.
 */
 create or alter function z.fn_DecodeZSequenceID(@SequenceID bigint)
 returns table

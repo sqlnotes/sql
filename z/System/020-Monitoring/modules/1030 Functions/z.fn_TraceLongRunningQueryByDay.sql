@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/modules/1030%20Functions/z.fn_TraceLongRunningQueryByDay.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/docs/reference/z.fn_TraceLongRunningQueryByDay.md
+
+Summarizes retained long-running query events by date and duration bucket.
 */
 create or alter function z.fn_TraceLongRunningQueryByDay(@Days int)
 returns table

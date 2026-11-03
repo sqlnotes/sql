@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/baseline/2020%20Tables/z.PerformanceCounters.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/docs/reference/z.usp_CollectPerformanceCounters.md
+
+Stores sampled and calculated SQL Server performance-counter measurements.
 */
 if object_id(N'z.PerformanceCounters') is null
 begin

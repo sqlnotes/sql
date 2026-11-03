@@ -3,6 +3,10 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/modules/1070%20Procedures/z.usp_RemoveSchemaZ.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/docs/reference/procedures.md#zusp_removeschemaz
+
+Attempts confirmed destructive removal of Schema Z objects, plan guides, shared partitions and
+the schema itself.
 */
 create or alter procedure z.usp_RemoveSchemaZ
 (

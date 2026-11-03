@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/020-Backup/modules/1010%20Functions/z.fn_DecodeBackupFileList.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/020-Backup/docs/reference/z.fn_DecodeBackupFileList.md
+
+Decodes backup file-list JSON into typed relational columns.
 */
 create or alter function z.fn_DecodeBackupFileList
 (

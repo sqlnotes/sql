@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Jobs/modules/1070%20Procedures/z.usp_CreateSchedule.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Jobs/docs/reference/z.usp_CreateSchedule.md
+
+Validates schedule parameters and creates or reuses matching SQL Agent schedules.
 */
 create or alter procedure z.usp_CreateSchedule
 (

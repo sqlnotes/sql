@@ -3,6 +3,10 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/890-SystemBeforePost/1010%20Procedures/z.usp_DataInitialization_PartitionedTableDataRetention.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/docs/reference/procedures.md#zusp_datainitialization_partitionedtabledataretention
+
+Inserts missing monthly retention policies for the shared bigint and datetime partition
+functions without overwriting existing policies.
 */
 create or alter procedure z.usp_DataInitialization_PartitionedTableDataRetention
 as

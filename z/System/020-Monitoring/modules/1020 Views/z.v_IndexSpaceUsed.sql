@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/modules/1020%20Views/z.v_IndexSpaceUsed.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/docs/reference/supporting-objects.md#zv_indexspaceused
+
+Reports row counts and allocated space for each index partition.
 */
 create or alter view z.v_IndexSpaceUsed
 as

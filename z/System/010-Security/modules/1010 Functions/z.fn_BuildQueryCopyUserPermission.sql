@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Security/modules/1010%20Functions/z.fn_BuildQueryCopyUserPermission.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Security/docs/reference/z.fn_BuildQueryCopyUserPermission.md
+
+Generates SQL to copy visible database permissions and role memberships.
 */
 create or alter  function z.fn_BuildQueryCopyUserPermission
 (

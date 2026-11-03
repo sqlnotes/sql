@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Trace/modules/1070%20Procedures/z.usp_TraceRemoveTrigger.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Trace/docs/reference/z.usp_TraceRemoveTrigger.md
+
+Removes a stored-procedure callback registration for the selected trace event.
 */
 create or alter procedure z.usp_TraceRemoveTrigger
 (

@@ -3,6 +3,10 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/modules/1020%20Views/z.v_Objects.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/docs/reference/catalog.md#catalog-views
+
+Exposes object-column metadata including SQL type definitions, primary-key order and identity
+and computed-column details.
 */
 create or alter view z.v_Objects
 as

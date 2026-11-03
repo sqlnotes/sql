@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Security/modules/1010%20Functions/z.fn_BuildQueryCopyLogin.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Security/docs/reference/z.fn_BuildQueryCopyLogin.md
+
+Generates SQL to recreate supported logins and non-fixed server roles.
 */
 create or alter  function z.fn_BuildQueryCopyLogin
 (

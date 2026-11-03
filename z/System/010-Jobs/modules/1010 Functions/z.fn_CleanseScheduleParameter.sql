@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Jobs/modules/1010%20Functions/z.fn_CleanseScheduleParameter.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Jobs/docs/reference/z.fn_CleanseScheduleParameter.md
+
+Normalizes readable schedule parameters into ordered, deduplicated schedule definitions.
 */
 create or alter function z.fn_CleanseScheduleParameter
 (

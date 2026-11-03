@@ -3,6 +3,10 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/modules/1010%20Functions/z.fn_GetFullErrorMessage.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/docs/reference/functions.md#zfn_getfullerrormessage
+
+Formats the current CATCH error context as a message containing error number, severity, state,
+procedure, line and text.
 */
 create or alter function z.fn_GetFullErrorMessage()
 returns nvarchar(max)

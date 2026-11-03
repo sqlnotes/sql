@@ -3,6 +3,10 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/baseline/2010%20Partitions/SchemaZPartitionGeneric.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Partition/docs/reference/storage.md#pf_schemazpartitiongeneric-and-ps_schemazpartitiongeneric
+
+Creates the shared bigint RANGE LEFT and datetime RANGE RIGHT partition functions and
+default-filegroup schemes when absent.
 */
 if not exists(select * from sys.partition_functions where name = 'PF_SchemaZPartitionGeneric')
 	create partition function PF_SchemaZPartitionGeneric (bigint) as range left for values();

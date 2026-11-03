@@ -3,6 +3,10 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/modules/1010%20Functions/z.fn_SqlVariantToDateTime.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/docs/reference/functions.md#zfn_sqlvarianttodatetime
+
+Returns a variant value as datetime with its base type, decoding bigint identifiers and
+excluding uniqueidentifiers.
 */
 create or alter function z.fn_SqlVariantToDateTime
 (

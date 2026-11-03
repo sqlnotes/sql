@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Jobs/modules/1010%20Functions/z.fn_GetServiceJobName.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Jobs/docs/reference/supporting-objects.md#zfn_getservicejobname
+
+Builds a database-prefixed service job name using the native job-name length.
 */
 create or alter function z.fn_GetServiceJobName (@Name nvarchar(255))
 returns nvarchar(128)

@@ -3,6 +3,10 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/modules/1070%20Procedures/z.usp_SuppressBackupSuccessMessages.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/docs/reference/procedures.md#zusp_suppressbackupsuccessmessages
+
+Enables global trace flag 3226 to suppress successful backup and restore log entries only when
+it is not already enabled.
 */
 create or alter procedure z.usp_SuppressBackupSuccessMessages
 as

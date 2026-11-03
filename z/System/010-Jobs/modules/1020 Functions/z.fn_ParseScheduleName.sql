@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Jobs/modules/1020%20Functions/z.fn_ParseScheduleName.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Jobs/docs/reference/z.fn_ParseScheduleName.md
+
+Decodes timing fields from a framework-generated SQL Agent schedule name.
 */
 create or alter function z.fn_ParseScheduleName
 (

@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Security/modules/1070%20Procedures/z.usp_RemapUserToLogin.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Security/docs/reference/z.usp_RemapUserToLogin.md
+
+Remaps database users to matching logins after applying name substitutions.
 */
 create or alter procedure z.usp_RemapUserToLogin
 (

@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/baseline/2020%20Tables/z.TraceFileAutoGrowActiveSessions.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/docs/reference/supporting-objects.md#ztracefileautogrowactivesessions
+
+Stores active-request snapshots correlated with file-growth trace events.
 */
 if object_id('z.TraceFileAutoGrowActiveSessions') is null
 begin

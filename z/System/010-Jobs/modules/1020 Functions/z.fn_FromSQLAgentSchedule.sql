@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Jobs/modules/1020%20Functions/z.fn_FromSQLAgentSchedule.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Jobs/docs/reference/z.fn_FromSQLAgentSchedule.md
+
+Converts native SQL Agent timing fields into readable schedule parameters.
 */
 create or alter function z.fn_FromSQLAgentSchedule
 (

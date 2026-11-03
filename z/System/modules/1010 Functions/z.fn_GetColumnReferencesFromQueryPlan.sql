@@ -3,6 +3,10 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/modules/1010%20Functions/z.fn_GetColumnReferencesFromQueryPlan.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/docs/reference/functions.md#zfn_getcolumnreferencesfromqueryplan
+
+Extracts distinct non-null database, schema, object and column references from execution-plan
+XML ColumnReference nodes.
 */
 create or alter function z.fn_GetColumnReferencesFromQueryPlan(@ExecutionPlan xml)
 returns table

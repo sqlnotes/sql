@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/modules/1070%20Procedures/z.usp_SkipTrigger.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/docs/reference/procedures.md#zusp_skiptrigger
+
+Stores or clears a session-context skip flag for selected cooperating triggers or all triggers.
 */
 create or alter procedure z.usp_SkipTrigger
 (

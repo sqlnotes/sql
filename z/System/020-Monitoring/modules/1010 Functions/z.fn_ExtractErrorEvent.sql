@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/modules/1010%20Functions/z.fn_ExtractErrorEvent.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring/docs/reference/extended-events.md#zfn_extracterrorevent
+
+Decodes error-event ring-buffer XML into typed event rows.
 */
 create or alter function z.fn_ExtractErrorEvent
 (

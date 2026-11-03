@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Partition/modules/1030%20Functions/z.fn_BuildQueryForceRetentionPolicy.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Partition/docs/reference/retention.md#zfn_buildqueryforcepartitionretentionpolicy
+
+Generates ordered SQL for partition recovery, future boundaries and retention.
 */
 create or alter function z.fn_BuildQueryForcePartitionRetentionPolicy
 (

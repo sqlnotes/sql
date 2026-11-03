@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/020-Backup/modules/1070%20Procedures/z.usp_ReadBackupFileList.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/020-Backup/docs/reference/z.usp_ReadBackupFileList.md
+
+Reads native backup file-list metadata and optionally returns it as JSON.
 */
 create or alter procedure z.usp_ReadBackupFileList
 (

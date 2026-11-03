@@ -3,6 +3,10 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/modules/1070%20Procedures/z.usp_SetLargeValueOutOfRow.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/docs/reference/procedures.md#zusp_setlargevalueoutofrow
+
+Enables out-of-row large-value storage for current-database tables with max-length columns and
+the option disabled.
 */
 create or alter procedure z.usp_SetLargeValueOutOfRow
 as

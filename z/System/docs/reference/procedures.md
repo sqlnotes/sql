@@ -229,3 +229,30 @@ create or alter procedure z.usp_SkipTrigger
 ```
 
 Stores session-context flag from comma-separated parent/trigger names or all. Null arguments clear it. No transaction/result set; only cooperating triggers consult it.
+
+## z.usp_SuppressBackupSuccessMessages
+
+[Source](../../modules/1070%20Procedures/z.usp_SuppressBackupSuccessMessages.sql)
+
+```sql
+create or alter procedure z.usp_SuppressBackupSuccessMessages
+```
+
+Checks global trace flag 3226 using `DBCC TRACESTATUS`. If already enabled globally,
+returns without changing it; otherwise enables it with `DBCC TRACEON (3226, -1)`.
+Suppresses successful backup/restore entries in the SQL Server error log and
+system event log for the whole instance. Backup failures remain logged; backup
+command progress/completion output to the client is unaffected. No parameters or
+result set. Enabling the flag requires membership in the sysadmin server role;
+permission and DBCC errors propagate to the caller.
+
+```sql
+exec z.usp_SuppressBackupSuccessMessages;
+```
+
+Installation defines this procedure without calling it. The runtime setting is
+lost on SQL Server restart unless separately configured with startup option
+`-T3226`; this procedure does not change startup configuration. Use when backup
+monitoring does not depend on successful backup log entries. The internal
+`INSERT ... EXEC` means it cannot run inside another `INSERT ... EXEC`.
+See Microsoft's [trace flag documentation](https://learn.microsoft.com/en-us/sql/t-sql/database-console-commands/dbcc-traceon-trace-flags-transact-sql).

@@ -3,6 +3,10 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/Deploy.Common.ps1
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/docs/deployment-process.md#source-and-plan
+
+Provides deployment-tree planning, connection, metadata RPC, logging-sanitization and SQL
+execution helpers.
 #>
 # Shared traversal and connection helpers for deployment and test execution.
 Set-StrictMode -Version Latest

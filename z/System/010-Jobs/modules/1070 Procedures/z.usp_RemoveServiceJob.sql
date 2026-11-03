@@ -3,6 +3,9 @@ Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Jobs/modules/1070%20Procedures/z.usp_RemoveServiceJob.sql
+Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Jobs/docs/reference/z.usp_RemoveServiceJob.md
+
+Removes the named database-prefixed SQL Agent job when it exists.
 */
 create or alter procedure z.usp_RemoveServiceJob
 (
