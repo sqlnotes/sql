@@ -59,3 +59,7 @@ Retired names and their current replacements:
 Update external callers before deploying; schema-bound dependencies can prevent removal. Old partition storage is retained with a message while indexes or partition schemes still reference it. Cleanup does not move table data or rewrite retention-policy rows. Add future retired names to the matching type section using an existence guard, and review dependencies before removal.
 
 The [0.0.1 marker](../versions/0.0.1/dummy.sql) contains no database-object definition; it establishes System's initial version through installer completion.
+
+## Database settings
+
+System owns [z.Settings and its helpers](reference/settings.md). The guarded table is in baseline, and the getter and setter are in modules. The current System source has one version folder, so baseline remains eligible on existing installations and hash checking skips unchanged ordinary scripts. Existing subsystems with multiple version folders skip baseline; fresh installations always include it. No settings are seeded or consumed automatically.

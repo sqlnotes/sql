@@ -28,7 +28,7 @@ function Get-DeployPlan {
     $activePaths = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 
     function Add-PlanFolder {
-        param($Folder, [string] $SystemName, [bool] $IsSystem, [string] $Phase, [string] $Version, [bool] $HashAllowed, [bool] $VersionContainer=$false)
+        param($Folder, [string] $SystemName, [bool] $IsSystem, [string] $Phase, [string] $Version, [bool] $HashAllowed, [bool] $VersionContainer=$false, [bool] $IncludeBaseline=$true)
         if ($Folder.Attributes -band [System.IO.FileAttributes]::ReparsePoint) { throw "Linked folders are not supported: $($Folder.FullName)" }
         if (-not $activePaths.Add($Folder.FullName)) { throw "Recursive folder path: $($Folder.FullName)" }
         try {
@@ -36,6 +36,7 @@ function Get-DeployPlan {
             $target = $current
             if ($IsSystem) {
                 if ($SystemName.Length -gt 4000) { throw "Subsystem path exceeds 4000 characters: $SystemName" }
+                $versionDirs = @()
                 $versionPath = Join-Path $Folder.FullName 'versions'
                 if (Test-Path -LiteralPath $versionPath -PathType Container) {
                     $versionDirs = @(Get-DeployChildren $versionPath | Where-Object { $_.Name -notin $reserved })
@@ -44,10 +45,15 @@ function Get-DeployPlan {
                         if (-not [version]::TryParse($directory.Name, [ref]$parsed)) { throw "Invalid version folder: $($directory.FullName)" }
                     }
                     if ($versionDirs.Count -gt 0) {
-                        $target = ($versionDirs | ForEach-Object { [version]$_.Name } | Sort-Object | Select-Object -Last 1)
+                        $availableVersions = @($versionDirs | ForEach-Object { [version]$_.Name } | Sort-Object)
+                        $target = $availableVersions[-1]
                         if (-not $TestMode -and $target -lt $current) { throw "Downgrade rejected for ${SystemName}: installed $current, available $target." }
+                        if (-not $TestMode -and $current -gt [version]'0.0.0' -and $current -lt $availableVersions[0]) {
+                            throw "Upgrade path unavailable for ${SystemName}: installed $current is older than earliest retained version $($availableVersions[0]). Deploy an intermediate release first."
+                        }
                     }
                 }
+                $IncludeBaseline = $current -eq [version]'0.0.0' -or $versionDirs.Count -le 1
                 $Version = $target.ToString()
                 if (-not $TestMode) { $steps.Add([pscustomobject]@{ Kind='Begin'; SystemName=$SystemName; Version=$Version; Path=$Folder.FullName; Phase='system'; HashAllowed=$false }) }
                 else {
@@ -63,14 +69,14 @@ function Get-DeployPlan {
             foreach ($stage in @('pre', 'baseline', 'versions', 'modules')) {
                 $stagePath = Join-Path $Folder.FullName $stage
                 if (-not (Test-Path -LiteralPath $stagePath -PathType Container)) { continue }
-                # Baseline is the foundation before the first completed version.
-                # Skip the entire subtree, including its own pre/post stages.
-                if (-not $TestMode -and $stage -eq 'baseline' -and $current -gt [version]'0.0.0') { continue }
+                # Fresh installs and zero/one-version sources include baseline.
+                # Installed multi-version sources skip its entire subtree.
+                if (-not $TestMode -and $stage -eq 'baseline' -and -not $IncludeBaseline) { continue }
                 $stageHash = $HashAllowed -and $stage -ne 'pre'
                 if ($stage -eq 'versions') {
-                    Add-PlanFolder (Get-Item -LiteralPath $stagePath) $SystemName $false $stage $Version $stageHash $true
+                    Add-PlanFolder (Get-Item -LiteralPath $stagePath) $SystemName $false $stage $Version $stageHash $true $IncludeBaseline
                 }
-                else { Add-PlanFolder (Get-Item -LiteralPath $stagePath) $SystemName $false $stage $Version $stageHash }
+                else { Add-PlanFolder (Get-Item -LiteralPath $stagePath) $SystemName $false $stage $Version $stageHash -IncludeBaseline $IncludeBaseline }
             }
             foreach ($file in Get-DeployChildren $Folder.FullName -Files) {
                 $steps.Add([pscustomobject]@{ Kind='File'; SystemName=$SystemName; Version=$Version; Path=$file.FullName; Phase=$Phase; HashAllowed=$HashAllowed })
@@ -82,14 +88,14 @@ function Get-DeployPlan {
                     if (-not [version]::TryParse($child.Name, [ref]$parsed)) { throw "Invalid version folder: $($child.FullName)" }
                 }
                 foreach ($child in $children | Sort-Object { [version]$_.Name }) {
-                    if ($TestMode -or [version]$child.Name -ge $current) { Add-PlanFolder $child $SystemName $false $Phase $child.Name $HashAllowed }
+                    if ($TestMode -or [version]$child.Name -ge $current) { Add-PlanFolder $child $SystemName $false $Phase $child.Name $HashAllowed -IncludeBaseline $IncludeBaseline }
                 }
             }
             else { foreach ($child in $children) {
-                Add-PlanFolder $child $(if ($IsSystem) { "$SystemName/$($child.Name)" } else { $SystemName }) $IsSystem $Phase $Version $HashAllowed
+                Add-PlanFolder $child $(if ($IsSystem) { "$SystemName/$($child.Name)" } else { $SystemName }) $IsSystem $Phase $Version $HashAllowed -IncludeBaseline $IncludeBaseline
             } }
             $postPath = Join-Path $Folder.FullName 'post'
-            if (Test-Path -LiteralPath $postPath -PathType Container) { Add-PlanFolder (Get-Item -LiteralPath $postPath) $SystemName $false 'post' $Version $false }
+            if (Test-Path -LiteralPath $postPath -PathType Container) { Add-PlanFolder (Get-Item -LiteralPath $postPath) $SystemName $false 'post' $Version $false -IncludeBaseline $IncludeBaseline }
             if ($IsSystem) { $steps.Add([pscustomobject]@{ Kind='End'; SystemName=$SystemName; Version=$Version; Path=$Folder.FullName; Phase='system'; HashAllowed=$false }) }
         }
         finally { $null = $activePaths.Remove($Folder.FullName) }

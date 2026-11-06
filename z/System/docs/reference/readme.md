@@ -8,6 +8,7 @@
 | [Catalog and baseline](catalog.md) | Sequence and every catalog view |
 | [Schema copy](schema-copy.md) | Generation, execution, permissions and copy limits |
 | [Coordination](coordination.md) | Semaphores and trigger flags |
+| [Settings](settings.md) | Database-local key/value table, getter and setter |
 | [Procedures](procedures.md) | Every shared procedure: exact declarations, sources and behavior |
 | [Remove blocker](remove-blocker.md) | z.usp_RemoveBlocker and generated global temporary worker/job |
 | [Installer reference](../../../docs/reference.md) | Deployment tables and procedure interfaces |

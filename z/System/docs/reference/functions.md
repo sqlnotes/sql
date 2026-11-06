@@ -293,3 +293,7 @@ returns datetime
 ```
 
 Returns datetime decoded from high bits of bigint; sequence bits ignored. Does not validate genuine ID.
+
+## z.fn_GetSetting
+
+Returns a database-local setting as nvarchar(max), or null when missing. Accepts only @Name; see [settings](settings.md#zfn_getsetting) for the declaration and behavior.

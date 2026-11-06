@@ -16,7 +16,9 @@ The existing `890-SystemBeforePost/1010 Procedures` helpers are installed after 
 
 ## Baselines and identities
 
-Installed version >0.0.0 excludes the owning subsystem's entire baseline subtree, even with hash checking disabled. Unversioned/new systems at 0.0.0 remain eligible. Children without migrations can remain 0.0.0, using hashes for repeat skipping.
+Baseline eligibility is decided independently for each owning subsystem. Fresh/unversioned systems at 0.0.0 include baseline followed by all available versions. Existing systems with zero or one version folder also include baseline, followed by the installed version folder and higher versions when present. Existing systems with more than one version folder skip the entire baseline subtree, including its pre/post stages. Only direct numeric version folders count; reserved stage folders and .vs do not. Eligible ordinary files still use hash checking; eligible pre/post scripts always run. Children without migrations can remain 0.0.0.
+
+When version folders exist, a nonzero installed version older than the earliest retained version is rejected with an upgrade-path error. Upgrade using an intermediate release before using a source tree whose older migrations have been consolidated into baseline. Fresh installations can use the consolidated baseline. Versions above the latest available version remain rejected as downgrades.
 
 CodeBase uses paths such as `/System/010-Partition`. SQL derives SystemID as GUID from MD5 of `trim(lower(CodeBase))`. Case/outer-space aliases share identity according to SQL normalization/collation; paths are not normalized independently by PowerShell. Renaming a folder, including its prefix, changes identity. The renamed Trace, Jobs, Backup and Security paths therefore initialize new subsystem owners and hashes; guarded baselines become eligible under those owners. Existing metadata history remains under the former paths; the installer does not remap it or carry its version forward. Review baseline replay before updating an existing installation.
 

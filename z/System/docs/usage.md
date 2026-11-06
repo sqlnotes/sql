@@ -88,3 +88,7 @@ commit;
 ```
 
 Default ownership requires an open transaction. All callers must agree on capacity and resource. Production callers should add error handling; use `@LockTimeout` in milliseconds to bound acquisition (-1 waits indefinitely, 0 polls once). [Coordination details](reference/coordination.md).
+
+## Store and read settings
+
+Use z.usp_SetSetting to write a named text value and z.fn_GetSetting to read it. Missing names return null; callers convert values to their expected types. See [settings examples and installation requirements](reference/settings.md).

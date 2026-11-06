@@ -257,3 +257,7 @@ lost on SQL Server restart unless separately configured with startup option
 monitoring does not depend on successful backup log entries. The internal
 `INSERT ... EXEC` means it cannot run inside another `INSERT ... EXEC`.
 See Microsoft's [trace flag documentation](https://learn.microsoft.com/en-us/sql/t-sql/database-console-commands/dbcc-traceon-trace-flags-transact-sql).
+
+## z.usp_SetSetting
+
+Inserts or updates a database-local setting with a locked atomic upsert. See [settings](settings.md#zusp_setsetting) for the declaration, description-preservation rules and transaction behavior.
