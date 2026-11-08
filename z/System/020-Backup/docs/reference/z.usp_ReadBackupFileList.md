@@ -8,12 +8,12 @@ Reads the database files described by one backup set and returns all 22 document
 
 | Parameter | Type | Meaning |
 | --- | --- | --- |
-| `@BackupFile` | `nvarchar(4000)` | Required disk path or full HTTPS/S3 backup-object URL. |
+| `@BackupFile` | `nvarchar(4000)` | Required disk path or full HTTP(S)/S3 backup-object URL. |
 | `@Position` | `int = 1` | Required positive backup-set position within the media file. |
 | `@FileListJson` | `nvarchar(max) = null output` | JSON array containing all file-list fields, including NULL properties. |
 | `@ReturnResult` | `bit = 1` | Return tabular rows. Set to 0 to consume only JSON. |
 
-HTTPS/S3 URLs use FROM URL; other inputs use FROM DISK. S3 requires SQL Server 2022+. Paths retain their case and separators. Credentials, storage permissions and native CREATE DATABASE permission remain the caller's responsibility. No directory checks, folder creation, backup deletion or privilege elevation occur.
+HTTP(S)/S3 URLs use FROM URL; other inputs use FROM DISK. Native SQL Server endpoint/transport support still applies. S3 requires SQL Server 2022+. Paths retain their case and separators. Credentials, storage permissions and native CREATE DATABASE permission remain the caller's responsibility. No directory checks, folder creation, backup deletion or privilege elevation occur.
 
 ## Example
 

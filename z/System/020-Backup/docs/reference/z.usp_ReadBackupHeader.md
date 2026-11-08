@@ -8,12 +8,12 @@ Reads backup headers and returns the same 59 documented columns on SQL Server 20
 
 | Parameter | Type | Meaning |
 | --- | --- | --- |
-| `@BackupFile` | `nvarchar(4000)` | Required filesystem path or full Azure HTTPS/S3 URL to a backup file. |
+| `@BackupFile` | `nvarchar(4000)` | Required filesystem path or full HTTP(S)/S3 URL to a backup file. |
 | `@Position` | `int = null` | Backup-set position within the file. NULL reads all sets; a supplied value must be positive. |
 | `@HeaderJson` | `nvarchar(max) = null output` | JSON array of the same header rows, including NULL properties. Cleared when execution starts. |
 | `@ReturnResult` | `bit = 1` | Return the tabular result. Set to 0 when consuming only the JSON output. |
 
-The procedure routes HTTPS and S3 URLs to `RESTORE HEADERONLY FROM URL`; all other values use `FROM DISK`. It preserves the supplied path and URL. S3 requires SQL Server 2022+. SQL Server credentials, filesystem access and storage permissions must already be configured. It does not enumerate directories, create folders, delete backups or contact storage before the native command.
+The procedure routes HTTP(S) and S3 URLs to `RESTORE HEADERONLY FROM URL`; all other values use `FROM DISK`. It preserves the supplied path and URL. Native SQL Server endpoint/transport support still applies. S3 requires SQL Server 2022+. SQL Server credentials, filesystem access and storage permissions must already be configured. It does not enumerate directories, create folders, delete backups or contact storage before the native command.
 
 ## Examples
 

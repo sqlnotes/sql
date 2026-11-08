@@ -215,6 +215,16 @@ Returns Ordinal/Value rows splitting CR/LF recursively. Empty/null input gives n
 
 Formerly `z.fn_ReadLinesFromString`; update callers before deploying. System post removes the old name. The current implementation also treats adjacent LFCR as one separator and can include newline characters in the last row for supplementary Unicode under SC collations.
 
+## z.fn_FormatDurationMilliseconds
+
+[Source](../../modules/1010%20Functions/z.fn_FormatDurationMilliseconds.sql)
+
+`z.fn_FormatDurationMilliseconds(@Milliseconds bigint)` returns `varchar(32)` in
+`days hh:mm:ss.fff` format. For example, 93784567 produces `1 02:03:04.567`.
+Zero produces `0 00:00:00.000`; NULL returns NULL. Negative inputs retain a leading
+minus sign, including bigint minimum. Uses arithmetic without FORMAT or datetime
+conversion, so days do not wrap at 24 hours.
+
 ## z.fn_FormatDurationSeconds
 
 [Source](../../modules/1010%20Functions/z.fn_FormatDurationSeconds.sql)

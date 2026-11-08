@@ -2,7 +2,7 @@
 
 [System documentation](../../docs/readme.md)
 
-Run full, differential, or transaction-log backups; report msdb backup/restore history; create database snapshots.
+Run full, differential, or transaction-log backups; restore full, differential and log backups; report msdb backup/restore history; create database snapshots.
 
 ## Start here
 
@@ -17,9 +17,22 @@ Backups run sequentially to filesystem folders, Azure Blob HTTPS URLs or S3-comp
 
 Windows destinations can use absolute local or UNC paths. Linux destinations use absolute filesystem paths, including mounted network shares. The parameterless Full/Log wrappers contain a fixed UNC destination; inspect them before use.
 
+[z.usp_RestoreDatabase](reference/z.usp_RestoreDatabase.md) accepts a backup file, a specific HTTP(S)/S3 backup-object URL or a recursive filesystem folder, supports renamed destinations and file relocation, and can continue compatible restoring/standby databases. URL inputs are single files without folder discovery. Preview the selected chain and file mappings with ShowPlan = 1. Its default is NORECOVERY with replacement enabled for existing databases outside restore/standby mode.
+
+DropConnections defaults to 1: an existing ONLINE target with pending commands uses
+SINGLE_USER WITH ROLLBACK IMMEDIATE before restore. Unavailable destinations skip
+this step. Preview shows access-mode actions without executing them.
+
+## Inspect history and activity
+
+Inspect recorded backups with z.v_BackupHistory, restores with z.v_RestoreHistory,
+and active native commands with z.v_BackupRestoreRequests. See the
+[inspection reference](reference/backup-restore-history.md) for row counts,
+permissions and examples.
+
 ## Prerequisites
 
-Uses sys.databases, sys.master_files, msdb backup history, filesystem extended procedures, and native backup/create database commands. Filesystem destinations require SQL Server service-account access. URL destinations require configured SQL Server credentials and storage permissions.
+Uses sys.databases, sys.master_files, msdb backup/restore history, filesystem operations, and native backup/restore/create database commands. Filesystem destinations require SQL Server service-account access. URL backup destinations require configured SQL Server credentials and storage permissions.
 
 For S3, use [z.usp_CreateS3BackupCredential](reference/z.usp_CreateS3BackupCredential.md) to create the URL-named credential or explicitly rotate its keys. This requires server-level credential permissions.
 

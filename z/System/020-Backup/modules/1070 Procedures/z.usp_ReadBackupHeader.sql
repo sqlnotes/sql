@@ -29,7 +29,8 @@ begin
 	if @ReturnResult is null
 		throw 50000, 'ReturnResult cannot be null.', 1;
 	select @IsS3 = iif(left(@BackupFile, 5) collate Latin1_General_100_CI_AS = N's3://', 1, 0),
-		@IsUrl = iif(left(@BackupFile, 8) collate Latin1_General_100_CI_AS = N'https://'
+		@IsUrl = iif(left(@BackupFile, 7) collate Latin1_General_100_CI_AS = N'http://'
+			or left(@BackupFile, 8) collate Latin1_General_100_CI_AS = N'https://'
 			or left(@BackupFile, 5) collate Latin1_General_100_CI_AS = N's3://', 1, 0);
 	if @IsS3 = 1 and @Major < 16
 		throw 50000, 'S3 backup headers require SQL Server 2022 or later.', 1;

@@ -13,3 +13,36 @@ Retention is separate from backup. Default filesystem retention trusts recognize
 The backup procedure has no application lock. Cleanup retains its own lock during deletion, but active backups do not participate. Schedule standalone cleanup separately from backups. Filesystem actions cannot be rolled back.
 
 The parameterless Full/Log wrappers contain a fixed UNC destination. The separate snapshot procedure has its own path-length and quoting limitations. Review each callable reference before execution.
+
+## Restore failures
+
+Preview with [z.usp_RestoreDatabase](reference/z.usp_RestoreDatabase.md) ShowPlan = 1.
+Mixed-source folders are supported; inspect the selected source before execution.
+A supplied TargetDatabaseName prefers a matching source, falling back to the latest
+full as a rename source. Keep managed timestamped filenames to avoid reading
+older headers on every call. Arbitrary filenames require broader discovery.
+A log gap, unsupported recovery-fork transition,
+missing restore history or uncertain destination progress stops planning rather
+than silently choosing an older full or restarting a restoring database.
+An incompatible differential is not applied to a different full base. A standalone
+differential requires its base already restored without recovery or subsequent
+log restores; otherwise provide the full backup folder.
+
+Choose UseDefaultFolder = 1 for instance-default directories or 0 for the backup's
+original directories; explicit DataFolder/LogFolder overrides either choice.
+Data/log directory existence is not checked during preview; native RESTORE reports
+missing directories or access failures without redirecting to another folder.
+DropConnections = 1 (the default) uses SINGLE_USER WITH ROLLBACK IMMEDIATE for an
+existing ONLINE target with pending commands. Preview shows the action without
+changing access mode. Native ALTER DATABASE permissions are needed. Applications
+that reconnect can still take the single-user slot. Review access mode after a
+failure or separate recovery from NORECOVERY; cleanup requires an ONLINE target.
+Check destination directories, SQL Server service-account permissions, encryption
+keys, disk capacity and active target connections. DataFolder/LogFolder choose
+destinations for new files without moving existing continuation files.
+Inspect AddedOrdinal in preview to see which command introduces each file.
+File-ID/GUID reuse, removals and unsupported container layouts still stop planning.
+Restore errors can leave a partially completed sequence; the procedure does not
+undo completed steps.
+Keep standby undo files available between restores. No live restore validation is
+implied by a successful preview or by reading backup headers.
