@@ -23,6 +23,7 @@ Installation visits these children sequentially in the alphabetical order shown.
 | [012-TaskQueue](../012-TaskQueue/docs/readme.md) | Generic task batches, execution levels, workers and recovery |
 | [020-Backup](../020-Backup/docs/readme.md) | Backup/restore reporting and snapshots |
 | [020-Monitoring](../020-Monitoring/docs/readme.md) | Sessions, diagnostic trace presets, resource/space views and System Health |
+| [050-AsyncChannel](../050-AsyncChannel/docs/readme.md) | Asynchronous data delivery, generated codecs, activation and processing pools |
 
 ## Compatibility and permissions
 
