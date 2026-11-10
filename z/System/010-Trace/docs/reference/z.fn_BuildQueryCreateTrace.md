@@ -2,7 +2,7 @@
 
 [Trace](../readme.md) | [Source](../../modules/1010%20Functions/z.fn_BuildQueryCreateTrace.sql)
 
-Return ordered setup scripts for a logical definition. The TraceID argument is a logical z.Trace identity, not sys.traces.id. Read logical configuration tables without modifying state or allocating a native trace.
+Return ordered setup scripts for one registered native TraceID. Read configuration without allocating or modifying a trace.
 
 ```sql
 select Ordinal, Script
@@ -10,6 +10,4 @@ from z.fn_BuildQueryCreateTrace(@TraceID)
 order by Ordinal;
 ```
 
-Scripts create the definition, add each event's selected columns, reproduce typed filters in FilterOrdinal order, register callbacks and enable the definition when currently enabled. Callbacks must exist in the target database before replay. Scripts use the logical name, so replay builds configuration in the executing session's run. They do not start collection or export persisted event data.
-
-Requires configuration/catalog visibility. No matching logical definition returns no rows. Use the generated native definition view for native trace inspection. A native trace can no longer be exported through this function merely by passing its native numeric ID.
+Scripts create a native trace by name in the executing session, add configured events/columns and typed native filters, register callbacks, and start it if the source trace is running. The newly allocated native ID can differ from the source ID. Callbacks must exist in the destination database. Scripts do not start collection or export event data. Requires configuration/catalog visibility; an unknown ID returns no rows.

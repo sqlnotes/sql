@@ -16,21 +16,37 @@ create or alter procedure z.usp_TraceRemoveTrigger
 as
 begin
 	set nocount, xact_abort on;
-	exec z.usp_TraceAssertOwner @TraceName, @TraceID;
-	if @TraceName is null and @TraceID is null
+	if @@trancount > 0
 	begin
-		throw 50000, N'Either @TraceName or @TraceID must be provided.', 1;
-	end
-	declare @ResolvedTraceID int;
-	select @ResolvedTraceID = TraceID
-	from z.v_TraceOwned
-	where (@TraceName is null or Name = @TraceName) and (@TraceID is null or TraceID = @TraceID);
-	select @TraceID = @ResolvedTraceID;
-	if not exists(select 1 from z.v_TraceOwned where TraceID = @TraceID and State = 'Building')
-	begin
-		throw 50000, N'Trace configuration requires an owned Building collector.', 1;
-	end
-	delete from z.TraceTrigger where TraceID = @TraceID and EventName = @EventName;
-	update z.Trace set ModificationDate = getdate() where TraceID = @TraceID;
+		set xact_abort off;
+		throw 50000, N'Trace configuration requires no existing transaction.', 1;
+	end;
+	begin try
+		begin tran;
+		exec z.usp_TraceAssertOwner @TraceName, @TraceID;
+		if @TraceName is null and @TraceID is null
+		begin
+			throw 50000, N'Either @TraceName or @TraceID must be provided.', 1;
+		end
+		declare @ResolvedTraceID int;
+		select @ResolvedTraceID = TraceID
+		from z.v_TraceOwned
+		where (@TraceName is null or Name = @TraceName) and (@TraceID is null or TraceID = @TraceID);
+		select @TraceID = @ResolvedTraceID;
+		if not exists(select 1 from z.Trace with (updlock, holdlock) where TraceID = @TraceID and CreatorSessionID = @@spid
+			and CreatorLoginTime = (select login_time from sys.dm_exec_sessions where session_id = @@spid))
+			throw 50000, N'The selected trace registration changed before configuration.', 1;
+		if not exists(select 1 from z.v_TraceOwned where TraceID = @TraceID and Status = 'Stopped')
+		begin
+			throw 50000, N'Stop the selected native trace before changing its configuration.', 1;
+		end
+		delete from z.TraceTrigger where TraceID = @TraceID and EventName = @EventName;
+		update z.Trace set ModificationDate = getdate() where TraceID = @TraceID;
+		commit;
+	end try
+	begin catch
+		if @@trancount > 0 rollback;
+		throw;
+	end catch;
 end
 go

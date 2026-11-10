@@ -2,57 +2,47 @@
 
 [Subsystem](../readme.md) | [Object index](readme.md)
 
-## Access and behavior
-
-Views/functions here read data without modifying it. Table access requires the corresponding select or write permission. Server/database catalog and DMV visibility can hide rows or reject access; permission on a wrapper alone does not guarantee access through every underlying system object. Definitions do not grant caller privileges. Units and interpretation below follow the expressions in source.
-
 ## z.Trace
 
 [Source](../../baseline/2020%20Tables/z.Trace.sql)
 
-Run-owned logical definitions. TraceID is an identity primary key; (CollectorUUID, Name) is unique. Store Description, CreationDate, ModificationDate, ReceivingTable, CreatorSessionID and IsEnabled (default 0). Dates default to local getdate; creator defaults to @@spid. A logical ID is distinct from a native trace ID. Create/Start do not allocate native resources. Run closure removes configuration while destination data remains.
+One native trace registration per TraceID (native ID, not identity). Stores name, description, destination, dates, CreatorSessionID and CreatorLoginTime. Creator session/login distinguishes reused SPIDs. The physical TraceID is the only trace identifier; no scheduled stop is configured. Configuration is removed on close; collected data remains.
 
 ## z.TraceEvent
 
 [Source](../../baseline/2020%20Tables/z.TraceEvent.sql)
 
-Selected logical event IDs, keyed by (TraceID, EventID). Event IDs reference the SQL Trace catalog by framework-managed convention, without a foreign key.
+Configured native event IDs keyed by TraceID/EventID. TraceStart applies event/column bindings.
 
 ## z.TraceEventColumn
 
 [Source](../../baseline/2020%20Tables/z.TraceEventColumn.sql)
 
-Output-column bindings keyed by (TraceID, EventID, ColumnID). Bindings must be supported by the native catalog. SPID is preserved where supported. Physical capture also includes filter inputs, which need not be output columns.
+Selected output bindings keyed by TraceID/EventID/ColumnID. SPID is retained where supported. No internal overlap columns are required.
 
 ## z.TraceFilter
 
 [Source](../../baseline/2020%20Tables/z.TraceFilter.sql)
 
-Ordered predicates keyed by (TraceID, FilterOrdinal), storing ColumnID, LogicOperator, ComparisonOperator and typed sql_variant Value. AND across column groups; ordered left-fold AND/OR within each group, ignoring the first operator. NULL/missing fields do not match. Definitions retain independent filters even though native capture is shared.
+Typed predicates keyed by TraceID/FilterOrdinal. TraceStart applies native filters in ColumnID/FilterOrdinal order; native filtering semantics apply. Predicates on different columns combine with AND.
 
 ## z.TraceTrigger
 
 [Source](../../baseline/2020%20Tables/z.TraceTrigger.sql)
 
-Procedural callback registration, not a DML trigger. Key (TraceID, EventName); ProcedureName holds a quoted schema-qualified current-database procedure name (nvarchar(517)). Register/remove through framework procedures. EventName all overrides the event-specific registration. Every callback receives named TraceSequence, logical TraceID and EventName arguments and shares the event's transaction. No foreign key is defined.
-
-## z.TraceCollector and z.TraceCollectorTrace
-
-[Collector source](../../baseline/2020%20Tables/z.TraceCollector.sql) | [Physical mapping source](../../baseline/2020%20Tables/z.TraceCollectorTrace.sql)
-
-Collector stores UUID, owner session/login generation, creation time and Building/Collecting state. Each run owns zero native traces during setup and multiple overlapping generations during collection. The composite key is (CollectorUUID, TraceID, NativeStopTime); each mapping also stores native start time and run name. Expiry can be a short scheduled handoff time. The eligible baseline upgrades the original CollectorUUID-only key. It is not a logical-to-native per-definition mapping. All definitions obtain their shared native identity through CollectorUUID. Internal relationships are managed by procedures without foreign keys; do not populate these tables manually.
+Procedure callbacks keyed by TraceID/EventName, not DML triggers. EventName all overrides event-specific callbacks. Named TraceSequence, native TraceID and EventName arguments execute after insert in the event transaction.
 
 ## z.v_TraceOwned
 
 [Source](../../modules/1020%20Views/z.v_TraceOwned.sql)
 
-Current UUID/session/login restricts logical metadata to its owner. Includes logical TraceID, enabled/state information, destination and shared NativeTraceID. Before collection, native identity is NULL. Logical Running status during Building means enabled, not a running native trace. Generation tags restrict native status to the recorded resource.
+Restricts z.v_Trace to the creating session/login. No UUID or collector context is used.
 
 ## z.v_Trace
 
 [Source](../../modules/1020%20Views/z.v_Trace.sql)
 
-Unscoped logical diagnostic catalog, including CollectorUUID, IsEnabled, State and shared NativeTraceID. TraceID remains logical. Inspect IsEnabled and State as well as Status to distinguish enabled setup from native collection.
+Registered native traces, destinations, creator session/login. Status Running/Stopped/Not Available uses the registered TraceID. No separate trace-ID alias or native start-time column is exposed.
 
 ## z.v_TraceColumn
 
@@ -84,8 +74,8 @@ Generated by [z.usp_TraceRefreshMetaData](z.usp_TraceRefreshMetaData.md). Event/
 
 ## z.v_TraceDefinition
 
-Generated by [z.usp_TraceRefreshMetaData](z.usp_TraceRefreshMetaData.md). Native TraceID, IsActive, CategoryName, EventName, TraceEventID, IsEventSelected plus one native selection/filter string per trace column. This is a physical trace/event matrix, not a logical destination/filter listing. Empty strings can mean a selected column without a filter; null can mean unselected. Server trace visibility controls rows.
+Generated by [z.usp_TraceRefreshMetaData](z.usp_TraceRefreshMetaData.md). Native TraceID, IsActive, CategoryName, EventName, TraceEventID, IsEventSelected plus one native selection/filter string per trace column. This matrix describes native server trace configuration; registered destinations are available through z.v_Trace. Empty strings can mean a selected column without a filter; null can mean unselected. Server trace visibility controls rows.
 
 ## Generated receiving tables
 
-[z.usp_TraceCollectAndClose](z.usp_TraceCollectAndClose.md) creates a missing receiving table from TraceSequence/EventID/EventName and then adds nullable columns from z.v_TraceColumn. Existing tables must have nonnullable, nonidentity, noncomputed TraceSequence bigint, EventID int and EventName nvarchar(128) or wider before any columns are added. Other existing trace columns are not altered or type-validated. Tables survive trace closure; no per-trace DML trigger is generated. z.TraceTrigger configures procedural callbacks instead.
+[z.usp_TraceCollectAndClose](z.usp_TraceCollectAndClose.md) creates missing tables with TraceSequence bigint, EventID int and EventName nvarchar(128), then adds only configured output columns. Required base columns must be nonnullable, nonidentity and noncomputed. Existing event columns are not retyped. Tables/data survive trace closure. Framework configuration tables have no foreign keys; use APIs rather than direct DML.

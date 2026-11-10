@@ -2,36 +2,20 @@
 
 [Trace](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_TraceCollectAndClose.sql)
 
-## Purpose and behavior
-
-Collect every enabled logical definition in the current session's run. Freeze configuration and start overlapping physical rowset generations containing the required event-column union, including filter inputs and internal EventSequence. One connection receives and processes all generations. Logical Create/Start allocate no native trace; other sessions collect independently.
-
-Prepare missing receiving tables and required nullable output columns. Decode each physical event once, apply each logical definition's independent typed predicates, and route every match to its configured destination. Give each logical delivery a separate TraceSequence. An all-event callback overrides its event-specific registration and receives named TraceSequence, logical TraceID and EventName parameters after the insert.
-
-On completion close all owned native generations and remove the run's configuration, including disabled definitions. Destination data remains. On failure roll back the current collection batch, attempt generation-safe cleanup, and rethrow the original error. Prior committed batches survive.
-
-## Parameters and defaults
+Collect running physical traces created by this session/login, optionally selected by name or native ID. Prepare destination tables and only selected output columns, poll each trace with sp_trace_getdata records = 1, and process every decoded event in buffer order. Traces keep running between reads with no scheduled stop time.
 
 ```text
 @MaxDurationInSec int = 2147483647,
-@TransactionDurationInSec int = 2,
-@MaxEventsPerTransaction int = 300
+@TransactionDurationInSec int = 5,
+@MaxEventsPerTransaction int = null,
+@TraceName nvarchar(128) = null,
+@TraceID int = null
 ```
 
-TraceName/TraceID selectors have been removed. Update named and positional callers to this signature. MaxDurationInSec must be nonnegative; transaction duration and event cap must be positive. Reject ambient transactions. Bound the long default duration during development.
+The first three parameter positions are retained. Use named selectors. Duration must be nonnegative; transaction duration and any supplied event limit must be positive. NULL disables the event limit. Ambient transactions are rejected. The total duration is soft and does not set native stoptime; zero selects and closes without polling.
 
-## Transactions and filtering
+Each complete event resets its fields, restores selected EventClass from its header, and receives a TraceSequence. Its insert and callback share one transaction. Callbacks accept @TraceSequence, @TraceID and @EventName; all overrides event-specific registration. They must not change transactions. Transactions span buffers, native reads and idle waits. By default, commit pending work after 5 seconds; @TransactionDurationInSec adjusts this window and an optional @MaxEventsPerTransaction can commit earlier. The deadline is checked before each native read, after each event and before an idle wait. Idle polling requests a 4 ms wait. Native reads, callbacks and scheduling can delay the deadline; locks remain held until commit. Normal collection completion flushes pending work. Datetimes decode from numeric parts. Existing destination columns are not retyped or fully validated beyond the required base columns.
 
-Commit after the time budget or physical-event cap, whichever is reached first, and commit the remainder at the end of a processed buffer. Controls, overlapping copies and fan-out deliveries do not add physical events to this count. Every matching delivery and callback for a physical event stays in one transaction. Callback failure can roll back earlier events in that batch. Blocking reads and callbacks can exceed the time budget.
+A selected trace stopped or closed elsewhere normally leaves polling, while other selected traces continue. If a concurrent native read error leaves the pending transaction uncommittable, it is rolled back and the original error is preserved. Normal completion closes the original selected trace IDs and creator session/login and removes their configuration, retaining output tables/data. Failures roll back the current batch, print trace/operation context, attempt cleanup and rethrow the original error. Native consumption is not transactional; prior commits survive. Cancellation may require abandoned cleanup after disconnect.
 
-The receiver uses direct INSERT EXEC sp_trace_getdata with records = 0 into a temporary table. Native expiry ends that generation's stream; a local static read-only cursor then processes its rows in insertion order while replacement generations continue capturing. Four future generations are maintained with nominal two-second expiry spacing. Native expiry/EOF scheduling and buffer processing can exceed that spacing; there is no strict callback-latency guarantee.
-
-Filters are ANDed across column groups. Within a column, fold predicates in FilterOrdinal order using their stored AND/OR operator, ignoring the first operator. Missing/NULL fields yield SQL UNKNOWN and do not match. Only a common, single SPID predicate proven safe for all enabled definitions is eligible for native pushdown.
-
-## Permissions and limits
-
-Events are written to receiving tables during collection. Client code must execute collection to completion and consume all results and errors. Requires registered session/login/UUID ownership, native trace privileges, catalog access, destination DDL/DML and callback privileges. Configuration freezes in Collecting. Receiving tables and configured callbacks are validated/prepared before reception.
-
-An exact temporary EventSequence set prevents overlapping copies from producing duplicate logical deliveries. Internal EventSequence capture does not change output-column masking. Seen identities are retained while older matching generations can still contain copies, then pruned conservatively. The generated loop adds no custom completeness exceptions. Genuine SQL and callback errors still propagate. Native buffering and available overlap are finite: overflow or processing delays can still affect reception. Successful return and zero reported drops do not prove completeness. Buffering and decoding occur sequentially in one receiver, without an API cursor, helper connection, SQLCLR, loopback or file-backed Trace.
-
-See [architecture](../architecture.md) and [cleanup](z.usp_TraceCleanupCollectors.md).
+Use one dedicated non-MARS connection. SQL Trace, metadata, destination DDL/DML and callback privileges are required. Bounded reads have known reception loss; successful return is not a completeness guarantee. See [architecture](../architecture.md) and [cleanup](z.usp_TraceCleanup.md).

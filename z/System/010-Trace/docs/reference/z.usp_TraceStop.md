@@ -2,19 +2,11 @@
 
 [Trace](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_TraceStop.sql)
 
-## Purpose and behavior
-
-Disable the selected logical definitions by setting IsEnabled=0, regardless of their owning session or Building/Collecting state. TraceID remains a logical z.Trace ID. An explicit TraceName applies to every matching name across runs; supplying TraceID selects that definition. With neither selector, act only on the current context run. Other enabled definitions keep their shared capture pool. When none remain enabled in an affected run, stop its native generations so the receiver can finish.
-
-## Parameters and defaults
+Stop selected registered native traces without deleting their configuration. Explicit name/ID selectors may target another creator when SQL permissions allow; no selector means the current session/login. Already-stopped or vanished matching traces are normal. Actions use the registered TraceID under its registration lock. The trace can be explicitly started again with the same native configuration. Change events/columns/filters by closing and recreating it.
 
 ```text
 @TraceName nvarchar(128) = null,
 @TraceID int = null
 ```
 
-## Results, permissions and limits
-
-No defined result set. No caller-ownership check is performed. Requires metadata update permission and ALTER TRACE when native generations must stop. In-flight delivery can finish; later logical deliveries consult IsEnabled. Metadata updates participate in a caller transaction, but native stop operations cannot be rolled back. Start retains its ownership check.
-
-See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for run ownership, schema compatibility and known transport limits.
+TraceID is the native SQL Server trace ID. Configuration and Start require the creator session/login; explicit Stop/Close selectors can target another creator when permissions allow. Native SQL Trace permissions are not granted by these procedures. See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md).

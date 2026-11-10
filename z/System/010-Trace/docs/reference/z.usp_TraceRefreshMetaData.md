@@ -22,4 +22,4 @@ Native dependencies: `sys.fn_listextendedproperty`, `sys.fn_trace_geteventinfo`,
 
 See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for subsystem-wide constraints.
 
-These generated views retain their existing native/catalog layouts. TraceID in z.v_TraceDefinition is sys.traces.id; inspect logical destinations and independent filters through z.v_TraceOwned and the logical configuration tables instead.
+These generated views retain their existing native/catalog layouts. TraceID in z.v_TraceDefinition is sys.traces.id; inspect registered destinations and configured filters through z.v_TraceOwned, z.Trace and z.TraceFilter.

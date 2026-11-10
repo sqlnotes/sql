@@ -5,7 +5,7 @@ Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Trace/modules/1010%20Functions/z.fn_BuildQueryCreateTrace.sql
 Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Trace/docs/reference/z.fn_BuildQueryCreateTrace.md
 
-Generates SQL to recreate a logical trace definition and its configuration.
+Generates SQL to recreate a native trace and its configuration.
 */
 create or alter function z.fn_BuildQueryCreateTrace
 (
@@ -14,7 +14,7 @@ create or alter function z.fn_BuildQueryCreateTrace
 returns table
 return
 (
-	-- TraceID identifies a logical definition, not a sys.traces ID.
+	-- TraceID is the registered native SQL Server trace ID.
 	select row_number() over(order by Phase, SortKey) Ordinal, Script
 	from
 	(
@@ -56,8 +56,9 @@ return
 				+ N', @ProcedureName = N''' + replace(c.ProcedureName, '''', '''''') + N''';' as nvarchar(max))
 		from z.Trace t inner join z.TraceTrigger c on c.TraceID = t.TraceID where t.TraceID = @TraceID
 		union all
-		select 4, 0, cast(N'exec z.usp_TraceStart @TraceName = N' + quotename(Name, '''') + N';' as nvarchar(max))
-		from z.Trace where TraceID = @TraceID and IsEnabled = 1
+		select 4, 0, cast(N'exec z.usp_TraceStart @TraceName = N' + quotename(t.Name, '''') + N';' as nvarchar(max))
+		from z.Trace t inner join sys.traces n on n.id = t.TraceID and n.is_rowset = 1 and n.stop_time is null
+		where t.TraceID = @TraceID and n.status = 1
 	) s
 )
 go

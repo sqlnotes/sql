@@ -5,7 +5,7 @@ Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Trace/modules/1070%20Procedures/z.usp_TraceStop.sql
 Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Trace/docs/reference/z.usp_TraceStop.md
 
-Disables selected logical trace definitions without stopping the entire collector run.
+Stops selected native traces; omitted selectors target the current session.
 */
 create or alter procedure z.usp_TraceStop
 (
@@ -15,49 +15,52 @@ create or alter procedure z.usp_TraceStop
 as
 begin
 	set nocount, xact_abort on;
-	declare @CurrentCollectorUUID uniqueidentifier = try_convert(uniqueidentifier, session_context(N'Schema z.TraceCollector.UUID')),
-		@CollectorUUID uniqueidentifier, @NativeTraceID int, @NativeStartTime datetime, @NativeStopTime datetime, @ReturnCode int,
-		@Failed bit = 0, @Message nvarchar(2048);
-	declare @Targets table (TraceID int not null primary key, CollectorUUID uniqueidentifier not null);
-	declare @Runs table (CollectorUUID uniqueidentifier not null primary key);
-	insert @Targets (TraceID, CollectorUUID)
-		select TraceID, CollectorUUID from z.Trace
-		where (@TraceName is not null or @TraceID is not null or CollectorUUID = @CurrentCollectorUUID)
+	if @@trancount > 0
+	begin
+		set xact_abort off;
+		throw 50000, N'Trace stop requires no existing transaction.', 1;
+	end;
+	declare @SelectedTraceID int, @CreatorSessionID int, @CreatorLoginTime datetime,
+		@ReturnCode int, @Message nvarchar(2048), @CurrentLoginTime datetime = (select login_time from sys.dm_exec_sessions where session_id = @@spid);
+	declare t cursor local static read_only for
+		select TraceID, CreatorSessionID, CreatorLoginTime from z.Trace
+		where (@TraceName is not null or @TraceID is not null or (CreatorSessionID = @@spid and CreatorLoginTime = @CurrentLoginTime))
 			and (@TraceName is null or Name = @TraceName) and (@TraceID is null or TraceID = @TraceID);
-	insert @Runs (CollectorUUID) select distinct CollectorUUID from @Targets;
-	if @TraceName is null and @TraceID is null and @CurrentCollectorUUID is not null
-		and not exists(select 1 from @Runs where CollectorUUID = @CurrentCollectorUUID)
-		insert @Runs (CollectorUUID) values (@CurrentCollectorUUID);
-	update t set IsEnabled = 0, ModificationDate = getdate() from z.Trace t inner join @Targets s on s.TraceID = t.TraceID;
-	-- Other enabled definitions retain their shared physical generations.
-	declare n cursor local static read_only for
-		select m.CollectorUUID, m.TraceID, m.NativeStartTime, m.NativeStopTime
-		from z.TraceCollectorTrace m inner join @Runs r on r.CollectorUUID = m.CollectorUUID
-		where not exists(select 1 from z.Trace t where t.CollectorUUID = m.CollectorUUID and t.IsEnabled = 1)
-		order by m.CollectorUUID, m.NativeStopTime, m.TraceID;
-	open n;
-	fetch next from n into @CollectorUUID, @NativeTraceID, @NativeStartTime, @NativeStopTime;
+	open t;
+	fetch next from t into @SelectedTraceID, @CreatorSessionID, @CreatorLoginTime;
 	while @@fetch_status = 0
 	begin
 		begin try
-			if not exists(select 1 from z.Trace where CollectorUUID = @CollectorUUID and IsEnabled = 1)
-				and exists(select 1 from sys.traces where id = @NativeTraceID and stop_time = @NativeStopTime
-					and (@NativeStartTime is null or start_time = @NativeStartTime) and status = 1)
+			begin tran;
+			-- Hold this registration through native operations; never act on a replacement registration.
+			if exists(select 1 from z.Trace with (updlock, holdlock) where TraceID = @SelectedTraceID
+				and CreatorSessionID = @CreatorSessionID and CreatorLoginTime = @CreatorLoginTime)
 			begin
-				exec @ReturnCode = sys.sp_trace_setstatus @NativeTraceID, 0;
-				if @ReturnCode <> 0 throw 50000, N'Failed to stop a physical generation for the selected logical traces.', 1;
+				if exists(select 1 from sys.traces where id = @SelectedTraceID and is_rowset = 1 and stop_time is null and status = 1)
+				begin
+					begin try
+						exec @ReturnCode = sys.sp_trace_setstatus @SelectedTraceID, 0;
+						if @ReturnCode <> 0 and exists(select 1 from sys.traces where id = @SelectedTraceID and is_rowset = 1 and stop_time is null and status = 1)
+						begin
+							select @Message = concat(N'Native trace ', @SelectedTraceID, N': stop failed; return code ', @ReturnCode, N'.');
+							throw 50000, @Message, 1;
+						end;
+					end try
+					begin catch
+						if exists(select 1 from sys.traces where id = @SelectedTraceID and is_rowset = 1 and stop_time is null and status = 1) throw;
+					end catch;
+				end;
+
 			end;
+			commit;
 		end try
 		begin catch
-			-- A concurrent caller may already have stopped or removed this generation.
-			if exists(select 1 from sys.traces where id = @NativeTraceID and stop_time = @NativeStopTime
-				and (@NativeStartTime is null or start_time = @NativeStartTime) and status = 1)
-				select @Failed = 1, @Message = isnull(@Message, error_message());
+			if @@trancount > 0 rollback;
+			throw;
 		end catch;
-		fetch next from n into @CollectorUUID, @NativeTraceID, @NativeStartTime, @NativeStopTime;
+		fetch next from t into @SelectedTraceID, @CreatorSessionID, @CreatorLoginTime;
 	end;
-	close n;
-	deallocate n;
-	if @Failed = 1 throw 50000, @Message, 1;
+	close t;
+	deallocate t;
 end;
 go

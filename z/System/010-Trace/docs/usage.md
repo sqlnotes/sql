@@ -2,48 +2,43 @@
 
 [Subsystem](readme.md) | [Object reference](reference/readme.md)
 
-## Examples
-
-Execute against a database containing System and this subsystem. Examples describe current interfaces; environment permissions and data determine results.
+## Inspect traces
 
 ```sql
-select TraceID, Name, IsEnabled, State, NativeTraceID, ReceivingTable
-from z.v_TraceOwned;
+select TraceID, Name, Status, CreatorSessionID, CreatorLoginTime, ReceivingTable
+from z.v_Trace;
+select * from z.v_TraceOwned;
 ```
-
-Build all logical definitions and collect on one dedicated connection. Start only enables each logical definition. Collect freezes the run and uses overlapping physical generations for all enabled definitions; one receiving connection processes their temp buffers and other sessions remain independent. Diagnostic presets and daily reports belong to [Monitoring](../../020-Monitoring/docs/usage.md). Use the bounded custom example below during development.
 
 ## Bounded custom trace
 
-Run all statements on one connection. This example builds and enables a logical definition, then creates its physical trace during collection. Normal completion removes the run configuration and retains destination data. Review privileges and workload impact first.
+Run configuration and collection on one dedicated connection. Each definition creates a separate native trace, with no scheduled stop. This example explicitly ends collection after 30 seconds and closes that trace.
 
 ```sql
 declare @TraceID int;
-exec z.usp_TraceCreate @TraceName = N'DeveloperTrace', @Description = N'Bounded example', @TraceID = @TraceID output;
-exec z.usp_TraceAddEvents @TraceID = @TraceID, @EventList = N'SQL:BatchCompleted', @EventColumnList = N'TextData,StartTime,Duration,SPID';
+exec z.usp_TraceCreate @TraceName = N'DeveloperTrace', @Description = N'Example', @TraceID = @TraceID output;
+exec z.usp_TraceAddEvents @TraceID = @TraceID, @EventList = N'SQL:BatchCompleted', @EventColumnList = N'TextData,StartTime,Duration,SPID,EventClass';
+exec z.usp_TraceAddFilter @TraceID = @TraceID, @ColumnName = N'SPID', @ComparisonOperator = N'<>', @Value = @@spid;
 exec z.usp_TraceStart @TraceID = @TraceID;
-exec z.usp_TraceCollectAndClose @MaxDurationInSec = 30, @TransactionDurationInSec = 2, @MaxEventsPerTransaction = 300;
+exec z.usp_TraceCollectAndClose @MaxDurationInSec = 30, @TraceID = @TraceID;
 ```
 
-On failure, inspect the owned registry and [cleanup procedure](reference/z.usp_TraceCleanupCollectors.md). An idle Building run is preserved while its original session exists. After a Collecting owner has no active request, a separate privileged connection can reap its registered native generation. The owner session itself cannot reap its own run while its cleanup request is active.
+Create more traces before the same collection call to poll them on the same connection. Their native configuration and destinations are independent. Omit @TraceID/@TraceName to collect all running traces created by this session/login. Configure events/columns/filters before first Start. After native event binding begins, Close/Create is required to change them. Stop/Start pauses and resumes the same trace. Callbacks and destination metadata can be changed while stopped.
 
-## Explicit event and column selectors
+## Selectors and callbacks
 
-Pass complete comma-separated catalog names to the event/column procedures. For example:
+Event and column lists contain complete comma-separated catalog names from z.v_TraceEvent and z.v_TraceColumn. Lists trim and deduplicate names and reject unknown/empty entries. AddEvents requires explicit events; column lists and RemoveEvents accept the whole value all. NULL AddEvents column list inherits existing columns; SPID is retained where supported.
+
+Register callbacks with z.usp_TraceSetTrigger. They accept named @TraceSequence bigint, @TraceID int and @EventName nvarchar(128), execute after the insert, and must not commit or roll back the collector transaction. EventName all overrides event-specific registrations. Configure callbacks while stopped.
+
+## Stop and cleanup
+
+Stop/Close accept explicit native ID/name selectors, including traces created by another session when SQL permissions allow. With no selectors, they affect only traces created by the current session/login. Stop is normal termination for that trace; other traces keep collecting. Close removes configuration and the native trace, retaining destination data.
 
 ```sql
-exec z.usp_TraceAddEvents @TraceName = N'DeveloperTrace',
-    @EventList = N'SQL:BatchCompleted,RPC:Completed',
-    @EventColumnList = N'TextData,StartTime,Duration,SPID';
+exec z.usp_TraceStop @TraceID = 42;
+exec z.usp_TraceClose @TraceID = 42;
+exec z.usp_TraceCleanup;
 ```
 
-Resolve the names from `z.v_TraceEvent` and `z.v_TraceColumn` before calling. Lists trim spaces, deduplicate names and reject unknown or empty entries. Partial names, wildcard patterns and SQL query text are invalid. Column lists and RemoveEvents support the whole value `all`; AddEvents requires explicit event names. AddEvents with a NULL column list inherits existing selected columns and always includes SPID. The former query-text parameters are removed; update positional callers to the current signatures.
-Use one dedicated connection and database for a collector run. TraceCreate registers the UUID automatically; normal configuration and lifecycle operations stay on that owner connection. Do not set the reserved Schema z.TraceCollector.UUID context key read-only.
-
-## Logical routing and callbacks
-
-Create and enable additional logical definitions before the same Collect call to merge them. Each definition keeps independent filters, destination and callbacks. Each matching delivery gets its own TraceSequence. Configure callbacks through `z.usp_TraceSetTrigger`, not direct metadata inserts. Callbacks accept named `@TraceSequence bigint`, `@TraceID int` (logical) and `@EventName nvarchar(128)` arguments. An all-event registration overrides the event-specific registration.
-
-Use `z.fn_BuildQueryCreateTrace` with a logical ID to export its configuration, filters and callbacks. The generated native definition view still uses native IDs. The collector no longer accepts TraceName/TraceID selectors. Configuration is frozen once Collect starts; event/filter/callback configuration remains possible after logical Start while Building.
-
-The bounded rowset backend can lose unread events even with zero native drops. Consolidation does not prove completeness. Blocking reads and callbacks can exceed collection and transaction time budgets. Separate raw saving and parsing are not implemented.
+Cleanup requires full session visibility and only reaps framework traces whose original owner session/login is absent. Idle connected owners are preserved. See [architecture](architecture.md) for lifecycle and best-effort transport limits.

@@ -5,7 +5,7 @@ Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Trace/baseline/2020%20Tables/z.TraceEvent.sql
 Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Trace/docs/reference/supporting-objects.md#ztraceevent
 
-Stores selected event IDs for each logical trace definition.
+Stores selected event IDs for each native trace.
 */
 if object_id(N'z.TraceEvent') is null
 begin

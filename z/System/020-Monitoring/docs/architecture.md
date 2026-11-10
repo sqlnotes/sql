@@ -22,11 +22,10 @@ Empty request snapshots can be normal: the collector excludes its own session. C
 
 ## SQL Trace monitoring
 
-`z.usp_CollectTrace` configures blocking, long-running query, exception and file-growth presets through the Trace framework. Monitoring owns their six event/snapshot tables, both active-request snapshot callbacks and the summaries `z.fn_TraceLongRunningQueryByDay` and `z.fn_TraceLongRunningQueryByHour`. The preset builds four logical definitions through framework APIs and registers callbacks with `z.usp_TraceSetTrigger`. One Collect call captures enabled definitions through overlapping physical generations for its session, using one receiving connection and preserving independent filters, destinations and callbacks. Other sessions can run their own identically named definitions independently. Installation does not start collection.
+`z.usp_CollectTrace` creates/configures four independent native rowset traces for blocking, long-running queries, errors and file growth. Each has native filters, its own destination and callbacks, and no scheduled stop time. One connection polls and processes their buffers. Monitoring owns diagnostic tables, snapshot callbacks and daily/hourly summaries. Installation does not start capture.
 
-Create/Start allocate no native trace. Collection freezes the run and closes/removes its configuration afterward; destination data remains. The receiver uses direct INSERT EXEC into a temporary buffer and processes it while replacement generations capture. EventSequence suppresses overlapping copies. Periodic processing and snapshot timing remain soft, and native buffering/available overlap are finite. No API cursor or second receiver is used.
+TraceCreate allocates stopped native traces; Start applies configuration and starts each one. Collection closes its selected traces/configuration on completion and retains diagnostic data. Cleanup reaps only framework registrations whose creator session/login is absent, preserving idle connected owners. Bounded reads have known reception loss. Snapshot callbacks inspect state when processing runs. See [Trace architecture](../../010-Trace/docs/architecture.md).
 
-Moving guarded baselines preserves existing tables and data; SQL object names and versions stay the same. A versioned Monitoring installation skips baseline replay and needs separate guarded-baseline execution if these tables are missing.
 ## Server Extended Events collectors
 
 [Error and long-running query sessions](reference/extended-events.md) are defined

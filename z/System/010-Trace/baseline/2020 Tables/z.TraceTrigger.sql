@@ -5,7 +5,7 @@ Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Trace/baseline/2020%20Tables/z.TraceTrigger.sql
 Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Trace/docs/reference/supporting-objects.md#ztracetrigger
 
-Stores stored-procedure callback registrations for logical trace events.
+Stores stored-procedure callback registrations for native trace events.
 */
 if object_id(N'z.TraceTrigger') is null
 begin

@@ -27,15 +27,10 @@ Exact SQL identifiers link to behavior and source. Native system dependencies ar
 | `z.v_TraceMetaData` | [Generated view](supporting-objects.md#zv_tracemetadata) | [Generator](z.usp_TraceRefreshMetaData.md) |
 | `z.v_Trace` | [Reference](supporting-objects.md#zv_trace) | [SQL](../../modules/1020%20Views/z.v_Trace.sql) |
 | `z.usp_TraceAssertOwner` | [Reference](z.usp_TraceAssertOwner.md) | [SQL](../../modules/1070%20Procedures/z.usp_TraceAssertOwner.sql) |
-| `z.usp_TraceCleanupCollectors` | [Reference](z.usp_TraceCleanupCollectors.md) | [SQL](../../modules/1070%20Procedures/z.usp_TraceCleanupCollectors.sql) |
-| `z.usp_TraceRegisterCollector` | [Reference](z.usp_TraceRegisterCollector.md) | [SQL](../../modules/1070%20Procedures/z.usp_TraceRegisterCollector.sql) |
-| `z.usp_TraceReleaseCollector` | [Reference](z.usp_TraceReleaseCollector.md) | [SQL](../../modules/1070%20Procedures/z.usp_TraceReleaseCollector.sql) |
-| `z.TraceCollector` | [Reference](supporting-objects.md#ztracecollector-and-ztracecollectortrace) | [SQL](../../baseline/2020%20Tables/z.TraceCollector.sql) |
-| `z.TraceCollectorTrace` | [Reference](supporting-objects.md#ztracecollector-and-ztracecollectortrace) | [SQL](../../baseline/2020%20Tables/z.TraceCollectorTrace.sql) |
 | `z.v_TraceOwned` | [Reference](supporting-objects.md#zv_traceowned) | [SQL](../../modules/1020%20Views/z.v_TraceOwned.sql) |
 | `z.TraceEvent` | [Reference](supporting-objects.md#ztraceevent) | [SQL](../../baseline/2020%20Tables/z.TraceEvent.sql) |
 | `z.TraceEventColumn` | [Reference](supporting-objects.md#ztraceeventcolumn) | [SQL](../../baseline/2020%20Tables/z.TraceEventColumn.sql) |
 | `z.TraceFilter` | [Reference](supporting-objects.md#ztracefilter) | [SQL](../../baseline/2020%20Tables/z.TraceFilter.sql) |
 | `z.usp_TraceSetTrigger` | [Reference](z.usp_TraceSetTrigger.md) | [SQL](../../modules/1070%20Procedures/z.usp_TraceSetTrigger.sql) |
 | `z.usp_TraceRemoveTrigger` | [Reference](z.usp_TraceRemoveTrigger.md) | [SQL](../../modules/1070%20Procedures/z.usp_TraceRemoveTrigger.sql) |
-| `z.usp_TraceOpenPhysical` | [Reference](z.usp_TraceOpenPhysical.md) | [SQL](../../modules/1070%20Procedures/z.usp_TraceOpenPhysical.sql) |
+| `z.usp_TraceCleanup` | [Reference](z.usp_TraceCleanup.md) | [SQL](../../modules/1070%20Procedures/z.usp_TraceCleanup.sql) |

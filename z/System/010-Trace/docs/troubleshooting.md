@@ -1,23 +1,13 @@
 # Trace troubleshooting
 
-[Subsystem](readme.md) | [Object reference](reference/readme.md)
+[Subsystem](readme.md) | [Architecture](architecture.md) | [Object index](reference/readme.md)
 
-## Diagnose current behavior
+Inspect z.v_Trace and z.v_TraceOwned for registered trace IDs, owner session/login and Running/Stopped/Not Available status. TraceID is the native ID. Configure and start on the creator connection; configure events/columns/filters before the first Start attempt. Once native event bindings exist, Close/Create is required to change them; Stop/Start resumes the same trace. Callbacks and destination metadata can be changed while stopped.
 
-TraceID identifies a logical definition. Inspect NativeTraceID in z.v_TraceOwned or the physical mapping for native operations. Before Collect, no native trace exists; a logical Running status in Building means enabled. Collect requires enabled definitions with events and freezes the run. Configure/start/collect on one dedicated connection and database.
+External Stop/Close is normal and ends polling for that trace. Actual read, decode, insert or callback failures print trace/operation context and rethrow the original SQL error. Current-batch changes roll back, earlier commits remain. Cleanup failures are reported separately and do not replace the collection error.
 
-An idle Building run is preserved while its original owner exists. An abandoned Collecting run is eligible when its owner has no active request; run cleanup from a separate privileged connection. Native generation mismatches remain registered for manual review. Different sessions can use identical logical names independently.
+Run z.usp_TraceCleanup after an abandoned owner's connection has ended. Idle connected sessions retain ownership. Cleanup requires VIEW SERVER STATE on SQL Server 2019, or VIEW SERVER PERFORMANCE STATE on SQL Server 2022 and later, and native trace/registry permissions. It never closes unrelated traces solely because they have no framework registration. Use framework Stop/Close APIs to keep registrations synchronized with server traces. Direct external trace closure and ID reuse cannot be distinguished from the stored TraceID alone.
 
-Callback failure rolls back the current batch; prior commits survive. Native expiry/EOF supplies periodic temp-buffer processing while overlapping generations capture. SQL and callback errors propagate, but the generated loop adds no custom completeness errors. Expiry scheduling, blocking reads and slow callbacks can exceed time budgets. Snapshot callbacks observe current sessions when their buffer is processed. Finite native buffers and processing that exhausts overlap can still lose events; successful return and zero native drops are not completeness proofs.
+A schema-transition error requires stopping old collectors and clearing their old registered configuration safely before eligible baseline replay. Keep receiving tables/data. Existing installations skipping the baseline need a separately planned transition; rerunning modules alone does not reconcile tables.
 
-When its baseline is eligible, the physical-mapping definition upgrades the original single-generation primary key while preserving rows. Other existing table shapes are not reconciled; those require a fresh installation or an explicit schema transition. Collect no longer accepts TraceName/TraceID selectors.
-
-## Permission and partial-operation failures
-
-System supplies z.SeqGeneralID, ID/date helpers, z.usp_ForceNamingConvention, and PS_SchemaZPartitionGeneric. SQL Trace system catalogs and sp_trace_* procedures are required.
-
-Read the relevant callable reference before retrying a failed write. Some procedures roll back any open transaction, including a caller's transaction; others leave earlier operations committed. Native server resources and filesystem actions do not share a single database rollback boundary. Catalog/DMV access is evaluated on the deployed server and depends on SQL Server version and caller context.
-
-## Verification limits
-
-These pages describe source behavior. A successful installation or module compilation does not demonstrate successful mail delivery, backup restoration, SQL Agent execution, trace workload collection, security migration, or application-specific Broker delivery.
+Missing events are possible with bounded sp_trace_getdata reads even when native dropped-event counters are zero. More frequent polling is not proof of complete delivery. A missing row does not prove a query never executed. No callback-latency guarantee is made; native calls and callbacks can exceed the optional collection duration.

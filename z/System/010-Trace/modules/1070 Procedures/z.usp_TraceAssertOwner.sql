@@ -5,7 +5,7 @@ Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/010-Trace/modules/1070%20Procedures/z.usp_TraceAssertOwner.sql
 Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Trace/docs/reference/z.usp_TraceAssertOwner.md
 
-Validates the current collector identity and ownership of a logical trace.
+Validates that the selected native traces were created by the current session.
 */
 create or alter procedure z.usp_TraceAssertOwner
 (
@@ -15,20 +15,7 @@ create or alter procedure z.usp_TraceAssertOwner
 as
 begin
 	set nocount on;
-	if not exists
-	(
-		select 1 from z.TraceCollector c
-		where c.CollectorUUID = try_convert(uniqueidentifier, session_context(N'Schema z.TraceCollector.UUID'))
-			and c.OwnerSessionID = @@spid
-			and c.OwnerLoginTime = (select login_time from sys.dm_exec_sessions where session_id = @@spid)
-	)
-		throw 50000, N'The current session does not own a registered trace collector.', 1;
-	-- Names are run-local; an identically named definition in another run is allowed.
-	if @TraceID is not null and exists
-	(
-		select 1 from z.Trace t where t.TraceID = @TraceID
-			and t.CollectorUUID <> try_convert(uniqueidentifier, session_context(N'Schema z.TraceCollector.UUID'))
-	)
-		throw 50000, N'The selected logical trace is not owned by the current collector session.', 1;
+	if not exists(select 1 from z.v_TraceOwned where (@TraceName is null or Name = @TraceName) and (@TraceID is null or TraceID = @TraceID))
+		throw 50000, N'No matching trace was created by the current session.', 1;
 end;
 go
