@@ -7,7 +7,7 @@ Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Trace/docs
 
 Registers native rowset traces, destinations, and their creating sessions.
 */
--- Existing logical collectors must be closed with the previous installation first.
+-- The installation pre-script closes legacy collectors and clears their configuration.
 if col_length(N'z.Trace', N'CollectorUUID') is not null or columnproperty(object_id(N'z.Trace'), N'TraceID', 'IsIdentity') = 1
 begin
 	if exists(select 1 from z.Trace)

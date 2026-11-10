@@ -10,3 +10,5 @@ The Trace subsystem creates and collects native SQL Server rowset traces. One de
 - [System](../../docs/readme.md)
 
 Collection is best effort: bounded native rowset reads have known event-loss limits. Successful completion and zero reported drops do not prove complete reception.
+
+When replacing the former shared-collector installation, the installer closes its registered native generations and removes the old trace definitions and configuration automatically. Receiving tables and captured diagnostic data are preserved. Run this transition during maintenance with collector calls quiesced; it does not provide a concurrent online upgrade. Native cleanup failures still stop installation so unresolved resources can be retried safely.
