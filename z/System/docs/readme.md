@@ -22,6 +22,7 @@ Installation visits these children sequentially in the alphabetical order shown.
 | [010-Trace](../010-Trace/docs/readme.md) | Trace framework, configuration, collection and lifecycle |
 | [020-Backup](../020-Backup/docs/readme.md) | Backup/restore reporting and snapshots |
 | [020-Monitoring](../020-Monitoring/docs/readme.md) | Sessions, diagnostic trace presets, resource/space views and System Health |
+| [050-AsyncChannel](../050-AsyncChannel/docs/readme.md) | Asynchronous data delivery, generated codecs, activation and processing pools |
 
 ## Compatibility and permissions
 

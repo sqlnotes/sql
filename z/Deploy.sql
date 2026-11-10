@@ -47,7 +47,7 @@ begin
 			@OtherOwner varchar(32), @ExistingSlot int, @OtherSlot int, @Slot int = 1,
 			@Result int, @Remaining int, @MainAcquired bit = 0, @SlotAcquired bit = 0,
 			@Started datetime2(3) = sysutcdatetime(), @Elapsed bigint,
-			@NameHash varchar(64), @Delay time(3);
+			@NameHash varchar(64), @Delay varchar(12);
 	if nullif(trim(@SemaphoreName), N'') is null or @TotalCount is null or @TotalCount < 1
 		throw 50000, 'A semaphore requires a nonempty name and positive capacity.', 1;
 	if @LockOwner is null or @LockOwner not in ('Transaction', 'Session')
@@ -125,7 +125,7 @@ begin
 			if @LockTimeout = 0 break;
 			select @Remaining = case when @LockTimeout = -1 then 4 else convert(int, @LockTimeout - @Elapsed) end;
 			if @Remaining <= 0 break;
-			select @Delay = dateadd(millisecond, iif(@Remaining < 4, @Remaining, 4), cast('00:00:00' as time(3)));
+			select @Delay = convert(varchar(12), dateadd(millisecond, iif(@Remaining < 4, @Remaining, 4), cast('00:00:00' as time(3))));
 			waitfor delay @Delay;
 			select @Slot = 1;
 		end
