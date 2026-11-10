@@ -20,6 +20,7 @@ Installation visits these children sequentially in the alphabetical order shown.
 | [010-Partition](../010-Partition/docs/readme.md) | Boundaries, schemes and retention |
 | [010-Security](../010-Security/docs/readme.md) | Login, user and permission utilities |
 | [010-Trace](../010-Trace/docs/readme.md) | Trace framework, configuration, collection and lifecycle |
+| [012-TaskQueue](../012-TaskQueue/docs/readme.md) | Generic task batches, execution levels, workers and recovery |
 | [020-Backup](../020-Backup/docs/readme.md) | Backup/restore reporting and snapshots |
 | [020-Monitoring](../020-Monitoring/docs/readme.md) | Sessions, diagnostic trace presets, resource/space views and System Health |
 
