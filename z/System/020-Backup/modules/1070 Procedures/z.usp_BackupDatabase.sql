@@ -14,7 +14,8 @@ create or alter procedure z.usp_BackupDatabase
 	@BackupFolder nvarchar(4000) = null, --Filesystem folder or Azure/S3 URL prefix.
 	@BackupCompression bit = 1,
 	@OtherBackupOptions nvarchar(max) = null,-- 'stats = 1',
-	@ServerName sysname = null --Backup path label; NULL uses @@servername.
+	@ServerName sysname = null, --Backup path label; NULL uses @@servername.
+	@BackupFileNameFormat nvarchar(4000) = N'{ServerName}${InstanceName}${DatabaseName}_{yyyyMMdd}_{HHmmssfffffff}'
 )
 as
 begin
@@ -28,11 +29,28 @@ begin
 	declare @BackupPath nvarchar(4000), @SQL nvarchar(max), @DatabaseName nvarchar(128), @StandardizedDatabaseName nvarchar(128), @FolderSeparator varchar(1),
 			@BackupFileName nvarchar(4000), @RawPath nvarchar(max), @Platform nvarchar(256), @DirectoryResult int,
 			@IsUrl bit, @BackupDevice varchar(4), @IsReadOnly bit,
-			@EffectiveOptions nvarchar(max), @OptionSeparator nvarchar(4) = nchar(13) + nchar(10) + N', ';
-	select @BackupType = upper(trim(@BackupType)), @ServerName = coalesce(@ServerName, @@servername);
+			@EffectiveOptions nvarchar(max), @OptionSeparator nvarchar(4) = nchar(13) + nchar(10) + N', ',
+			@ServerLabel nvarchar(128), @InstanceLabel nvarchar(128), @InstanceSeparator int, @BackupTime datetime2(7),
+			@EffectiveFileNameFormat nvarchar(max), @FormattedName nvarchar(max), @FormatRemainder nvarchar(max),
+			@FormatOffset int, @TokenStart int, @TokenEnd int, @Token nvarchar(128);
+	select @BackupType = upper(trim(@BackupType)), @ServerName = coalesce(nullif(trim(@ServerName), N''), @@servername);
 
 	if @BackupType is null or @BackupType not in ('FULL', 'LOG', 'DIFF')
 		throw 50000, '@BackupType must be Full, Log, or Diff', 1;
+	if nullif(trim(@BackupFileNameFormat), N'') is null
+		throw 50000, 'BackupFileNameFormat must specify a filename template without an extension.', 1;
+	select @FormatRemainder = @BackupFileNameFormat;
+	select @FormatRemainder = replace(replace(replace(replace(@FormatRemainder, N'{ServerName}', N''), N'{InstanceName}', N''), N'{DatabaseName}', N''), N'{BackupType}', N'');
+	select @FormatRemainder = replace(replace(replace(replace(replace(replace(@FormatRemainder, N'{yyyyMMdd}', N''), N'{HHmmssfffffff}', N''), N'{HHmmssffffff}', N''), N'{HHmmss}', N''), N'{fffffff}', N''), N'{ffffff}', N'');
+	if @FormatRemainder like N'%[{}]%' or @BackupFileNameFormat like N'%[<>:"/\|?*]%'
+		throw 50000, 'BackupFileNameFormat contains an unknown token or an invalid filename character.', 1;
+	select @InstanceSeparator = charindex(N'\', @ServerName);
+	select @ServerLabel = z.fn_StandardizeFileName(iif(@InstanceSeparator = 0, @ServerName, left(@ServerName, case when @InstanceSeparator > 0 then @InstanceSeparator - 1 else 0 end))),
+		@InstanceLabel = z.fn_StandardizeFileName(iif(@InstanceSeparator = 0, N'MSSQLSERVER', substring(@ServerName, @InstanceSeparator + 1, 128)));
+	if nullif(@ServerLabel, N'') is null or nullif(@InstanceLabel, N'') is null
+		throw 50000, 'ServerName must identify a server and an optional nonempty instance name.', 1;
+	select @EffectiveFileNameFormat = @BackupFileNameFormat;
+
 
 
 	if nullif(trim(translate(@OtherBackupOptions, nchar(9) + nchar(10) + nchar(11) + nchar(12) + nchar(13), N'     ')), N'') is null
@@ -42,81 +60,6 @@ begin
 	begin
 		select @BackupCompression = isnull((select cast(value as int) from sys.configurations where name = 'backup compression default'), 0)
 	end
-	declare @Options table(OptionID int identity primary key, OptionName nvarchar(128) collate Latin1_General_100_BIN2, OptionText nvarchar(max));
-	if @OtherBackupOptions is not null
-	begin
-		-- Split only top-level commas. Quoted values, nested lists and comments remain intact.
-		declare @OptionInput nvarchar(max) = @OtherBackupOptions + nchar(13) + nchar(10) + N',',
-			@Position int = 1, @OptionStart int = 1, @InputLength int, @Depth int = 0, @CommentDepth int = 0,
-			@LineComment bit = 0, @Quote nchar(1), @Character nchar(1), @Next nchar(1),
-			@OptionName nvarchar(128) = N'', @NameDone bit = 0, @OptionText nvarchar(max);
-		select @InputLength = len(@OptionInput);
-		while @Position <= @InputLength
-		begin
-			select @Character = substring(@OptionInput, @Position, 1), @Next = substring(@OptionInput, @Position + 1, 1);
-			if @LineComment = 1
-			begin
-				if @Character in (nchar(13), nchar(10)) select @LineComment = 0;
-			end
-			else if @CommentDepth > 0
-			begin
-				if @Character = N'/' and @Next = N'*' select @CommentDepth += 1, @Position += 1;
-				else if @Character = N'*' and @Next = N'/' select @CommentDepth -= 1, @Position += 1;
-			end
-			else if @Quote is not null
-			begin
-				if @Character = @Quote
-				begin
-					if @Next = @Quote select @Position += 1;
-					else select @Quote = null;
-				end
-			end
-			else if @Character = N'-' and @Next = N'-'
-				select @LineComment = 1, @Position += 1, @NameDone = iif(@OptionName = N'', 0, 1);
-			else if @Character = N'/' and @Next = N'*'
-				select @CommentDepth = 1, @Position += 1, @NameDone = iif(@OptionName = N'', 0, 1);
-			else if @Character in (N'''', N'"', N'[')
-				select @Quote = iif(@Character = N'[', N']', @Character), @NameDone = 1;
-			else if @Character = N'('
-				select @Depth += 1, @NameDone = 1;
-			else if @Character = N')'
-			begin
-				select @Depth -= 1;
-				if @Depth < 0 throw 50000, 'Malformed @OtherBackupOptions: unmatched parenthesis.', 1;
-			end
-			else if @Character = N',' and @Depth = 0
-			begin
-				if @OptionName = N'' throw 50000, 'Malformed @OtherBackupOptions: an option name is missing.', 1;
-				select @OptionText = trim(substring(@OptionInput, @OptionStart, @Position - @OptionStart - iif(@Position = @InputLength, 2, 0))),
-					@OptionName = upper(@OptionName collate Latin1_General_100_CI_AS);
-				select @OptionName = case @OptionName
-					when N'NO_COMPRESSION' then N'COMPRESSION' when N'NOINIT' then N'INIT'
-					when N'NOFORMAT' then N'FORMAT' when N'NO_CHECKSUM' then N'CHECKSUM'
-					when N'NOSKIP' then N'SKIP' when N'NOREWIND' then N'REWIND'
-					when N'NOUNLOAD' then N'UNLOAD' when N'CONTINUE_AFTER_ERROR' then N'STOP_ON_ERROR'
-					else @OptionName end;
-				insert into @Options(OptionName, OptionText) values(@OptionName, @OptionText);
-				select @OptionStart = @Position + 1, @OptionName = N'', @NameDone = 0;
-			end
-			else if @NameDone = 0
-			begin
-				if @Character collate Latin1_General_100_BIN2 like N'[A-Za-z0-9_]'
-				begin
-					if len(@OptionName) = 128 throw 50000, 'Malformed @OtherBackupOptions: option name is too long.', 1;
-					select @OptionName += @Character;
-				end
-				else if @OptionName <> N'' or @Character not in (N' ', nchar(9), nchar(10), nchar(11), nchar(12), nchar(13))
-					select @NameDone = 1;
-			end
-			select @Position += 1;
-		end
-		if @Quote is not null or @Depth <> 0 or @CommentDepth <> 0
-			throw 50000, 'Malformed @OtherBackupOptions: unclosed quote, bracket, parenthesis or comment.', 1;
-		-- Last user occurrence wins, including opposing switches in the same option group.
-		delete t from @Options t where exists(select * from @Options s where s.OptionName = t.OptionName and s.OptionID > t.OptionID);
-		select @OtherBackupOptions = string_agg(OptionText, @OptionSeparator) within group(order by OptionID) from @Options;
-	end
-
 	declare @DatabaseList table(
 								DatabaseName nvarchar(128) primary key,
 							StandardizedDatabaseName nvarchar(128) not null, DataSizeMB bigint, IsReadOnly bit
@@ -124,7 +67,7 @@ begin
 
 	insert into @DatabaseList(DatabaseName, StandardizedDatabaseName, DataSizeMB, IsReadOnly)
 		select	d.name,
-				replace(translate(d.name, N'<>:"/\?*' + nchar(9) + nchar(10) + nchar(11) + nchar(12) + nchar(13), '             '), ' ', '_'),
+				z.fn_StandardizeFileName(d.name),
 				sum(cast(m.size as bigint)) * 8/1024, d.is_read_only
 		from sys.databases d
 			inner join sys.master_files m on m.database_id = d.database_id
@@ -184,11 +127,35 @@ begin
 		fetch next from c into @DatabaseName, @StandardizedDatabaseName, @IsReadOnly;
 		while @@fetch_status = 0
 		begin
-			select @RawPath = @BackupFolder + iif(@ServerName like '%\%', replace(@ServerName, '\', @FolderSeparator), @ServerName + @FolderSeparator + 'MSSQLSERVER')
-				+ @FolderSeparator + @StandardizedDatabaseName;
-			select @BackupPath = @RawPath + @FolderSeparator + @BackupType + @FolderSeparator;
-			select @BackupFileName = @BackupPath + @StandardizedDatabaseName + '_' + format(sysdatetime(), 'yyyyMMdd_HHmmss_ffffff', 'en-US')
-				+ case @BackupType when 'FULL' then N'.bak' when 'DIFF' then N'.diff' else N'.trn' end;
+			select @RawPath = @BackupFolder + @ServerLabel + @FolderSeparator + @InstanceLabel
+				+ @FolderSeparator + @StandardizedDatabaseName + @FolderSeparator + @BackupType + @FolderSeparator,
+				@BackupTime = sysdatetime(), @FormattedName = N'', @FormatOffset = 1;
+			while @FormatOffset <= len(@EffectiveFileNameFormat)
+			begin
+				select @TokenStart = charindex(N'{', @EffectiveFileNameFormat, @FormatOffset);
+				if @TokenStart = 0
+				begin
+					select @FormattedName += substring(@EffectiveFileNameFormat, @FormatOffset, 4000);
+					break;
+				end
+				select @TokenEnd = charindex(N'}', @EffectiveFileNameFormat, @TokenStart + 1),
+					@FormattedName += substring(@EffectiveFileNameFormat, @FormatOffset, @TokenStart - @FormatOffset);
+				select @Token = substring(@EffectiveFileNameFormat, @TokenStart + 1, @TokenEnd - @TokenStart - 1);
+				select @FormattedName += case @Token
+					when N'ServerName' then @ServerLabel when N'InstanceName' then @InstanceLabel when N'DatabaseName' then @StandardizedDatabaseName when N'BackupType' then @BackupType
+					when N'yyyyMMdd' then convert(nvarchar(8), @BackupTime, 112)
+					when N'HHmmssfffffff' then format(@BackupTime, 'HHmmssfffffff', 'en-US')
+					when N'HHmmssffffff' then format(@BackupTime, 'HHmmssffffff', 'en-US')
+					when N'HHmmss' then format(@BackupTime, 'HHmmss', 'en-US')
+					when N'fffffff' then format(@BackupTime, 'fffffff', 'en-US') when N'ffffff' then format(@BackupTime, 'ffffff', 'en-US') end,
+					@FormatOffset = @TokenEnd + 1;
+			end
+			if @FormattedName in (N'', N'.', N'..') or @FormattedName <> z.fn_StandardizeFileName(@FormattedName)
+				throw 50000, 'BackupFileNameFormat must render a nonempty filename without invalid characters or trailing periods.', 1;
+			select @FormattedName += case @BackupType when 'FULL' then N'.bak' when 'DIFF' then N'.diff' else N'.trn' end;
+			if len(@FormattedName) > 255 or len(@RawPath + @FormattedName) > iif(@IsUrl = 1, 4000, 260)
+				throw 50000, 'The backup filename or destination path is too long; use a shorter filename format or backup folder.', 1;
+			select @BackupPath = @RawPath, @BackupFileName = @RawPath + @FormattedName;
 			if @IsUrl = 0
 			begin
 				if not exists(select * from sys.dm_os_file_exists(@BackupPath) where file_is_a_directory = 1)
@@ -202,13 +169,12 @@ begin
 				select @SQL = 'backup database ' + quotename(@DatabaseName) + ' to ' + @BackupDevice + ' = N''' + replace(@BackupFileName, N'''', N'''''') + ''' with ';
 			else
 				select @SQL = 'backup log ' + quotename(@DatabaseName) + ' to ' + @BackupDevice + ' = N''' + replace(@BackupFileName, N'''', N'''''') + ''' with ';
-			select @EffectiveOptions = @OtherBackupOptions;
-			if not exists(select * from @Options where OptionName = N'COMPRESSION')
-				select @EffectiveOptions = iif(@BackupCompression = 1, N'compression', N'no_compression') + coalesce(@OptionSeparator + @EffectiveOptions, N'');
-			if @BackupType = 'DIFF' and not exists(select * from @Options where OptionName = N'DIFFERENTIAL')
-				select @EffectiveOptions = N'differential' + @OptionSeparator + @EffectiveOptions;
-			if @IsReadOnly = 1 and not exists(select * from @Options where OptionName = N'COPY_ONLY')
-				select @EffectiveOptions = N'copy_only' + @OptionSeparator + @EffectiveOptions;
+			select @EffectiveOptions = iif(@BackupCompression = 1, N'compression', N'no_compression');
+			if @BackupType = 'DIFF'
+				select @EffectiveOptions += @OptionSeparator + N'differential';
+			if @IsReadOnly = 1
+				select @EffectiveOptions += @OptionSeparator + N'copy_only';
+			select @EffectiveOptions += coalesce(@OptionSeparator + @OtherBackupOptions, N'');
 			select @SQL += @EffectiveOptions;
 			print @SQL;
 			exec(@SQL);

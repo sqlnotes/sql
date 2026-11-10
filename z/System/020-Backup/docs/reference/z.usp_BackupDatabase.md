@@ -12,26 +12,60 @@ Back up the selected databases sequentially in ascending data-file size. Every i
 @BackupFolder nvarchar(4000) = null,
 @BackupCompression bit = 1,
 @OtherBackupOptions nvarchar(max) = null,
-@ServerName sysname = null
+@ServerName sysname = null,
+@BackupFileNameFormat nvarchar(4000) = N'{ServerName}${InstanceName}${DatabaseName}_{yyyyMMdd}_{HHmmssfffffff}'
 ```
 
 Databases accepts AllDatabases, UserDatabases, SystemDatabases or comma-separated names. Exclude tempdb and error/recovery states; skip SIMPLE recovery for LOG. Read-only databases automatically include COPY_ONLY for disk and URL backups. SQL Server honors it for FULL and LOG; with DIFFERENTIAL it has no effect and the requested type remains DIFF. Read-write backups use COPY_ONLY only when explicitly supplied in OtherBackupOptions. Compression NULL uses the server default. OtherBackupOptions supplies trusted SQL options, including an existing credential option where appropriate.
 
 ServerName is a destination naming label, not a remote SQL connection. NULL uses @@servername; otherwise the supplied name replaces it in the server/instance prefix. A name without an instance uses MSSQLSERVER; a backslash separates a named instance. The procedure always backs up databases on the instance where it executes.
 
-## Backup option deduplication
+## Additional backup options
 
-Options are compared by name without case sensitivity. The last user occurrence wins; its text and value are retained. For example, `STATS=1, stats=5` emits only `stats=5`. Generated compression, DIFFERENTIAL and readonly COPY_ONLY options are added only when the corresponding option is absent.
-
-Opposing flags share a key: COMPRESSION/NO_COMPRESSION, INIT/NOINIT, FORMAT/NOFORMAT, CHECKSUM/NO_CHECKSUM, SKIP/NOSKIP, REWIND/NOREWIND, UNLOAD/NOUNLOAD and STOP_ON_ERROR/CONTINUE_AFTER_ERROR. Thus a caller compression option overrides the BackupCompression-derived default. Winning user options retain their relative order.
-
-Commas inside quoted values, bracketed identifiers and parentheses do not split an option. Quoted escapes and comments are preserved; output separators include newlines so line comments cannot swallow subsequent options. Unbalanced delimiters are rejected. Deduplication does not validate every native option/value combination or make the trusted SQL input safe for untrusted callers.
+OtherBackupOptions is appended unchanged after generated compression,
+DIFFERENTIAL and read-only COPY_ONLY options. NULL or whitespace omits extras.
+The procedure does not parse, validate or deduplicate supplied options. SQL
+Server decides option validity when BACKUP executes; duplicate options may be
+accepted by the engine and are not normalized by this procedure. Use
+BackupCompression to choose compression rather than repeating it in the options.
 
 ## Filesystem destinations
 
 A NULL BackupFolder uses InstanceDefaultBackupPath. The folder is trimmed; Windows non-URL paths normalize `/` to `\`, including `//server/share` UNC paths. Linux keeps `/`. Paths are not prevalidated; native directory creation and BACKUP determine usability. Missing directories are created before `BACKUP TO DISK`.
 
-Files use `<root>/<server>/<instance>/<database>/<type>/<database>_yyyyMMdd_HHmmss_ffffff` followed by .bak, .diff or .trn. Filesystem separators follow the host platform. The timestamp uses SQL Server local time with six fractional-second digits.
+Folders remain `<root>/<server>/<instance>/<database>/<type>/`. Default filenames are:
+
+```text
+Server$MSSQLSERVER$Database_yyyyMMdd_HHmmssfffffff.bak
+Server$NamedInstance$Database_yyyyMMdd_HHmmssfffffff.trn
+```
+
+Server, instance and database components use `$` separators. The default instance
+is included as MSSQLSERVER. The extension is appended automatically: `.bak`,
+`.diff` or `.trn`. Timestamp tokens use one SQL Server local datetime2(7) value;
+`fffffff` writes seven fractional-second digits. Clock accuracy and uniqueness
+are not implied by the number of digits. See [date/time formatting](https://learn.microsoft.com/en-us/dotnet/standard/base-types/custom-date-and-time-format-strings).
+
+BackupFileNameFormat supplies the filename without its extension. Supported
+replacement tokens are `{ServerName}`, `{InstanceName}`, `{DatabaseName}`,
+`{BackupType}`, `{yyyyMMdd}`, `{HHmmssfffffff}`, `{HHmmssffffff}`, `{HHmmss}`,
+`{fffffff}` and `{ffffff}`.
+For example:
+
+```sql
+-- Omit the instance explicitly.
+exec z.usp_BackupDatabase @Databases = N'Sales',
+    @BackupFileNameFormat = N'{ServerName}${DatabaseName}_{yyyyMMdd}_{HHmmssfffffff}';
+
+-- Use the former database-only, six-digit convention.
+exec z.usp_BackupDatabase @Databases = N'Sales',
+    @BackupFileNameFormat = N'{DatabaseName}_{yyyyMMdd}_{HHmmss}_{ffffff}';
+```
+
+Components are transformed by [z.fn_StandardizeFileName](../../../docs/reference/functions.md#zfn_standardizefilename).
+Custom layouts outside [recognized filename shapes](z.fn_DecodeBackupFileName.md)
+use broader restore header discovery and require header-based cleanup.
+
 
 ## Azure and S3 destinations
 

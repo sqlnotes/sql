@@ -307,3 +307,17 @@ Returns datetime decoded from high bits of bigint; sequence bits ignored. Does n
 ## z.fn_GetSetting
 
 Returns a database-local setting as nvarchar(max), or null when missing. Accepts only @Name; see [settings](settings.md#zfn_getsetting) for the declaration and behavior.
+
+## z.fn_StandardizeFileName
+
+[Source](../../modules/1010%20Functions/z.fn_StandardizeFileName.sql)
+
+```sql
+select z.fn_StandardizeFileName(N'Sales / West'); -- Sales___West
+```
+
+Accepts and returns nvarchar(4000); NULL stays NULL. Replaces filename-unsafe
+characters (`<>:"/\|?*`), spaces and ASCII control characters 1–31 with underscores.
+A final period becomes an underscore. Unicode and case are preserved. This is a
+shared filename-component transformation used by backup, restore and cleanup;
+it does not rename SQL databases or logical files or validate directory access.

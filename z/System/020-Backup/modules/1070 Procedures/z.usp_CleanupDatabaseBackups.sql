@@ -31,8 +31,8 @@ begin
 	declare @Platform nvarchar(256), @Separator nchar(1), @Root nvarchar(4000), @Folder nvarchar(4000),
 		@Path nvarchar(4000), @Sql nvarchar(max), @LockName nvarchar(255), @LockResult int, @DeleteResult int,
 		@Family uniqueidentifier, @Fork uniqueidentifier, @Major int,
-		@Cutoff datetime2(6), @Now datetime2(6) = sysdatetime(), @AnchorStart datetime2(6), @AnchorFirstLSN numeric(25,0),
-		@Prefix nvarchar(128), @PredecessorLog datetime2(6),
+		@Cutoff datetime2(7), @Now datetime2(7) = sysdatetime(), @AnchorStart datetime2(7), @AnchorFirstLSN numeric(25,0),
+		@Prefix nvarchar(128), @PredecessorLog datetime2(7),
 		@SkipReason nvarchar(2048), @Pass int = 1, @Fingerprint varbinary(32), @ExpectedFingerprint varbinary(32),
 		@LockHeld bit = 0, @TypeFolder nvarchar(4), @Character int = 1, @LongestPath int;
 	select @Platform = host_platform from sys.dm_os_host_info;
@@ -60,13 +60,13 @@ begin
 		throw 50000, 'Windows backup folders must be absolute drive or UNC paths.', 1;
 	while right(@Root, 1) = @Separator and len(@Root) > 1 select @Root = left(@Root, len(@Root) - 1);
 	if len(@Root) + 5 > 4000 throw 50000, 'Database backup folder is too long.', 1;
-	if @RetentionHours > datediff(hour, convert(datetime2(6), '00010101', 112), @Now)
+	if @RetentionHours > datediff(hour, convert(datetime2(7), '00010101', 112), @Now)
 		throw 50000, '@RetentionHours exceeds the supported datetime range.', 1;
 	if not exists(select * from sys.dm_os_file_exists(@Root) where file_is_a_directory = 1)
 		throw 50000, 'Database backup root is missing or inaccessible.', 1;
 	select @Cutoff = dateadd(hour, -@RetentionHours, @Now);
 	if db_id(@DatabaseName) is null throw 50000, 'Database does not exist; cleanup refused.', 1;
-	select @Prefix = replace(translate(@DatabaseName, N'<>:"/\?*', N'        '), N' ', N'_');
+	select @Prefix = z.fn_StandardizeFileName(@DatabaseName);
 	select @LockName = N'z.Backup:' + convert(nvarchar(64), hashbytes('SHA2_256', convert(varbinary(max),
 		convert(nvarchar(max), convert(nvarchar(20), db_id(@DatabaseName))) + N'|' + iif(@Platform = N'Windows', lower(@Root), @Root))), 2);
 
@@ -74,7 +74,7 @@ begin
 	(
 		Path nvarchar(4000) collate Latin1_General_100_BIN2 not null,
 		FileName nvarchar(4000), FolderType nvarchar(4), LastWriteTime datetime2(7), SizeInBytes bigint,
-		BackupType smallint, BackupStartDate datetime2(6), BackupFinishDate datetime2(6),
+		BackupType smallint, BackupStartDate datetime2(7), BackupFinishDate datetime2(7),
 		FirstLSN numeric(25,0), LastLSN numeric(25,0), CheckpointLSN numeric(25,0),
 		DifferentialBaseLSN numeric(25,0), DifferentialBaseGUID uniqueidentifier, BackupSetGUID uniqueidentifier,
 		IsCopyOnly bit, Fingerprint varbinary(32), Action nvarchar(10) not null default N'KEEP', Reason nvarchar(2048)
@@ -229,32 +229,27 @@ begin
 		else
 		begin
 			if exists(select * from sys.databases d
-				cross apply (values(replace(translate(d.name, N'<>:"/\?*', N'        '), N' ', N'_'))) n(Prefix)
+				cross apply (values(z.fn_StandardizeFileName(d.name))) n(Prefix)
 				where d.database_id <> db_id(@DatabaseName)
 					and ((@Platform = N'Linux' and n.Prefix collate Latin1_General_100_BIN2 = @Prefix collate Latin1_General_100_BIN2)
 					or (@Platform = N'Windows' and n.Prefix collate Latin1_General_100_CI_AS = @Prefix collate Latin1_General_100_CI_AS)))
 				select @SkipReason = N'Another database maps to the same managed filename prefix; filename cleanup skipped for the whole folder.';
+			if exists(select * from #Files f
+				cross apply z.fn_DecodeBackupFileName(f.FileName) p
+				inner join sys.databases d on
+					((@Platform = N'Linux' and z.fn_StandardizeFileName(d.name) collate Latin1_General_100_BIN2 = p.Prefix collate Latin1_General_100_BIN2)
+						or (@Platform = N'Windows' and z.fn_StandardizeFileName(d.name) collate Latin1_General_100_CI_AS = p.Prefix collate Latin1_General_100_CI_AS))
+				where d.database_id <> db_id(@DatabaseName) and p.DatabaseName collate Latin1_General_100_BIN2 = @Prefix collate Latin1_General_100_BIN2)
+				select @SkipReason = N'A filename is ambiguous between a legacy database name and a server-prefixed name; use header-based cleanup.';
 			-- This mode trusts only the exact managed filename convention, not backup contents.
 			update #Files set Reason = N'Filename does not match the managed database/type/timestamp convention; preserved.';
 			update #Files set Reason = N'Path exceeds the native 259-character limit; preserved.' where datalength(Path) > 518;
-			update f set BackupType = t.BackupType, BackupStartDate = p.BackupTime, BackupFinishDate = p.BackupTime,
+			update f set BackupType = p.BackupType, BackupStartDate = p.BackupTime, BackupFinishDate = p.BackupTime,
 				Reason = N'Recognized filename; retained at or after the full anchor.'
 				from #Files f
-					cross apply (values(case f.FolderType when N'FULL' then 1 when N'DIFF' then 5 else 2 end,
-						case f.FolderType when N'FULL' then N'.bak' when N'DIFF' then N'.diff' else N'.trn' end)) t(BackupType, Extension)
-					cross apply (values(substring(f.FileName, len(@Prefix) + 2, 22))) n(Stamp)
-					cross apply (values(try_convert(datetime2(6), substring(n.Stamp, 1, 4) + N'-' + substring(n.Stamp, 5, 2) + N'-' + substring(n.Stamp, 7, 2)
-						+ N'T' + substring(n.Stamp, 10, 2) + N':' + substring(n.Stamp, 12, 2) + N':' + substring(n.Stamp, 14, 2)
-						+ N'.' + substring(n.Stamp, 17, 6), 126))) p(BackupTime)
-				where datalength(f.Path) <= 518 and p.BackupTime is not null
-					and datalength(f.FileName) = datalength(@Prefix + N'_' + n.Stamp + t.Extension)
-					and f.FileName collate Latin1_General_100_BIN2 = (@Prefix + N'_' + n.Stamp + t.Extension) collate Latin1_General_100_BIN2
-					and substring(n.Stamp, 9, 1) = N'_' and substring(n.Stamp, 16, 1) = N'_'
-					and datalength(replace(n.Stamp, N'_', N'')) = 40
-					and replace(n.Stamp, N'_', N'') collate Latin1_General_100_BIN2 not like N'%[^0-9]%'
-					and n.Stamp collate Latin1_General_100_BIN2 = (convert(nvarchar(8), p.BackupTime, 112) + N'_'
-						+ replace(convert(nvarchar(8), p.BackupTime, 108), N':', N'') + N'_'
-						+ right(N'000000' + convert(nvarchar(6), datepart(microsecond, p.BackupTime)), 6)) collate Latin1_General_100_BIN2;
+					cross apply z.fn_DecodeBackupFileName(f.FileName) p
+				where datalength(f.Path) <= 518 and p.DatabaseName collate Latin1_General_100_BIN2 = @Prefix collate Latin1_General_100_BIN2
+					and p.BackupType = case f.FolderType when N'FULL' then 1 when N'DIFF' then 5 else 2 end;
 			select top(1) @AnchorStart = BackupFinishDate from #Files where BackupType = 1 and BackupFinishDate <= @Cutoff
 				order by BackupFinishDate desc, Path;
 			if @AnchorStart is null and @SkipReason is null select @SkipReason = N'No recognized full filename at or before cutoff; no files deleted.';

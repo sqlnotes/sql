@@ -21,3 +21,5 @@ Exact SQL identifiers link to behavior and source. Native system dependencies ar
 | `z.usp_ReadBackupFileList` | [Reference](z.usp_ReadBackupFileList.md) | [SQL](../../modules/1070%20Procedures/z.usp_ReadBackupFileList.sql) |
 | `z.fn_DecodeBackupHeader` | [Reference](z.fn_DecodeBackupHeader.md) | [SQL](../../modules/1010%20Functions/z.fn_DecodeBackupHeader.sql) |
 | `z.fn_DecodeBackupFileList` | [Reference](z.fn_DecodeBackupFileList.md) | [SQL](../../modules/1010%20Functions/z.fn_DecodeBackupFileList.sql) |
+
+| `z.fn_DecodeBackupFileName` | [Reference](z.fn_DecodeBackupFileName.md) | [SQL](../../modules/1010%20Functions/z.fn_DecodeBackupFileName.sql) |

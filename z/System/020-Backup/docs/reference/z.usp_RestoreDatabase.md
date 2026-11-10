@@ -13,19 +13,23 @@ create or alter procedure z.usp_RestoreDatabase
 	@TargetDatabaseName sysname = null,
 	@RecoveryType varchar(10) = 'NORECOVERY',
 	@ReplaceExisting bit = 1,
+	@OtherRestoreOptions nvarchar(max) = N'stats = 10',
 	@DataFolder nvarchar(4000) = null,
 	@LogFolder nvarchar(4000) = null,
-	@UseDefaultFolder bit = 1,
 	@StandbyFolder nvarchar(4000) = null,
+	@UseDefaultFolder bit = 1,
 	@ShowPlan bit = 0,
-	@DropConnections bit = 1,
-	@OtherRestoreOptions nvarchar(max) = N'stats = 1'
+	@DropConnections bit = 1
 )
 ```
 
 ## Source selection
 
-A filesystem folder is searched recursively, with a limit of 4096 directories.
+A backup file may contain multiple backup sets. Header metadata identifies each
+set and its position; generated commands use FILE = n for the selected set.
+Multiple sets alone do not disable filename-based discovery. Header mismatches still trigger header-based discovery.
+
+A filesystem folder is searched recursively with one call to sys.dm_os_enumerate_filesystem.
 HTTP(S) and S3 paths identify one specific backup object and use FROM URL; the
 procedure does not list remote folders, scan sibling objects or perform local
 filesystem checks on a URL. URLs retain their case and forward slashes on Windows
@@ -35,8 +39,13 @@ HTTP URL does not add transport support beyond the native SQL Server provider.
 A folder may contain backups
 from several databases. For initialization or replacement, a supplied TargetDatabaseName
 prefers a matching source database. If none matches, select the latest full backup
-as a rename source. Without TargetDatabaseName, select the latest full and use its source
-name as the destination. Equal candidates use a deterministic path order.
+as a rename source. Without TargetDatabaseName, read the latest LOG header first and use its actual
+database name and family to resolve the destination. Continue an existing
+RESTORING/STANDBY target from native redo progress. Only search FULL candidates
+when initialization or replacement is required; that FULL must belong to the
+inferred family. If no LOG identifies the source, a FULL header can infer it.
+An explicit target can still request a renamed restore from another source.
+Omitting the target does not itself request replacement.
 
 After selecting the full, consider only its database family and recovery fork.
 Restore the latest compatible differential if available, then the remaining log
@@ -45,24 +54,37 @@ full cannot be a differential base. Differentials belonging to another full do
 not change the selected full. Without a compatible differential, use full plus
 logs; without pending logs, restore the selected data backups alone.
 
-Managed filenames from z.usp_BackupDatabase use
-`<database>_yyyyMMdd_HHmmss_ffffff.bak`, `.diff` and `.trn`. These names allow
+Managed filenames from z.usp_BackupDatabase default to
+`Server$Instance$Database_yyyyMMdd_HHmmssfffffff.bak`, `.diff` and `.trn`.
+The default instance is included as MSSQLSERVER. Legacy database-only six-digit
+names and recognized custom instance-omitting names remain supported through
+[z.fn_DecodeBackupFileName](z.fn_DecodeBackupFileName.md). These names allow
 newest-first candidate discovery without opening every older backup. Opened headers
 confirm identity, type and LSNs. Arbitrary filenames require broader header
 inspection. Managed mode trusts the embedded producer timestamp to order
 candidates; it does not compare every full backup's header completion time.
 A detected filename/header type or source mismatch switches to header discovery.
-Multiple filename prefixes also use header discovery, because a source rename
-can change the prefix while preserving its backup family and log chain.
-Directory listing still covers the selected folder tree. Unreadable files in
-general header discovery are skipped; errors opening managed candidates or
-validating selected media stop planning.
+Multiple database-name hints use header discovery, because a source rename can
+change the database name while preserving its backup family and log chain.
+Different server/instance prefixes or legacy/new layouts for the same database
+do not alone disable filename-based discovery.
+Directory listing still covers the selected folder tree. Unreadable header candidates are recorded and skipped. Errors validating
+selected media still stop planning.
 
-A file or URL input considers only that object; it does not scan siblings. A standalone log
-or differential requires an explicit TargetDatabaseName and a compatible unrecovered
-destination. A differential alone cannot initialize a missing database. Existing
+A file or URL input considers only that object; it does not scan siblings. A standalone log can infer its target from the header or use an explicit target.
+A standalone differential requires an explicit compatible unrecovered target. A differential alone cannot initialize a missing database. Existing
 RESTORING or standby destinations use their verified restore identity and progress,
 even when a different database has a newer full in the folder.
+
+For a recognized-name folder and an existing continuation target, read its native
+required LSN before opening backup files. Identify the source using LOG headers
+first, or DIFF headers if needed; FULL headers are not opened merely to identify
+the source. A newer full backup does not restart the target or advance its redo
+position. Continue the existing log chain across that newer full backup.
+Reuse cached log headers before opening another file. An already-current target
+needs only the newest log header; a recognized full-only folder can return a
+no-op without reading a backup header. Unknown source names remain NULL when no
+backup header was needed. Arbitrary names still require broader header discovery.
 
 Log planning uses exact numeric LSNs, database family and recovery-fork identity.
 Inspect candidate logs newest first until their collected coverage reaches the
@@ -70,7 +92,7 @@ required LSN, then execute the selected logs in forward LSN order. Include the
 log overlapping the starting boundary; filename dates alone cannot prove coverage.
 Already-covered backups are skipped. Gaps still fail rather than silently choosing
 an older full. Recovery-fork transitions, file/filegroup restores, striped or
-multi-set media and incomplete or damaged selected backup metadata are unsupported.
+incomplete or damaged selected backup metadata are unsupported.
 
 ## Destination state and replacement
 
@@ -81,23 +103,32 @@ multi-set media and incomplete or damaged selected backup metadata are unsupport
 | Other state, ReplaceExisting = 1 | Restore full with REPLACE, optional differential, then logs |
 | Other state, ReplaceExisting = 0 | Error |
 
-Continuation takes precedence over replacement. An incompatible or unprovable
-continuation fails; it never automatically replaces that database from full.
-Continuation requires retained compatible msdb restore history, current recovery
-metadata and matching physical-file identities. Database name alone is not proof
-of identity. History must retain a compatible full-restore anchor and each base
-file's latest mapping within that restore chain. A log restore need not repeat
-data-file mappings and can omit the destination mapping for a newly added data
-file. For that new-file case, continuation requires matching native file GUID
-and creation LSN, compatible retained backup metadata and proof of the introducing
-log interval or differential base. Its current catalog path is retained. Base
-files still require their recorded destination mapping. Existing files retain
-their current paths during continuation.
-DataFolder/LogFolder apply to newly introduced files and may differ from the
-existing files' directories. Stale non-full history predating the
-destination's creation/rename timestamp is rejected. A full restore's recorded
-start can precede creation of its destination; full history is instead bound by
-the restore sequence, database family/fork and each file's latest GUID/path mapping.
+A RESTORING or STANDBY destination with available recovery identity is continued.
+If its family or recovery fork is unavailable, ReplaceExisting = 1 instead plans
+a replacement from the latest selected full, compatible differential and logs.
+OFFLINE, SUSPECT and RECOVERY_PENDING destinations also require replacement.
+ReplaceExisting = 0 rejects those replacements, and a full backup is required.
+A known but incompatible family, fork or log chain still fails continuation.
+Continuation reads the database family/fork from sys.database_recovery_status
+and the current file identities, physical paths and next redo LSN/fork from
+sys.master_files. Database name alone does not establish identity. Existing files
+retain their current paths; pending backups are checked against those file
+identities with FILELISTONLY. DataFolder/LogFolder apply to newly introduced files.
+Ordinary log continuation does not need retained msdb restore history when native
+recovery metadata is available.
+
+A matching full header, its differential base and the current redo position can
+establish differential eligibility. Otherwise, inspect a differential candidate before consulting the latest restore
+record. An already-covered differential or a known incompatible native base does not
+trigger a history lookup. A newer incompatible differential does not hide an older
+compatible one. Missing or incompatible history disables an unproven
+optional differential; compatible logs can still continue. An explicitly supplied
+differential must have a proven matching base. Differential-base catalog fields
+alone do not prove that no log has been restored since the full.
+
+If native redo metadata is unavailable for a standby database, compatible retained
+history supplies the fallback position. Undo-file naming does not require history.
+An already-current standby performs no finalization.
 
 Execute outside a user transaction. System databases, snapshots and the database
 hosting the procedure cannot be restore targets. DropConnections defaults to 1.
@@ -174,7 +205,7 @@ also validates the operation. Restored file and undo paths are limited to 260 ch
 ## Extra restore options and readable SQL
 
 OtherRestoreOptions supplies additional WITH options for FULL, DIFF and LOG media
-commands. Its default is `stats = 1`. Supplying NULL or ASCII whitespace omits
+commands. Its default is `stats = 10`. Supplying NULL or ASCII whitespace omits
 extras; a custom list replaces the default, so include STATS explicitly if wanted:
 
 ```sql
@@ -185,17 +216,11 @@ exec z.usp_RestoreDatabase
 	@ShowPlan = 1;
 ```
 
-Use comma-separated flags or `option = literal`. Values may be numeric,
-hexadecimal, quoted strings (including N-prefixed strings and quoted commas/JSON),
-or one keyword. Duplicate options use the last occurrence; opposing checksum,
-error-handling, rewind/unload and broker switches share their option group.
-Comments, statement separators outside quoted strings, expressions and stacked
-SQL statements are rejected. SQL Server validates option availability and values.
-RESTART can be supplied when its native resume requirements are met.
-
-The planner owns FILE, MOVE, REPLACE, recovery/standby and point-in-time settings,
-partial/filegroup selection and restricted-user access. Those cannot be overridden
-through OtherRestoreOptions. Extras do not apply to HEADERONLY/FILELISTONLY/LABELONLY
+The supplied text is appended unchanged to the media command's WITH options.
+The procedure does not parse, validate or deduplicate it. SQL Server decides
+option validity on execution; duplicates may be accepted by the engine.
+Use ShowPlan to inspect
+the generated commands. Extras do not apply to HEADERONLY/FILELISTONLY/LABELONLY
 or the separate final RECOVERY/STANDBY command.
 
 Generated media SQL has one RESTORE/FROM line, one line per MOVE and one line for
@@ -205,7 +230,7 @@ the remaining options, for example:
 restore database [Sales_Test] from disk = N'D:\Backups\Sales.bak'
 with move N'Sales' to N'E:\Data\Sales_Test.mdf',
 	move N'Sales_log' to N'F:\Log\Sales_Test_log.ldf',
-	file = 1, norecovery, stats = 1;
+	file = 1, norecovery, stats = 10;
 ```
 
 Final RECOVERY and STANDBY commands remain one line. Command output uses
@@ -220,14 +245,11 @@ RECOVERY or STANDBY; the default NORECOVERY needs no finalization. RECOVERY brin
 the database online; STANDBY makes it readable between restores. These options do
 not change its recovery model. STANDBY cannot perform a database-version upgrade.
 
-StandbyFolder is an optional directory. If null, use the primary data file's actual
-destination directory. Use the selected full backup's filename, replacing its
-extension with `.standby`; the destination database rename does not change this
-undo filename. For example, `Sales_FULL_20261106.bak` produces
-`Sales_FULL_20261106.standby` alongside the restored primary data file.
-
-For a standalone log continuation, the full-backup filename must be recoverable
-from trusted restore history; otherwise provide the full backup folder. SQL Server
+StandbyFolder is the directory for the undo file. If NULL, use the primary data
+file's actual destination directory. The basename is the standardized target
+database name plus `.standby`, for example `Sales_Test.standby`. A renamed target
+gets its own undo basename. This naming requires neither a full backup header nor
+msdb history. SQL Server
 consumes the previous undo file internally before applying another restore. The
 final STANDBY command writes the new undo file at the resolved path; the procedure
 does not search for or delete the previous file itself. Before writing the new

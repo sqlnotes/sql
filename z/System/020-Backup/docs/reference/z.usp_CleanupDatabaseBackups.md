@@ -26,19 +26,28 @@ Native backup paths have a smaller limit: the complete filename must fit within 
 
 ## Default: filename-based cleanup
 
-Accept only the generated convention, including the sanitized database-name prefix and exactly six fractional digits:
+Recognize the current and legacy conventions through
+[z.fn_DecodeBackupFileName](z.fn_DecodeBackupFileName.md), matching the standardized
+database-name hint and the FULL/DIFF/LOG folder type:
 
 ```text
-FULL/<DatabaseName>_yyyyMMdd_HHmmss_ffffff.bak
-DIFF/<DatabaseName>_yyyyMMdd_HHmmss_ffffff.diff
-LOG/<DatabaseName>_yyyyMMdd_HHmmss_ffffff.trn
+FULL/Server$MSSQLSERVER$Database_yyyyMMdd_HHmmssfffffff.bak
+DIFF/Server$Instance$Database_yyyyMMdd_HHmmssfffffff.diff
+LOG/Database_yyyyMMdd_HHmmss_ffffff.trn
 ```
 
-The timestamp is SQL Server's local time. Folder, extension, digit count and calendar date must match. Preserve malformed names, different database prefixes and older seven-digit names; they do not become deletion candidates.
+The default instance is included as MSSQLSERVER. Custom formats may omit it. Timestamp precision is retained
+as datetime2(7). Malformed names, other database hints and custom layouts outside
+the parser's recognized shapes are preserved; use header mode for those layouts.
 
 Keep the latest recognized full filename at or before the cutoff, all recognized backups at or after that timestamp, and the immediately preceding recognized log file. Without a recognized full anchor, preserve everything. Older recognized files can be deleted. Recheck inventory membership, sizes and modification times before deletion.
 
 If another database currently listed in `sys.databases` maps to the same sanitized filename prefix, preserve the whole inventory. For example, `A B` and `A_B` share a prefix. This guard includes offline databases, but cannot identify historical ownership after a conflicting database has been dropped.
+
+A legacy database name containing `$` can resemble a server-prefixed name.
+If the raw prefix matches another current database, preserve the whole inventory
+and use header mode. Names or ownership no longer visible in current catalogs
+cannot be proven from filenames alone; use header mode for ambiguous `$` layouts.
 
 This mode trusts managed filenames. It does not inspect database identity, copy-only flags, differential bases or LSNs, and does not prove a recoverable chain. Preserving an irregular file does not establish its dependencies. Use header mode when those checks are needed, including inventories containing copy-only backups or mixed database identities.
 

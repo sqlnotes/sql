@@ -31,6 +31,15 @@ exec z.usp_BackupDatabase
 
 The procedure appends server/instance/database/type/timestamped-filename prefixes to these bases. S3 requires SQL Server 2022 or later. URLs use `/` on both operating systems and never create directories or delete old objects. See [destination requirements](reference/z.usp_BackupDatabase.md).
 
+Default filenames include all three components separated by `$`, including
+MSSQLSERVER for a default instance. Override BackupFileNameFormat to omit a
+component, for example:
+
+```sql
+exec z.usp_BackupDatabase @Databases = N'Application',
+    @BackupFileNameFormat = N'{ServerName}${DatabaseName}_{yyyyMMdd}_{HHmmssfffffff}';
+```
+
 Schedule filesystem retention independently:
 
 ```sql
@@ -93,7 +102,7 @@ no-op restores skip this step. Set DropConnections = 0 to disable it. Preview sh
 access-mode actions without executing them. The prior mode is restored when the
 same database remains ONLINE; see the reference for NORECOVERY and failure limits.
 
-OtherRestoreOptions defaults to `stats = 1` on media restore commands. To change
+OtherRestoreOptions defaults to `stats = 10` on media restore commands. To change
 progress reporting or add native options, pass a list such as
 `N'stats = 5, checksum, buffercount = 8'`; NULL disables the extra options.
 The preview returns the same ordered command table that execution consumes.

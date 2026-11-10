@@ -34,10 +34,22 @@ Shared header/file-list readers return JSON, which the typed decoder
 functions project without nesting INSERT EXEC. Exact producer filenames enable
 newest-first discovery with fewer header reads; arbitrary names use broader
 header inspection. A requested database name prefers a matching source, otherwise
-the latest full supplies the source for a renamed restore. Mixed-source folders
+the latest full supplies the source for a renamed restore. An omitted target is
+inferred from the newest LOG header first, then its native state decides
+continuation versus initialization/replacement. A FULL is searched only when
+needed or when no LOG can identify the target. An inferred source family is
+preserved across planning; an unrelated FULL cannot initialize that target.
+Mixed-source folders
 are supported. Headers bind the selected full, optional differential and logs to
 one database family and recovery fork. File-list metadata drives explicit
 physical-file MOVE mappings and destination collision checks.
+
+For recognized filenames, continuation reads the current native redo position
+first and identifies its source from LOG or DIFF headers without opening FULL
+headers. Logs are scanned newest first until cached LSN ranges bridge back to
+the target's required LSN, then restored forward. Newer full backups do not reset
+a delayed target's log chain. Cached coverage is checked before another header
+read; full-only continuation can remain a no-op without backup header reads.
 
 File metadata is accumulated in restore order. Each mapping carries its introducing
 ordinal, so full, differential and log commands receive only the MOVE clauses
@@ -54,15 +66,14 @@ was changed and the last proven destination identity; cleanup SQL is planned in
 advance and reused on errors. The shared z.usp_PrintString and its splitting
 functions must precede Backup deployment and provide long-command output.
 
-OtherRestoreOptions defaults to STATS = 1 for media restores. A literal option-list
-parser preserves quoted values, rejects stacked SQL and planner-owned overrides,
-and normalizes duplicate/opposing options. Native SQL Server validates the
-remaining option semantics. Generated headers, MOVE clauses and other options
-are separated into readable lines.
+OtherRestoreOptions defaults to STATS = 10 for media restores. Supplied text is
+appended unchanged; SQL Server decides option validity during execution.
+The engine may accept duplicates; this procedure does not normalize them. Generated headers, MOVE clauses and other options are separated into
+readable lines; whitespace within supplied options is preserved.
 
 ```mermaid
 flowchart TD
-    A[Inspect destination] --> B{Destination state?}
+    A[Resolve target: latest LOG header if name omitted] --> B{Destination state?}
     B -->|Missing| F[Choose latest full; prefer requested source name]
     B -->|Replacement allowed| F
     B -->|Replacement disabled| X[Stop]
@@ -85,16 +96,22 @@ flowchart TD
     P --> Z[Leave NORECOVERY or finalize RECOVERY / STANDBY]
 ```
 
-The filename fast path requires one filename prefix and assumes the producer's
-timestamp/type convention. Multiple prefixes use header discovery so source
-renames cannot hide compatible logs. Headers
+The filename fast path requires one decoded database-name hint and assumes the
+producer's timestamp/type convention. Multiple database-name hints use header
+discovery so source renames cannot hide compatible logs. Server/instance prefix
+variations and recognized legacy/new layouts for one database keep the fast path. Headers
 confirm opened candidates, and LSN coverage includes any overlapping boundary log.
 Differentials reduce the amount of log replay; reading fewer headers reduces
 planning I/O. Neither optimization replaces validation of the selected chain.
 
 An existing restoring or standby database is a continuation candidate; native
-recovery metadata and retained msdb restore history establish its identity and
-progress. Uncertain continuation fails without reverting to a full replacement.
+family/fork and current file redo metadata establish its identity and progress.
+Existing file mappings come directly from sys.master_files. Retained history is
+consulted only for unproven differential eligibility, unavailable standby redo
+metadata. Already-covered DIFF candidates do not trigger that lookup.
+Unavailable family/fork metadata selects full replacement when ReplaceExisting = 1;
+otherwise it fails. OFFLINE and failed-start states also use replacement.
+A known incompatible continuation still fails.
 Other existing destinations require ReplaceExisting = 1. The selected commands
 execute sequentially outside a user transaction. Failure leaves any completed
 restore steps in place. DropConnections defaults to 1; an existing ONLINE target
@@ -108,6 +125,7 @@ databases is performed.
 
 All intermediate commands leave NORECOVERY; the final state is NORECOVERY,
 RECOVERY or STANDBY. SQL Server consumes the previous standby undo file internally;
-the final STANDBY command writes the resolved new file. Preview performs metadata
+the final STANDBY command writes the standardized target-name .standby file
+under StandbyFolder or the primary data directory. Preview performs metadata
 inspection and returns commands/mappings without restore execution. See the
 [restore contract](reference/z.usp_RestoreDatabase.md).
