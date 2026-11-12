@@ -14,6 +14,7 @@ begin
 		BatchID bigint not null,
 		ExecutionID uniqueidentifier not null constraint DF_z_TaskQueueBatch_ExecutionID default (newid()),
 		BatchName nvarchar(128) not null,
+		BatchType nvarchar(50) not null constraint DF_z_TaskQueueBatch_BatchType default (N'Unclassified'),
 		Description nvarchar(max),
 		MaxConcurrentWorkers int not null constraint DF_z_TaskQueueBatch_MaxConcurrentWorkers default (0),
 		Status varchar(16) not null constraint DF_z_TaskQueueBatch_Status default ('Draft'),

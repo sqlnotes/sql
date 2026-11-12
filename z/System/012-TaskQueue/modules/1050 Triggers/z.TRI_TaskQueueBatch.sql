@@ -23,8 +23,8 @@ begin
 			coalesce(@Action, case when d.BatchID is null then N'DirectInsert' when i.BatchID is null then N'DirectDelete' else N'DirectUpdate' end),
 			case when d.BatchID is null then 'Insert' when i.BatchID is null then 'Delete' else 'Update' end,
 			original_login(), app_name(), host_name(), @@spid,
-			case when d.BatchID is null then null else (select d.BatchID, d.ExecutionID, d.BatchName, d.Description, d.MaxConcurrentWorkers, d.Status, d.LastErrorMessage, d.CreatedAtUTC, d.StartedAtUTC, d.FinishedAtUTC for json path, include_null_values, without_array_wrapper) end,
-			case when i.BatchID is null then null else (select i.BatchID, i.ExecutionID, i.BatchName, i.Description, i.MaxConcurrentWorkers, i.Status, i.LastErrorMessage, i.CreatedAtUTC, i.StartedAtUTC, i.FinishedAtUTC for json path, include_null_values, without_array_wrapper) end
+			case when d.BatchID is null then null else (select d.BatchID, d.ExecutionID, d.BatchName, d.BatchType, d.Description, d.MaxConcurrentWorkers, d.Status, d.LastErrorMessage, d.CreatedAtUTC, d.StartedAtUTC, d.FinishedAtUTC for json path, include_null_values, without_array_wrapper) end,
+			case when i.BatchID is null then null else (select i.BatchID, i.ExecutionID, i.BatchName, i.BatchType, i.Description, i.MaxConcurrentWorkers, i.Status, i.LastErrorMessage, i.CreatedAtUTC, i.StartedAtUTC, i.FinishedAtUTC for json path, include_null_values, without_array_wrapper) end
 		from inserted i
 			full join deleted d on d.BatchID = i.BatchID;
 end;

@@ -8,6 +8,7 @@ Exact SQL identifiers link to behavior and source. Native system dependencies ar
 | --- | --- | --- |
 | `z.usp_BackupDatabase_Full` | [Reference](z.usp_BackupDatabase_Full.md) | [SQL](../../modules/1070%20Procedures/z.usp_BackupDatabase_Full.sql) |
 | `z.usp_BackupDatabase_Log` | [Reference](z.usp_BackupDatabase_Log.md) | [SQL](../../modules/1070%20Procedures/z.usp_BackupDatabase_Log.sql) |
+| `z.usp_BackupDatabasesParallel` | [Reference](z.usp_BackupDatabasesParallel.md) | [SQL](../../modules/1070%20Procedures/z.usp_BackupDatabasesParallel.sql) |
 | `z.usp_BackupDatabase` | [Reference](z.usp_BackupDatabase.md) | [SQL](../../modules/1070%20Procedures/z.usp_BackupDatabase.sql) |
 | `z.usp_RestoreDatabase` | [Reference](z.usp_RestoreDatabase.md) | [SQL](../../modules/1070%20Procedures/z.usp_RestoreDatabase.sql) |
 | `z.usp_CleanupDatabaseBackups` | [Reference](z.usp_CleanupDatabaseBackups.md) | [SQL](../../modules/1070%20Procedures/z.usp_CleanupDatabaseBackups.sql) |

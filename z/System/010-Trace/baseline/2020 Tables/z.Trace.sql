@@ -34,6 +34,6 @@ begin
 		CreatorSessionID int not null,
 		CreatorLoginTime datetime not null,
 		constraint PK_z_Trace primary key (TraceID),
-		constraint UQ_z_Trace_Owner_Name unique (CreatorSessionID, CreatorLoginTime, Name)
+		constraint UQ_z_Trace_CreatorSessionID_CreatorLoginTime_Name unique (CreatorSessionID, CreatorLoginTime, Name)
 	);
 end;

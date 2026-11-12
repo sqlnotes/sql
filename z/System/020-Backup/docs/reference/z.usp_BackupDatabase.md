@@ -31,7 +31,10 @@ BackupCompression to choose compression rather than repeating it in the options.
 
 ## Filesystem destinations
 
-A NULL BackupFolder uses InstanceDefaultBackupPath. The folder is trimmed; Windows non-URL paths normalize `/` to `\`, including `//server/share` UNC paths. Linux keeps `/`. Paths are not prevalidated; native directory creation and BACKUP determine usability. Missing directories are created before `BACKUP TO DISK`.
+A NULL BackupFolder uses InstanceDefaultBackupPath. The folder is trimmed; Windows non-URL paths normalize `/` to `\`, including `//server/share` UNC paths. Linux keeps `/`. Paths are not prevalidated; native directory creation and BACKUP determine usability. Missing directories are created before `BACKUP TO DISK`. Directory creation
+allows up to three attempts, separated by 100 milliseconds, when concurrent
+backups race on shared parent folders. Existing directories are accepted; a
+persistent creation failure still stops that backup.
 
 Folders remain `<root>/<server>/<instance>/<database>/<type>/`. Default filenames are:
 
@@ -75,6 +78,8 @@ Use preconfigured SQL Server credentials and storage permissions. Azure block-bl
 
 ## Execution and retention
 
-Run outside a transaction and schedule one invocation at a time. Filesystem backups need SQL Server service-account destination access. The main procedure requires no application-lock or extended-property write permissions.
+Run outside a transaction. For a bounded pool across selected databases, use
+[z.usp_BackupDatabasesParallel](z.usp_BackupDatabasesParallel.md). Independent
+sequential calls do not share assignments. Filesystem backups need SQL Server service-account destination access. The main procedure requires no application-lock or extended-property write permissions.
 
 Retention is separate. The removed RetentionHours and UseBackupHeaderToDetermineBackupDate parameters are no longer accepted. The sixth positional argument is now ServerName, so update positional callers as well as named retention arguments. Schedule [filesystem cleanup](z.usp_CleanupDatabaseBackups.md) separately from active backups; use storage lifecycle rules or separate provider tooling for URL retention. The backup procedure never deletes old backups.

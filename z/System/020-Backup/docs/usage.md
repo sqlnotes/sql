@@ -106,3 +106,14 @@ OtherRestoreOptions defaults to `stats = 10` on media restore commands. To chang
 progress reporting or add native options, pass a list such as
 `N'stats = 5, checksum, buffercount = 8'`; NULL disables the extra options.
 The preview returns the same ordered command table that execution consumes.
+
+## Parallel backups
+
+```sql
+exec z.usp_BackupDatabasesParallel @Databases = N'UserDatabases',
+    @BackupType = N'Full', @BackupFolder = N'D:\Backups', @MaxConcurrentWorkers = 3;
+```
+
+Waits for temporary Agent workers, attempts every selected database once and
+throws after completion if any task failed. Inspect retained TaskQueue results.
+See [parallel backup reference](reference/z.usp_BackupDatabasesParallel.md).

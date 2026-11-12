@@ -28,7 +28,7 @@ begin
 		constraint CK_z_TaskQueueLog_ChangeType check (ChangeType in ('Insert', 'Update', 'Delete')),
 		constraint CK_z_TaskQueueLog_BeforeJson check (BeforeJson is null or isjson(BeforeJson) = 1),
 		constraint CK_z_TaskQueueLog_AfterJson check (AfterJson is null or isjson(AfterJson) = 1),
-		index IX_z_TaskQueueLog_BatchExecution nonclustered (BatchID, ExecutionID, LogID) with (data_compression = page) on PS_SchemaZPartitionGeneric(LogID),
-		index IX_z_TaskQueueLog_Action nonclustered (ActionID, LogID) with (data_compression = page) on PS_SchemaZPartitionGeneric(LogID)
+		index IX_z_TaskQueueLog_BatchID_ExecutionID_LogID nonclustered (BatchID, ExecutionID, LogID) with (data_compression = page) on PS_SchemaZPartitionGeneric(LogID),
+		index IX_z_TaskQueueLog_ActionID_LogID nonclustered (ActionID, LogID) with (data_compression = page) on PS_SchemaZPartitionGeneric(LogID)
 	) on PS_SchemaZPartitionGeneric(LogID);
 end;

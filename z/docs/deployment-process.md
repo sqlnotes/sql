@@ -20,6 +20,33 @@ Baseline eligibility is decided independently for each owning subsystem. Fresh/u
 
 When version folders exist, a nonzero installed version older than the earliest retained version is rejected with an upgrade-path error. Upgrade using an intermediate release before using a source tree whose older migrations have been consolidated into baseline. Fresh installations can use the consolidated baseline. Versions above the latest available version remain rejected as downgrades.
 
+### Baseline, migrations and rebasing
+
+The baseline contains complete initial table definitions and can be deployed
+without version folders. During initial-version development, put the initial
+columns, constraints and indexes directly in those definitions. Baseline files
+create absent objects; they do not contain rolling schema updates.
+
+After that initial definition is established, preserve it. Put each subsequent
+schema change in the appropriate version folder, including CREATE TABLE for a
+new table. For example, an existing 0.0.0 installation receives the guarded
+0.0.1 migration. An empty installation receives the complete initial baseline;
+that migration detects the already-present schema and performs no changes.
+The installer still visits the version folder. A later 0.0.2 column addition
+belongs in its migration rather than an edit to the baseline; fresh installations
+reach that version by applying the later migrations after baseline creation.
+
+A deliberate rebase replaces baseline definitions with the complete schema at
+a chosen supported floor and consolidates the older migration history. For
+example, a project at 10.10.10 could rebase to 8.0.0: fresh installations start
+with the 8.0.0 baseline and apply later migrations; existing installations below
+8.0.0 no longer have a supported rolling upgrade through that source tree.
+Such installations need an intermediate release or a separately planned upgrade.
+A rebase must retain an explicit floor/version boundary and reject older existing
+installations, including existing unversioned 0.0.0 systems; baseline eligibility
+alone does not enforce that distinction. This is a policy for a future deliberate
+rebase, not a rebase of the current source tree.
+
 CodeBase uses paths such as `/System/010-Partition`. SQL derives SystemID as GUID from MD5 of `trim(lower(CodeBase))`. Case/outer-space aliases share identity according to SQL normalization/collation; paths are not normalized independently by PowerShell. Renaming a folder, including its prefix, changes identity. The renamed Trace, Jobs, Backup and Security paths therefore initialize new subsystem owners and hashes; guarded baselines become eligible under those owners. Existing metadata history remains under the former paths; the installer does not remap it or carry its version forward. Review baseline replay before updating an existing installation.
 
 ## Hashes and logs

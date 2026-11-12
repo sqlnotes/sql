@@ -17,7 +17,8 @@ create or alter procedure z.usp_CreateTaskQueueBatch
 	@BatchID bigint =  null output,
 	@BatchName nvarchar(128),
 	@Description nvarchar(max) = null,
-	@MaxConcurrentWorkers int = 0
+	@MaxConcurrentWorkers int = 0,
+	@BatchType nvarchar(50) = N'Unclassified'
 )
 as
 begin
@@ -30,8 +31,8 @@ begin
 			select @BatchID = z.fn_GenerateZSequenceID(null, @SequenceValue);
 		end;
 		exec z.usp_SetTaskQueueAction @Action = N'Create', @ActionID = @ActionID;
-		insert z.TaskQueueBatch (BatchID, BatchName, Description, MaxConcurrentWorkers)
-			values (@BatchID, @BatchName, @Description, @MaxConcurrentWorkers);
+		insert z.TaskQueueBatch (BatchID, BatchName, Description, MaxConcurrentWorkers, BatchType)
+			values (@BatchID, @BatchName, @Description, @MaxConcurrentWorkers, @BatchType);
 		exec z.usp_SetTaskQueueAction;
 	end try
 	begin catch

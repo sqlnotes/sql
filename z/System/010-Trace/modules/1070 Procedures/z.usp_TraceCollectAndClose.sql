@@ -86,7 +86,7 @@ begin
 			begin
 				select @SQL = N'create table ' + quotename(parsename(@ReceivingTable, 2)) + N'.' + quotename(parsename(@ReceivingTable, 1)) + N' (TraceSequence bigint not null constraint ' + quotename(N'DF_TraceReceiver_' + replace(convert(nvarchar(36), newid()), N'-', N''))
 					+ N' default(datediff_big(second, ''1900-01-01'', getutcdate()) * 268435456 | next value for z.SeqGeneralID), EventID int not null, EventName nvarchar(128) not null, constraint '
-					+ quotename(N'PK_TraceReceiver_' + replace(convert(nvarchar(36), newid()), N'-', N'')) + N' primary key clustered(TraceSequence) with (data_compression = page) on PS_SchemaZPartitionGeneric(TraceSequence)) on PS_SchemaZPartitionGeneric(TraceSequence);';
+					+ quotename(left(N'PK_' + parsename(@ReceivingTable, 2) + N'_' + parsename(@ReceivingTable, 1), 128)) + N' primary key clustered(TraceSequence) with (data_compression = page) on PS_SchemaZPartitionGeneric(TraceSequence)) on PS_SchemaZPartitionGeneric(TraceSequence);';
 				exec sys.sp_executesql @SQL;
 			end;
 			declare c cursor local fast_forward for select c.ColumnName, c.Definition from #Columns c

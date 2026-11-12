@@ -19,7 +19,8 @@ begin
 	if @RequireIdle = 1 and exists (select 1 from z.TaskQueueTasks where BatchID = @BatchID and Status = 'Running')
 		throw 50000, 'The batch has Running tasks; wait for completion or recover ownership before changing it.', 1;
 	declare @TaskID int, @Body nvarchar(max), @Command nvarchar(4000), @Parameters nvarchar(max),
-		@SchemaName sysname, @ProcedureName sysname, @ObjectID int, @LockResource nvarchar(255);
+		@SchemaName sysname, @ProcedureName sysname, @ObjectID int, @LockResource nvarchar(255), @IsTemporary bit;
+	declare @ParameterMetadata table(ParameterName sysname, TypeName sysname);
 	declare Definitions cursor local fast_forward for
 		select TaskID, TaskBody from z.TaskQueueTasks where BatchID = @BatchID order by TaskID;
 	begin try
@@ -43,12 +44,31 @@ begin
 					or not exists (select 1 from openjson(@Body) where [key] = 'parameters' and [type] = 4)
 					throw 50000, 'TaskBody requires one command string and one parameters array.', 1;
 				select @Command = json_value(@Body, '$.command'), @Parameters = json_query(@Body, '$.parameters');
-				select @SchemaName = parsename(@Command, 2), @ProcedureName = parsename(@Command, 1);
-				if @SchemaName is null or @ProcedureName is null or parsename(@Command, 3) is not null or parsename(@Command, 4) is not null
-					throw 50000, 'Task commands must name local schema-qualified SQL procedures.', 1;
-				select @ObjectID = object_id(quotename(@SchemaName) + N'.' + quotename(@ProcedureName), N'P');
-				if @ObjectID is null or @ObjectID = object_id(N'z.usp_RunTaskQueueWorker', N'P')
+				select @SchemaName = parsename(@Command, 2), @ProcedureName = parsename(@Command, 1),
+					@IsTemporary = iif(left(parsename(@Command, 1), 2) = N'##' and parsename(@Command, 2) is null, 1, 0);
+				if @ProcedureName is null or parsename(@Command, 3) is not null or parsename(@Command, 4) is not null
+					or (@IsTemporary = 0 and (@SchemaName is null or left(@ProcedureName, 1) = N'#' or left(@Command, 2) = N'##'))
+					throw 50000, 'Task commands must name local schema-qualified SQL procedures or one-part ## procedures.', 1;
+				select @ObjectID = object_id(case when @IsTemporary = 1 then N'tempdb..' + quotename(@ProcedureName)
+					else quotename(@SchemaName) + N'.' + quotename(@ProcedureName) end, N'P');
+				if @ObjectID is null or (@IsTemporary = 0 and @ObjectID = object_id(N'z.usp_RunTaskQueueWorker', N'P'))
 					throw 50000, 'A task command does not identify an allowed existing SQL procedure.', 1;
+				delete from @ParameterMetadata;
+				if @IsTemporary = 1
+					insert @ParameterMetadata
+						select m.name, y.name from tempdb.sys.parameters m
+							join tempdb.sys.types d on d.user_type_id = m.user_type_id and d.is_user_defined = 0 and d.is_table_type = 0
+							join tempdb.sys.types y on y.user_type_id = m.system_type_id and y.user_type_id = y.system_type_id
+						where m.object_id = @ObjectID and m.is_output = 0;
+				else
+					insert @ParameterMetadata
+						select m.name, y.name from sys.parameters m
+							join sys.types d on d.user_type_id = m.user_type_id and d.is_user_defined = 0 and d.is_table_type = 0
+							join sys.types y on y.user_type_id = m.system_type_id and y.user_type_id = y.system_type_id
+						where m.object_id = @ObjectID and m.is_output = 0;
+				-- Bind under the queue database collation; never choose between ambiguous tempdb names.
+				if @IsTemporary = 1 and exists (select ParameterName from @ParameterMetadata group by ParameterName having count(*) > 1)
+					throw 50000, 'Temporary procedure parameter names are ambiguous under the queue database collation.', 1;
 				if exists (select 1 from openjson(@Parameters) where [type] <> 5)
 					throw 50000, 'Each task parameter must be a JSON object.', 1;
 				if exists
@@ -77,11 +97,9 @@ begin
 						or substring(n.ParameterName, 2, 1) collate Latin1_General_100_BIN2 like N'[^A-Za-z_]'
 						or not exists
 						(
-							select 1 from sys.parameters m
-								join sys.types d on d.user_type_id = m.user_type_id and d.is_user_defined = 0 and d.is_table_type = 0
-								join sys.types y on y.user_type_id = m.system_type_id and y.user_type_id = y.system_type_id
-							where m.object_id = @ObjectID and m.name = n.ParameterName and m.is_output = 0
-								and y.name in ('bigint', 'int', 'smallint', 'tinyint', 'bit', 'decimal', 'numeric', 'money', 'smallmoney',
+							select 1 from @ParameterMetadata m
+							where m.ParameterName = n.ParameterName
+								and m.TypeName in ('bigint', 'int', 'smallint', 'tinyint', 'bit', 'decimal', 'numeric', 'money', 'smallmoney',
 									'float', 'real', 'date', 'datetime', 'smalldatetime', 'datetime2', 'datetimeoffset', 'time',
 									'char', 'varchar', 'nchar', 'nvarchar', 'binary', 'varbinary', 'uniqueidentifier', 'xml')
 						)

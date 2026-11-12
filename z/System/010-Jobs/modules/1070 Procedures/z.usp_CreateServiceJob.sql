@@ -31,7 +31,8 @@ create or alter procedure z.usp_CreateServiceJob
 	@Command7 nvarchar(max) = null,
 	@Command8 nvarchar(max) = null,
 	@Command9 nvarchar(max) = null,
-	@Command10 nvarchar(max) = null
+	@Command10 nvarchar(max) = null,
+	@CreateSchedule bit = 1
 )
 as
 begin
@@ -51,10 +52,14 @@ begin
 			nchar(9) + nchar(10) + nchar(11) + nchar(12) + nchar(13), N'     ')) > 0;
 	if @DeleteAfterExecution is null or @DeleteAfterExecution not between 0 and 3
 		throw 51000, '@DeleteAfterExecution must be 0 (never), 1 (on success), 2 (on failure), or 3 (on completion).', 1;
-	declare @ValidationError nvarchar(4000) = z.fn_ValidateScheduleParameter(@Frequency, @Interval, @ByDay, @IntradayFrequency, @IntradayInterval, @ByTime, @StartDate, @EndDate);
-	if @ValidationError is not null throw 51000, @ValidationError, 1;
-	if not exists(select * from z.fn_ToSQLAgentSchedule(@Frequency, @Interval, @ByDay, @IntradayFrequency, @IntradayInterval, @ByTime, @StartDate, @EndDate))
-		throw 51000, 'The schedule definition did not produce any schedules; database-prefixed schedule names must fit the 128-character limit.', 1;
+	if @CreateSchedule is null throw 51000, '@CreateSchedule must not be null.', 1;
+	if @CreateSchedule = 1
+	begin
+		declare @ValidationError nvarchar(4000) = z.fn_ValidateScheduleParameter(@Frequency, @Interval, @ByDay, @IntradayFrequency, @IntradayInterval, @ByTime, @StartDate, @EndDate);
+		if @ValidationError is not null throw 51000, @ValidationError, 1;
+		if not exists(select * from z.fn_ToSQLAgentSchedule(@Frequency, @Interval, @ByDay, @IntradayFrequency, @IntradayInterval, @ByTime, @StartDate, @EndDate))
+			throw 51000, 'The schedule definition did not produce any schedules; database-prefixed schedule names must fit the 128-character limit.', 1;
+	end;
 	create table #Steps
 	(
 		step_id int,step_name nvarchar(128) collate database_default, subsystem nvarchar(40), command nvarchar(max), flags int,
@@ -123,10 +128,13 @@ end
 	begin tran
 	exec @LockResult = z.usp_AcquireSemaphore @SemaphoreName = @Resource, @TotalCount = 1, @LockOwner = N'Transaction', @LockTimeout = 15000;
 	if @LockResult <= 0 throw 51001, 'Could not acquire the database schedule operation lock.', 1;
-	exec z.usp_CreateSchedule @Frequency = @Frequency, @Interval = @Interval, @ByDay = @ByDay, @IntradayFrequency = @IntradayFrequency, @IntradayInterval = @IntradayInterval, @ByTime = @ByTime, @StartDate = @StartDate, @EndDate = @EndDate, @ScheduleNames = @ScheduleNames output, @ScheduleIDs = @ScheduleIDs output, @OperationDate = @Today
-	if nullif(@ScheduleNames, '') is null throw 51000, 'The schedule definition did not produce any schedules; database-prefixed schedule names must fit the 128-character limit.', 1;
-	insert into #ScheduleIDs(ScheduleID)
-		select convert(int, value) from openjson(@ScheduleIDs);
+	if @CreateSchedule = 1
+	begin
+		exec z.usp_CreateSchedule @Frequency = @Frequency, @Interval = @Interval, @ByDay = @ByDay, @IntradayFrequency = @IntradayFrequency, @IntradayInterval = @IntradayInterval, @ByTime = @ByTime, @StartDate = @StartDate, @EndDate = @EndDate, @ScheduleNames = @ScheduleNames output, @ScheduleIDs = @ScheduleIDs output, @OperationDate = @Today
+		if nullif(@ScheduleNames, '') is null throw 51000, 'The schedule definition did not produce any schedules; database-prefixed schedule names must fit the 128-character limit.', 1;
+		insert into #ScheduleIDs(ScheduleID)
+			select convert(int, value) from openjson(@ScheduleIDs);
+	end;
 
 	select @JobID = (select job_id from msdb.dbo.sysjobs where name = @JobName)
 	if @JobID is not null

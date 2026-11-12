@@ -16,7 +16,7 @@ begin
 		GroupBucket smallint not null,
 		ConversationHandle uniqueidentifier not null,
 		StartTimeUTC datetime2(7) not null,
-		index IDX_z_AsyncChannelSession_AsyncChannelID_GroupBucket nonclustered (AsyncChannelID, GroupBucket),
+		index IX_z_AsyncChannelSession_AsyncChannelID_GroupBucket nonclustered (AsyncChannelID, GroupBucket),
 		constraint PK_z_AsyncChannelSession primary key clustered (AsyncChannelID, SessionID),
 		constraint UQ_z_AsyncChannelSession_ConversationHandle unique nonclustered (ConversationHandle)
 	);

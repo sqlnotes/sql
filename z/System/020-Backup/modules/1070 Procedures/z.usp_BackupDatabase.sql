@@ -27,7 +27,7 @@ begin
 	end
 	set xact_abort on;
 	declare @BackupPath nvarchar(4000), @SQL nvarchar(max), @DatabaseName nvarchar(128), @StandardizedDatabaseName nvarchar(128), @FolderSeparator varchar(1),
-			@BackupFileName nvarchar(4000), @RawPath nvarchar(max), @Platform nvarchar(256), @DirectoryResult int,
+			@BackupFileName nvarchar(4000), @RawPath nvarchar(max), @Platform nvarchar(256), @DirectoryResult int, @DirectoryAttempt int,
 			@IsUrl bit, @BackupDevice varchar(4), @IsReadOnly bit,
 			@EffectiveOptions nvarchar(max), @OptionSeparator nvarchar(4) = nchar(13) + nchar(10) + N', ',
 			@ServerLabel nvarchar(128), @InstanceLabel nvarchar(128), @InstanceSeparator int, @BackupTime datetime2(7),
@@ -158,11 +158,20 @@ begin
 			select @BackupPath = @RawPath, @BackupFileName = @RawPath + @FormattedName;
 			if @IsUrl = 0
 			begin
-				if not exists(select * from sys.dm_os_file_exists(@BackupPath) where file_is_a_directory = 1)
+				select @DirectoryAttempt = 0;
+				while not exists(select * from sys.dm_os_file_exists(@BackupPath) where file_is_a_directory = 1)
 				begin
-					exec @DirectoryResult = master.sys.xp_create_subdir @BackupPath;
-					if @DirectoryResult <> 0 or @DirectoryResult is null or not exists(select * from sys.dm_os_file_exists(@BackupPath) where file_is_a_directory = 1)
-						throw 50000, 'Backup directory creation failed.', 1;
+					select @DirectoryAttempt += 1;
+					begin try
+						exec @DirectoryResult = master.sys.xp_create_subdir @BackupPath;
+					end try
+					begin catch
+						if @DirectoryAttempt >= 3 and not exists(select * from sys.dm_os_file_exists(@BackupPath) where file_is_a_directory = 1) throw;
+					end catch;
+					if exists(select * from sys.dm_os_file_exists(@BackupPath) where file_is_a_directory = 1) break;
+					if @DirectoryAttempt >= 3 throw 50000, 'Backup directory creation failed.', 1;
+					-- Concurrent creators may race on shared ancestors; retry the remaining path.
+					waitfor delay '00:00:00.100';
 				end
 			end
 			if @BackupType in ('FULL', 'DIFF')

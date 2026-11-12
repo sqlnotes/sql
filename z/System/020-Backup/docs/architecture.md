@@ -10,7 +10,9 @@ Uses server catalogs, msdb backup history, filesystem operations and native back
 
 ## Backup flow
 
-`z.usp_BackupDatabase` resolves a database list and processes it once, sequentially by data-file size. For each database it creates a directory for filesystem destinations only, then performs native BACKUP TO DISK or BACKUP TO URL. A native backup error stops the call; previous files remain. New calls start fresh. Parallel jobs, shared assignments and persistent backup status are unsupported.
+`z.usp_BackupDatabase` resolves a database list and processes it once, sequentially by data-file size. For each database it creates a directory for filesystem destinations only, then performs native BACKUP TO DISK or BACKUP TO URL. A native backup error stops the call; previous files remain. New calls start fresh. For bounded parallel work, `z.usp_BackupDatabasesParallel` composes a separate
+TaskQueue batch and launches Agent workers through Jobs. The sequential procedure
+has no shared assignments or persistent execution status of its own.
 
 The backup procedure has no application lock. The cleanup helper locks only while cleaning up; it does not coordinate with active backups. Schedule standalone cleanup separately from backups.
 
