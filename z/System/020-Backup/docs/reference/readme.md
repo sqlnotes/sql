@@ -11,6 +11,8 @@ Exact SQL identifiers link to behavior and source. Native system dependencies ar
 | `z.usp_BackupDatabasesParallel` | [Reference](z.usp_BackupDatabasesParallel.md) | [SQL](../../modules/1070%20Procedures/z.usp_BackupDatabasesParallel.sql) |
 | `z.usp_BackupDatabase` | [Reference](z.usp_BackupDatabase.md) | [SQL](../../modules/1070%20Procedures/z.usp_BackupDatabase.sql) |
 | `z.usp_RestoreDatabase` | [Reference](z.usp_RestoreDatabase.md) | [SQL](../../modules/1070%20Procedures/z.usp_RestoreDatabase.sql) |
+| `z.usp_RestoreDatabaseTarget` | [Implementation helper](z.usp_RestoreDatabase.md) | [SQL](../../modules/1070%20Procedures/z.usp_RestoreDatabaseTarget.sql) |
+| `z.usp_RestoreDatabaseExecute` | [Implementation helper](z.usp_RestoreDatabase.md) | [SQL](../../modules/1070%20Procedures/z.usp_RestoreDatabaseExecute.sql) |
 | `z.usp_CleanupDatabaseBackups` | [Reference](z.usp_CleanupDatabaseBackups.md) | [SQL](../../modules/1070%20Procedures/z.usp_CleanupDatabaseBackups.sql) |
 | `z.usp_CreateDatabaseSnapshot` | [Reference](z.usp_CreateDatabaseSnapshot.md) | [SQL](../../modules/1070%20Procedures/z.usp_CreateDatabaseSnapshot.sql) |
 | `z.v_BackupRestore` | [Reference](supporting-objects.md#zv_backuprestore) | [SQL](../../modules/1020%20Views/z.v_BackupRestore.sql) |

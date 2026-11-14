@@ -25,86 +25,101 @@ create or alter procedure z.usp_RestoreDatabase
 
 ## Source selection
 
-A backup file may contain multiple backup sets. Header metadata identifies each
-set and its position; generated commands use FILE = n for the selected set.
-Multiple sets alone do not disable filename-based discovery. Header mismatches still trigger header-based discovery.
+A local folder is searched recursively. A file or HTTP(S)/S3 URL considers only
+that object; remote folders and sibling objects are not enumerated. Recognized
+filenames are decoded and grouped by server, instance and database labels, with
+newest timestamps inspected first. The naming convention is trusted for grouping
+and chronological file order. Read older headers only until a complete chain is
+proven from a full backup or the destination's current restore position.
+Each inspected file is read once and all appended backup sets are cached.
 
-A filesystem folder is searched recursively with one call to sys.dm_os_enumerate_filesystem.
-HTTP(S) and S3 paths identify one specific backup object and use FROM URL; the
-procedure does not list remote folders, scan sibling objects or perform local
-filesystem checks on a URL. URLs retain their case and forward slashes on Windows
-and Linux. SQL Server credentials, endpoint/transport support and storage access
-must already be configured; S3 requires SQL Server 2022 or later. Recognizing an
-HTTP URL does not add transport support beyond the native SQL Server provider.
-A folder may contain backups
-from several databases. For initialization or replacement, a supplied TargetDatabaseName
-prefers a matching source database. If none matches, select the latest full backup
-as a rename source. Without TargetDatabaseName, read the latest LOG header first and use its actual
-database name and family to resolve the destination. Continue an existing
-RESTORING/STANDBY target from native redo progress. Only search FULL candidates
-when initialization or replacement is required; that FULL must belong to the
-inferred family. If no LOG identifies the source, a FULL header can infer it.
-An explicit target can still request a renamed restore from another source.
-Omitting the target does not itself request replacement.
+Nonconforming filenames are inspected after the recognized groups. Their sets
+are merged before final planning; recognized groups are revisited when the merged
+inventory requires an older base or missing chain segment. Header family, fork,
+backup type and LSNs validate the selected chain. Selected media labels and file
+layouts are also validated. Unopened older files are not inspected for hidden
+sources or newly appended sets: convention-compliant containers must retain their
+source grouping and chronological ordering. A custom filename layout outside the
+recognized convention uses header discovery.
+Native URL credentials and transport support must already be configured.
 
-After selecting the full, consider only its database family and recovery fork.
-Restore the latest compatible differential if available, then the remaining log
-chain. A differential must identify the selected full as its base; a copy-only
-full cannot be a differential base. Differentials belonging to another full do
-not change the selected full. Without a compatible differential, use full plus
-logs; without pending logs, restore the selected data backups alone.
+A file may contain multiple appended backup sets. Each selected command uses its
+`FILE = position`. Mixed sets in a file and equivalent sets in a folder follow
+the same source-selection rules. Striped backups spanning several media files
+remain unsupported; unrelated unsupported media is reported separately.
 
-Managed filenames from z.usp_BackupDatabase default to
-`Server$Instance$Database_yyyyMMdd_HHmmssfffffff.bak`, `.diff` and `.trn`.
-The default instance is included as MSSQLSERVER. Legacy database-only six-digit
-names and recognized custom instance-omitting names remain supported through
-[z.fn_DecodeBackupFileName](z.fn_DecodeBackupFileName.md). These names allow
-newest-first candidate discovery without opening every older backup. Opened headers
-confirm identity, type and LSNs. Arbitrary filenames require broader header
-inspection. Managed mode trusts the embedded producer timestamp to order
-candidates; it does not compare every full backup's header completion time.
-A detected filename/header type or source mismatch switches to header discovery.
-Multiple database-name hints use header discovery, because a source rename can
-change the database name while preserving its backup family and log chain.
-Different server/instance prefixes or legacy/new layouts for the same database
-do not alone disable filename-based discovery.
-Directory listing still covers the selected folder tree. Unreadable header candidates are recorded and skipped. Errors validating
-selected media still stop planning.
+With TargetDatabaseName omitted, process each eligible user database family under
+its source name. Initialize missing databases when a usable full is available;
+defer sources containing only logs/differentials. Continue matching RESTORING or
+STANDBY databases. Existing ONLINE and unavailable databases are skipped even when
+ReplaceExisting = 1. The automatic path never replaces an existing database.
+System database sources master, model, msdb and tempdb are skipped. The database
+hosting this procedure cannot be restored.
 
-A file or URL input considers only that object; it does not scan siblings. A standalone log can infer its target from the header or use an explicit target.
-A standalone differential requires an explicit compatible unrecovered target. A differential alone cannot initialize a missing database. Existing
-RESTORING or standby destinations use their verified restore identity and progress,
-even when a different database has a newer full in the folder.
+One family is one source even when it has several full backups or source-name
+aliases. Use the newest header name deterministically for a new target. If one
+existing RESTORING/STANDBY database matches that family and a source-name alias,
+continue that target after a source rename instead of creating another target.
+Several existing matching aliases, or distinct families sharing a destination
+name, are ambiguous and fail that source. If retained media no longer includes
+the old source name but another same-family continuation database exists,
+automatic creation fails conservatively; specify the intended target explicitly.
 
-For a recognized-name folder and an existing continuation target, read its native
-required LSN before opening backup files. Identify the source using LOG headers
-first, or DIFF headers if needed; FULL headers are not opened merely to identify
-the source. A newer full backup does not restart the target or advance its redo
-position. Continue the existing log chain across that newer full backup.
-Reuse cached log headers before opening another file. An already-current target
-needs only the newest log header; a recognized full-only folder can return a
-no-op without reading a backup header. Unknown source names remain NULL when no
-backup header was needed. Arbitrary names still require broader header discovery.
+With an explicit missing target, exactly one usable full-backed source family
+must exist. Multiple fulls of A count as one source. A full of A plus standalone
+logs/differentials of B also counts as one initialization source. Fulls of A and
+B are ambiguous and rejected, even when one source name matches the target.
+The same unique-source rule applies to explicit replacement. For initialization
+or replacement, the newest eligible full by completion time establishes the
+supported recovery branch. Evaluate full starting points and matching differentials
+on that branch to reach the greatest endpoint; prefer a log-only route on ties.
+An older regular full plus a differential can therefore win over a newer copy-only
+full when it restores farther. LSNs are never ranked across recovery branches. An existing
+RESTORING/STANDBY target instead selects its native family/fork; unrelated
+restorable databases do not make continuation ambiguous. Renamed targets work
+the same way. A log or differential alone cannot create a missing database.
 
-Log planning uses exact numeric LSNs, database family and recovery-fork identity.
-Inspect candidate logs newest first until their collected coverage reaches the
-required LSN, then execute the selected logs in forward LSN order. Include the
-log overlapping the starting boundary; filename dates alone cannot prove coverage.
-Already-covered backups are skipped. Gaps still fail rather than silently choosing
-an older full. Recovery-fork transitions, file/filegroup restores, striped or
-incomplete or damaged selected backup metadata are unsupported.
+Plan the log-only route first, without executing any commands. Prefer it when it
+reaches the latest eligible endpoint. Consider a matching differential only when
+it reaches beyond that log-only endpoint; then plan its subsequent logs. A
+copy-only full cannot be a differential base. A differential requires a proven
+unrecovered full state with no intervening log restore; it is not a general gap
+repair for an already advancing secondary. No gap causes an automatic full
+reseed. An unbridgeable gap fails planning for that database before any of its
+restore commands execute. LSNs are compared only within compatible families and
+recovery branches; branch transitions remain unsupported.
+
+Already-covered backups are skipped. Invalid pending log media that extends
+beyond every usable route fails the affected database; a valid alternative that
+covers its endpoint can still be used. Unreadable or unsupported inventory objects
+are reported. Known foreign media errors do not prevent an explicit target from
+using its own compatible backups. Unknown unreadable identities prevent proving
+an unambiguous initialization/replacement source. A continuing target can process
+its known compatible media, but unresolved inventory errors remain in the final
+outcomes and cause an aggregate execution error.
+
+All sources are discovered and every target plan is completed before the first
+restore executes. The shared temporary plan stores the exact commands, backup-set
+positions, execution order, file mappings and destination guards. Independent
+sources retain separate outcomes; one source's failure does not stop other sources. The final outcomes identify DatabaseName, SourceDatabaseName,
+SourceFamilyGUID, Status, LastLSN, ErrorNumber, ErrorMessage and BackupPath.
+Statuses include Initialized, Advanced, AlreadyCurrent, Deferred, Skipped, Ignored
+and Failed; successful previews use Planned. After returning outcomes, execution
+throws an aggregate error if any source failed. Preview reports failures without
+executing restores. Explicit-target errors remain errors. This is a sequential
+restore operation, not a transaction across databases.
 
 ## Destination state and replacement
 
-| Destination | Action |
-| --- | --- |
-| Missing | Restore full, optional differential, then logs |
-| RESTORING or standby | Verify identity and progress, then apply pending compatible backups |
-| Other state, ReplaceExisting = 1 | Restore full with REPLACE, optional differential, then logs |
-| Other state, ReplaceExisting = 0 | Error |
+| Destination | Explicit target | Omitted target |
+| --- | --- | --- |
+| Missing | Initialize the unique full-backed source | Initialize each eligible source, defer those without a full |
+| RESTORING or standby | Continue native matching identity/progress | Continue native matching identity/progress |
+| Other state, ReplaceExisting = 1 | Replace from the unique full-backed source | Skip |
+| Other state, ReplaceExisting = 0 | Error | Skip |
 
 A RESTORING or STANDBY destination with available recovery identity is continued.
-If its family or recovery fork is unavailable, ReplaceExisting = 1 instead plans
+For an explicit target only, if its family or recovery fork is unavailable, ReplaceExisting = 1 instead plans
 a replacement from the latest selected full, compatible differential and logs.
 OFFLINE, SUSPECT and RECOVERY_PENDING destinations also require replacement.
 ReplaceExisting = 0 rejects those replacements, and a full backup is required.
@@ -264,9 +279,11 @@ other recovery types.
 
 ShowPlan = 1 reads backup/catalog metadata and returns the restore commands,
 file mappings and a discovery summary without executing restores, creating
-folders or changing databases. The summary identifies the source database/family,
-DiscoveryMode (FILENAME or HEADER), FilesDiscovered and HeadersRead. HeadersRead
-counts header-reader calls, not label reads or file-list reads.
+folders or changing databases. Each per-target summary identifies the source database/family,
+DiscoveryMode (FILENAME for recognized names, HEADER when nonconforming files
+are present), FilesDiscovered and HeadersRead. Automatic preview returns
+per-target plans and mappings followed by the combined outcomes. HeadersRead
+counts shared inventory header-reader calls, not label reads or file-list reads.
 It is a plan for the current inventory and destination state, not a reservation or
 a guarantee that later native restore commands will succeed. For an existing
 standby database, the final undo-path check can only complete after execution
@@ -284,7 +301,7 @@ exec z.usp_RestoreDatabase
 	@LogFolder = N'F:\Log',
 	@ShowPlan = 1;
 
--- Default: source name, replacement enabled, leave NORECOVERY.
+-- Automatic discovery: source names, skip online targets, leave NORECOVERY.
 exec z.usp_RestoreDatabase
 	@BackupPath = N'D:\Backups\Sales';
 

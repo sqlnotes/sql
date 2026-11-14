@@ -17,13 +17,20 @@ The parameterless Full/Log wrappers contain a fixed UNC destination. The separat
 ## Restore failures
 
 Preview with [z.usp_RestoreDatabase](reference/z.usp_RestoreDatabase.md) ShowPlan = 1.
-Mixed-source folders are supported; inspect the selected source before execution.
-A supplied TargetDatabaseName prefers a matching source, falling back to the latest
-full as a rename source. Keep managed timestamped filenames to avoid reading
-older headers on every call. Arbitrary filenames require broader discovery.
-A log gap, unsupported recovery-fork transition,
-missing restore history or uncertain destination progress stops planning rather
-than silently choosing an older full or restarting a restoring database.
+Mixed folders and files containing appended backup sets are supported. Inspect
+the selected source and per-database outcomes before execution. A missing explicit
+target requires exactly one usable full-backed source family; several full backups
+of one family count once. Unrelated standalone logs/differentials do not add
+initialization candidates. Omit the target for automatic per-source processing;
+existing ONLINE/unavailable databases are skipped rather than replaced. Sources
+without a full cannot initialize a missing destination. Recognized names permit newest-first header reads
+that stop once the chain is complete. Nonconforming names all require headers;
+large collections of those files can take longer to plan.
+A log gap, unsupported recovery-fork transition or unavailable destination progress
+without a compatible fallback stops that database's planning rather than silently
+restarting it. Missing optional differential history does not prevent valid native
+log continuation. Other automatic sources continue and failures remain visible
+in the final outcomes and aggregate execution error.
 An incompatible differential is not applied to a different full base. A standalone
 differential requires its base already restored without recovery or subsequent
 log restores; otherwise provide the full backup folder.

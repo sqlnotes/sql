@@ -33,25 +33,54 @@ URL, or a recursive filesystem folder. A URL always takes the single-file path;
 remote directory discovery is unavailable. Native metadata and media restore
 commands use FROM URL, preserving the supplied URL on either operating system.
 Shared header/file-list readers return JSON, which the typed decoder
-functions project without nesting INSERT EXEC. Exact producer filenames enable
-newest-first discovery with fewer header reads; arbitrary names use broader
-header inspection. A requested database name prefers a matching source, otherwise
-the latest full supplies the source for a renamed restore. An omitted target is
-inferred from the newest LOG header first, then its native state decides
-continuation versus initialization/replacement. A FULL is searched only when
-needed or when no LOG can identify the target. An inferred source family is
-preserved across planning; an unrelated FULL cannot initialize that target.
-Mixed-source folders
-are supported. Headers bind the selected full, optional differential and logs to
-one database family and recovery fork. File-list metadata drives explicit
-physical-file MOVE mappings and destination collision checks.
+functions project without nesting INSERT EXEC. Filename decoding groups recognized
+files by source labels and orders them newest first. Trust those names for source
+grouping and chronology; cache every appended set from each inspected file and
+walk backward only until a complete chain is proven. Inspect nonconforming names
+afterward, merge their sets, then revisit recognized groups when an older base or
+chain segment is still required. Unopened containers are outside source discovery;
+newly appended sets must preserve the convention's grouping and ordering.
 
-For recognized filenames, continuation reads the current native redo position
-first and identifies its source from LOG or DIFF headers without opening FULL
-headers. Logs are scanned newest first until cached LSN ranges bridge back to
-the target's required LSN, then restored forward. Newer full backups do not reset
-a delayed target's log chain. Cached coverage is checked before another header
-read; full-only continuation can remain a no-op without backup header reads.
+An explicit missing destination requires exactly one usable full-backed source
+family. Several full backups of one family count once; foreign standalone logs
+and differentials cannot initialize another database and do not increase the
+count. Existing RESTORING/STANDBY targets select by native family/fork and redo
+position, including renamed destinations. Newer full backups do not restart a
+continuation target. LSN comparisons never merge unrelated families or branches.
+For initialization/replacement, the newest full by completion time establishes
+the supported branch. Evaluate full starts and matching differentials on that
+branch to reach the latest endpoint; a newer copy-only full must not hide a later
+differential based on an older regular full. Prefer a route without a differential
+when endpoints tie.
+
+With no target, each user source is processed independently under its source
+name. Missing targets are initialized when a usable full is available; otherwise
+the source is deferred. Existing ONLINE/unavailable targets are skipped even when
+ReplaceExisting = 1. System sources are excluded, and the hosting database,
+snapshots and AG targets remain protected. Source-name collisions across families
+are reported rather than overwritten.
+After a source rename, reuse a unique matching continuation target among known
+source-name aliases. If the family already has a continuation target whose name
+cannot be resolved from the retained headers, require an explicit target instead
+of initializing a duplicate.
+
+The implementation helper `z.usp_RestoreDatabaseTarget` consumes the caller's
+inventory and saves each destination's commands, file mappings and state in shared
+temporary tables. Every target finishes planning before execution begins.
+`z.usp_RestoreDatabaseExecute` then consumes the saved commands with destination
+and cleanup guards. Call `z.usp_RestoreDatabase` as the supported entry point.
+The per-target planner first computes log-only coverage. It prefers logs when
+they reach the latest eligible endpoint, otherwise considers a differential that
+matches the full base and can legally extend the endpoint. A differential cannot
+follow intervening log restores. The complete chain is checked before execution;
+an unbridgeable gap fails that target without applying a prefix or silently
+reseeding. Other independent targets continue and retain individual outcomes.
+File-list metadata drives explicit physical-file MOVE mappings and collision
+checks, preserving every input path even when media belongs to another source.
+Validated destination and standby paths are also reserved across targets for the
+current call, including preview. A later target cannot plan the same output path.
+Reservations last until the call returns, including after an execution failure;
+they are temporary planning checks and do not lock filesystem paths.
 
 File metadata is accumulated in restore order. Each mapping carries its introducing
 ordinal, so full, differential and log commands receive only the MOVE clauses
@@ -75,46 +104,41 @@ readable lines; whitespace within supplied options is preserved.
 
 ```mermaid
 flowchart TD
-    A[Resolve target: latest LOG header if name omitted] --> B{Destination state?}
-    B -->|Missing| F[Choose latest full; prefer requested source name]
-    B -->|Replacement allowed| F
-    B -->|Replacement disabled| X[Stop]
-    B -->|RESTORING or standby| C[Verify identity and required LSN]
-    F --> D[Select latest differential matching the full base]
-    C --> E{Still directly on full base?}
-    E -->|Yes| D
-    E -->|No| L[Inspect logs newest first]
-    D --> L
-    L --> Q{Any pending log backups?}
-    Q -->|No| S[Stop reading older files; validate chain]
-    Q -->|Yes| R{Collected coverage reaches required LSN?}
-    R -->|No| N[Read next older log header]
-    N --> L
-    R -->|Yes| S
-    S --> T{ONLINE target, pending commands and DropConnections enabled?}
-    T -->|Yes| U[Set SINGLE_USER WITH ROLLBACK IMMEDIATE]
-    T -->|No| P[Restore full if needed, then differential, then logs forward]
-    U --> P
+    A[Decode names and read only required headers; merge unknown files] --> B[Resolve next source and target]
+    B --> C{Automatic target already ONLINE or unavailable?}
+    C -->|Yes| K[Report skipped and continue next source]
+    C -->|No| D[Verify native continuation or select unique full source]
+    D --> E[Plan log-only coverage]
+    E --> F{Logs reach latest eligible endpoint?}
+    F -->|Yes| H[Validate full sequence and file mappings]
+    F -->|No| G[Evaluate legal differential and subsequent logs]
+    G --> H
+    H --> I{Valid complete plan?}
+    I -->|No| J[Report failure and continue next source]
+    I -->|Yes| S[Save target commands and guards]
+    S --> T{All sources planned?}
+    J --> T
+    K --> T
+    T -->|No| B
+    T -->|Yes| P[Preview or execute saved plans]
     P --> Z[Leave NORECOVERY or finalize RECOVERY / STANDBY]
+    Z --> R[Report per-source outcomes and aggregate failures]
 ```
 
-The filename fast path requires one decoded database-name hint and assumes the
-producer's timestamp/type convention. Multiple database-name hints use header
-discovery so source renames cannot hide compatible logs. Server/instance prefix
-variations and recognized legacy/new layouts for one database keep the fast path. Headers
-confirm opened candidates, and LSN coverage includes any overlapping boundary log.
-Differentials reduce the amount of log replay; reading fewer headers reduces
-planning I/O. Neither optimization replaces validation of the selected chain.
+Log coverage includes any backup overlapping the required starting LSN. Filename
+timestamps and extensions do not prove identity or chain coverage. Appended backup
+sets use FILE = position; assembling striped backups remains unsupported.
 
 An existing restoring or standby database is a continuation candidate; native
 family/fork and current file redo metadata establish its identity and progress.
 Existing file mappings come directly from sys.master_files. Retained history is
 consulted only for unproven differential eligibility, unavailable standby redo
 metadata. Already-covered DIFF candidates do not trigger that lookup.
-Unavailable family/fork metadata selects full replacement when ReplaceExisting = 1;
-otherwise it fails. OFFLINE and failed-start states also use replacement.
-A known incompatible continuation still fails.
-Other existing destinations require ReplaceExisting = 1. The selected commands
+Automatic mode does not replace existing targets when identity is unavailable.
+Explicit requests retain the guarded replacement path for unavailable identity,
+OFFLINE and failed-start states when ReplaceExisting = 1. A known incompatible
+continuation still fails. Other explicit existing destinations also require
+ReplaceExisting = 1 and an unambiguous full-backed source. The selected commands
 execute sequentially outside a user transaction. Failure leaves any completed
 restore steps in place. DropConnections defaults to 1; an existing ONLINE target
 with pending commands enters SINGLE_USER WITH ROLLBACK IMMEDIATE. Unavailable

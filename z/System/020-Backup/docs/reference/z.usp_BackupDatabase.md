@@ -13,12 +13,51 @@ Back up the selected databases sequentially in ascending data-file size. Every i
 @BackupCompression bit = 1,
 @OtherBackupOptions nvarchar(max) = null,
 @ServerName sysname = null,
-@BackupFileNameFormat nvarchar(4000) = N'{ServerName}${InstanceName}${DatabaseName}_{yyyyMMdd}_{HHmmssfffffff}'
+@BackupFileNameFormat nvarchar(4000) = N'{ServerName}${InstanceName}${DatabaseName}_{yyyyMMdd}_{HHmmssfffffff}',
+@FullBackupIfNeeded bit = 0
 ```
 
 Databases accepts AllDatabases, UserDatabases, SystemDatabases or comma-separated names. Exclude tempdb and error/recovery states; skip SIMPLE recovery for LOG. Read-only databases automatically include COPY_ONLY for disk and URL backups. SQL Server honors it for FULL and LOG; with DIFFERENTIAL it has no effect and the requested type remains DIFF. Read-write backups use COPY_ONLY only when explicitly supplied in OtherBackupOptions. Compression NULL uses the server default. OtherBackupOptions supplies trusted SQL options, including an existing credential option where appropriate.
 
 ServerName is a destination naming label, not a remote SQL connection. NULL uses @@servername; otherwise the supplied name replaces it in the server/instance prefix. A name without an instance uses MSSQLSERVER; a backslash separates a named instance. The procedure always backs up databases on the instance where it executes.
+
+## Full backup when needed
+
+Set FullBackupIfNeeded to 1 to establish a regular full backup when a selected
+database lacks the prerequisite for the requested backup:
+
+- DIFF with no primary data-file differential base performs FULL instead of DIFF.
+- LOG with an uninitialized log backup chain completes FULL, then performs LOG.
+- Existing differential bases and initialized log chains keep the requested type.
+  FULL requests and the existing SIMPLE-recovery LOG skip are unchanged.
+- The default 0, and NULL, preserve the requested backup behavior.
+
+Detection uses the target database's sys.database_files primary-file
+differential_base_lsn/differential_base_guid and
+sys.database_recovery_status.last_log_backup_lsn. A newly added secondary data
+file without a base does not trigger a full database backup. These checks inspect
+current engine state, not backup history or the existence or usability of media.
+
+Each backup uses its actual type for its folder, extension and BackupType filename
+token. A prerequisite full uses the same destination, compression and additional
+options. Errors stop the call; LOG is attempted only after a successful full and
+a confirmed initialized log chain.
+
+A prerequisite full must establish a new differential base. Read-only databases
+requiring fallback are rejected because their automatic COPY_ONLY policy cannot
+establish it. Do not supply COPY_ONLY in OtherBackupOptions when fallback is
+needed: the copy-only file can be created, but the call fails if the new base was
+not established and no subsequent LOG is attempted. Options remain trusted SQL;
+they are not parsed or rewritten. A regular full changes the differential base
+used by subsequent differential backups.
+
+```sql
+exec z.usp_BackupDatabase @Databases = N'Sales', @BackupType = N'Diff',
+    @FullBackupIfNeeded = 1;
+
+exec z.usp_BackupDatabase @Databases = N'Sales', @BackupType = N'Log',
+    @FullBackupIfNeeded = 1;
+```
 
 ## Additional backup options
 

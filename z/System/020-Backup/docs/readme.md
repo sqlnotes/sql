@@ -17,7 +17,17 @@ Backups run sequentially to filesystem folders, Azure Blob HTTPS URLs or S3-comp
 
 Windows destinations can use absolute local or UNC paths. Linux destinations use absolute filesystem paths, including mounted network shares. The parameterless Full/Log wrappers contain a fixed UNC destination; inspect them before use.
 
-[z.usp_RestoreDatabase](reference/z.usp_RestoreDatabase.md) accepts a backup file, a specific HTTP(S)/S3 backup-object URL or a recursive filesystem folder, supports renamed destinations and file relocation, and can continue compatible restoring/standby databases. URL inputs are single files without folder discovery. Preview the selected chain and file mappings with ShowPlan = 1. Its default is NORECOVERY with replacement enabled for existing databases outside restore/standby mode.
+[z.usp_RestoreDatabase](reference/z.usp_RestoreDatabase.md) accepts a backup file, a
+specific HTTP(S)/S3 backup-object URL or a recursive filesystem folder. Mixed
+folders and appended backup files use the same source-selection rules. Omit the
+target to initialize missing user databases and continue matching restoring/standby
+databases under their source names; existing ONLINE/unavailable targets are skipped.
+An explicit missing target requires one usable full-backed source family and can
+rename that source. Logs are preferred when sufficient; a compatible differential
+is considered when needed to reach a later endpoint. URL inputs identify one
+object without remote folder discovery. Preview chains, file mappings and outcomes
+with ShowPlan = 1. The recovery default remains NORECOVERY; explicit replacement
+retains the ReplaceExisting control.
 
 DropConnections defaults to 1: an existing ONLINE target with pending commands uses
 SINGLE_USER WITH ROLLBACK IMMEDIATE before restore. Unavailable destinations skip

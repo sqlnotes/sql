@@ -54,7 +54,8 @@ Use `@UseBackupHeader = 1` on the cleanup procedure for header-based cleanup. UR
 
 ## Restore a full backup, differential and logs
 
-Preview the latest full backup, optional compatible differential and remaining log chain:
+Preview initialization from a full backup and continuation to the latest compatible
+endpoint, preferring logs when they are sufficient:
 
 ```sql
 exec z.usp_RestoreDatabase
@@ -66,16 +67,32 @@ exec z.usp_RestoreDatabase
 ```
 
 Set ShowPlan = 0 to execute the selected sequence. The default leaves the database
-in NORECOVERY and permits replacement of an existing destination outside restore
-or standby mode. TargetDatabaseName prefers a source with that name; when none matches,
-the latest full is used as a rename source. Mixed-source folders are supported.
-Managed timestamped filenames reduce the number of headers opened; arbitrary
-names use broader header discovery. Review the chosen source in the preview.
-A compatible restoring/standby destination receives only pending backups; a
-differential requires its matching full base and cannot follow restored logs.
-Use RecoveryType = 'RECOVERY' to bring the result online, or
-'STANDBY' for read access between restores. A null StandbyFolder places the full
-backup's basename with extension .standby beside the primary data file.
+in NORECOVERY. A missing explicit target requires exactly one usable full-backed
+source family: several fulls of one database count once, and unrelated standalone
+logs/differentials do not add initialization candidates. Two full-backed families
+are ambiguous even when one source name matches the requested target.
+An existing compatible RESTORING/STANDBY target selects its native family and
+receives pending backups, ignoring unrelated sources. Explicit replacement of
+other existing destinations requires ReplaceExisting = 1, the default.
+
+Omit TargetDatabaseName to process each user database under its source name.
+Missing databases with a usable full are initialized; sources without a full are
+deferred. Existing ONLINE/unavailable databases are skipped in automatic mode,
+including when ReplaceExisting = 1. System databases are excluded. Mixed folders
+and files containing appended backup sets use the same selection rules; remote
+URLs still identify one object. Recognized filenames group and order discovery;
+headers are read backward only as needed. Nonconforming files are inspected next.
+Every target plan is completed before the first restore executes.
+
+Log-only planning has priority when it reaches the latest eligible endpoint.
+Otherwise a compatible differential can bridge a gap or advance farther, but it
+requires its matching full base and cannot follow restored logs. An unbridgeable
+gap fails that database's planning without executing a partial chain. Independent
+databases continue, and outcomes retain individual failures.
+Use RecoveryType = 'RECOVERY' to bring the result online, or 'STANDBY' for read
+access between restores. Recurring shipping requires NORECOVERY or STANDBY.
+A null StandbyFolder places the standardized target name with extension .standby
+beside the primary data file.
 See the [restore reference](reference/z.usp_RestoreDatabase.md) for source selection,
 path rules, continuation requirements and failure behavior.
 

@@ -15,7 +15,8 @@ create or alter procedure z.usp_BackupDatabase
 	@BackupCompression bit = 1,
 	@OtherBackupOptions nvarchar(max) = null,-- 'stats = 1',
 	@ServerName sysname = null, --Backup path label; NULL uses @@servername.
-	@BackupFileNameFormat nvarchar(4000) = N'{ServerName}${InstanceName}${DatabaseName}_{yyyyMMdd}_{HHmmssfffffff}'
+	@BackupFileNameFormat nvarchar(4000) = N'{ServerName}${InstanceName}${DatabaseName}_{yyyyMMdd}_{HHmmssfffffff}',
+	@FullBackupIfNeeded bit = 0
 )
 as
 begin
@@ -29,6 +30,8 @@ begin
 	declare @BackupPath nvarchar(4000), @SQL nvarchar(max), @DatabaseName nvarchar(128), @StandardizedDatabaseName nvarchar(128), @FolderSeparator varchar(1),
 			@BackupFileName nvarchar(4000), @RawPath nvarchar(max), @Platform nvarchar(256), @DirectoryResult int, @DirectoryAttempt int,
 			@IsUrl bit, @BackupDevice varchar(4), @IsReadOnly bit,
+			@EffectiveBackupType nvarchar(50), @NeedsFull bit, @DifferentialBaseLSN numeric(25,0),
+			@DifferentialBaseGUID uniqueidentifier, @PreviousBaseGUID uniqueidentifier, @LastLogBackupLSN numeric(25,0),
 			@EffectiveOptions nvarchar(max), @OptionSeparator nvarchar(4) = nchar(13) + nchar(10) + N', ',
 			@ServerLabel nvarchar(128), @InstanceLabel nvarchar(128), @InstanceSeparator int, @BackupTime datetime2(7),
 			@EffectiveFileNameFormat nvarchar(max), @FormattedName nvarchar(max), @FormatRemainder nvarchar(max),
@@ -127,66 +130,109 @@ begin
 		fetch next from c into @DatabaseName, @StandardizedDatabaseName, @IsReadOnly;
 		while @@fetch_status = 0
 		begin
-			select @RawPath = @BackupFolder + @ServerLabel + @FolderSeparator + @InstanceLabel
-				+ @FolderSeparator + @StandardizedDatabaseName + @FolderSeparator + @BackupType + @FolderSeparator,
-				@BackupTime = sysdatetime(), @FormattedName = N'', @FormatOffset = 1;
-			while @FormatOffset <= len(@EffectiveFileNameFormat)
+			select @EffectiveBackupType = @BackupType, @NeedsFull = 0;
+			if @FullBackupIfNeeded = 1 and @BackupType in ('DIFF', 'LOG')
 			begin
-				select @TokenStart = charindex(N'{', @EffectiveFileNameFormat, @FormatOffset);
-				if @TokenStart = 0
-				begin
-					select @FormattedName += substring(@EffectiveFileNameFormat, @FormatOffset, 4000);
-					break;
-				end
-				select @TokenEnd = charindex(N'}', @EffectiveFileNameFormat, @TokenStart + 1),
-					@FormattedName += substring(@EffectiveFileNameFormat, @FormatOffset, @TokenStart - @FormatOffset);
-				select @Token = substring(@EffectiveFileNameFormat, @TokenStart + 1, @TokenEnd - @TokenStart - 1);
-				select @FormattedName += case @Token
-					when N'ServerName' then @ServerLabel when N'InstanceName' then @InstanceLabel when N'DatabaseName' then @StandardizedDatabaseName when N'BackupType' then @BackupType
-					when N'yyyyMMdd' then convert(nvarchar(8), @BackupTime, 112)
-					when N'HHmmssfffffff' then format(@BackupTime, 'HHmmssfffffff', 'en-US')
-					when N'HHmmssffffff' then format(@BackupTime, 'HHmmssffffff', 'en-US')
-					when N'HHmmss' then format(@BackupTime, 'HHmmss', 'en-US')
-					when N'fffffff' then format(@BackupTime, 'fffffff', 'en-US') when N'ffffff' then format(@BackupTime, 'ffffff', 'en-US') end,
-					@FormatOffset = @TokenEnd + 1;
+				select @DifferentialBaseLSN = null, @DifferentialBaseGUID = null, @LastLogBackupLSN = null;
+				-- The primary file identifies the database base; newly added secondary files may have none.
+				select @SQL = N'use ' + quotename(@DatabaseName) + N';
+select @BaseLSN = differential_base_lsn, @BaseGUID = differential_base_guid
+from sys.database_files where file_id = 1 and type = 0;';
+				exec sys.sp_executesql @SQL, N'@BaseLSN numeric(25,0) output, @BaseGUID uniqueidentifier output',
+					@BaseLSN = @DifferentialBaseLSN output, @BaseGUID = @DifferentialBaseGUID output;
+				if @BackupType = 'LOG'
+					select @LastLogBackupLSN = last_log_backup_lsn from sys.database_recovery_status where database_id = db_id(@DatabaseName);
+				if @BackupType = 'DIFF' and (@DifferentialBaseLSN is null or @DifferentialBaseGUID is null)
+					or @BackupType = 'LOG' and @LastLogBackupLSN is null
+					select @NeedsFull = 1, @EffectiveBackupType = 'FULL';
+				if @NeedsFull = 1 and @IsReadOnly = 1
+					throw 50000, 'FullBackupIfNeeded cannot establish a regular full backup under the read-only COPY_ONLY policy.', 1;
+				select @PreviousBaseGUID = @DifferentialBaseGUID;
 			end
-			if @FormattedName in (N'', N'.', N'..') or @FormattedName <> z.fn_StandardizeFileName(@FormattedName)
-				throw 50000, 'BackupFileNameFormat must render a nonempty filename without invalid characters or trailing periods.', 1;
-			select @FormattedName += case @BackupType when 'FULL' then N'.bak' when 'DIFF' then N'.diff' else N'.trn' end;
-			if len(@FormattedName) > 255 or len(@RawPath + @FormattedName) > iif(@IsUrl = 1, 4000, 260)
-				throw 50000, 'The backup filename or destination path is too long; use a shorter filename format or backup folder.', 1;
-			select @BackupPath = @RawPath, @BackupFileName = @RawPath + @FormattedName;
-			if @IsUrl = 0
+			while @EffectiveBackupType is not null
 			begin
-				select @DirectoryAttempt = 0;
-				while not exists(select * from sys.dm_os_file_exists(@BackupPath) where file_is_a_directory = 1)
+				select @RawPath = @BackupFolder + @ServerLabel + @FolderSeparator + @InstanceLabel
+					+ @FolderSeparator + @StandardizedDatabaseName + @FolderSeparator + @EffectiveBackupType + @FolderSeparator,
+					@BackupTime = sysdatetime(), @FormattedName = N'', @FormatOffset = 1;
+				while @FormatOffset <= len(@EffectiveFileNameFormat)
 				begin
-					select @DirectoryAttempt += 1;
-					begin try
-						exec @DirectoryResult = master.sys.xp_create_subdir @BackupPath;
-					end try
-					begin catch
-						if @DirectoryAttempt >= 3 and not exists(select * from sys.dm_os_file_exists(@BackupPath) where file_is_a_directory = 1) throw;
-					end catch;
-					if exists(select * from sys.dm_os_file_exists(@BackupPath) where file_is_a_directory = 1) break;
-					if @DirectoryAttempt >= 3 throw 50000, 'Backup directory creation failed.', 1;
-					-- Concurrent creators may race on shared ancestors; retry the remaining path.
-					waitfor delay '00:00:00.100';
+					select @TokenStart = charindex(N'{', @EffectiveFileNameFormat, @FormatOffset);
+					if @TokenStart = 0
+					begin
+						select @FormattedName += substring(@EffectiveFileNameFormat, @FormatOffset, 4000);
+						break;
+					end
+					select @TokenEnd = charindex(N'}', @EffectiveFileNameFormat, @TokenStart + 1),
+						@FormattedName += substring(@EffectiveFileNameFormat, @FormatOffset, @TokenStart - @FormatOffset);
+					select @Token = substring(@EffectiveFileNameFormat, @TokenStart + 1, @TokenEnd - @TokenStart - 1);
+					select @FormattedName += case @Token
+						when N'ServerName' then @ServerLabel when N'InstanceName' then @InstanceLabel when N'DatabaseName' then @StandardizedDatabaseName when N'BackupType' then @EffectiveBackupType
+						when N'yyyyMMdd' then convert(nvarchar(8), @BackupTime, 112)
+						when N'HHmmssfffffff' then format(@BackupTime, 'HHmmssfffffff', 'en-US')
+						when N'HHmmssffffff' then format(@BackupTime, 'HHmmssffffff', 'en-US')
+						when N'HHmmss' then format(@BackupTime, 'HHmmss', 'en-US')
+						when N'fffffff' then format(@BackupTime, 'fffffff', 'en-US') when N'ffffff' then format(@BackupTime, 'ffffff', 'en-US') end,
+						@FormatOffset = @TokenEnd + 1;
 				end
+				if @FormattedName in (N'', N'.', N'..') or @FormattedName <> z.fn_StandardizeFileName(@FormattedName)
+					throw 50000, 'BackupFileNameFormat must render a nonempty filename without invalid characters or trailing periods.', 1;
+				select @FormattedName += case @EffectiveBackupType when 'FULL' then N'.bak' when 'DIFF' then N'.diff' else N'.trn' end;
+				if len(@FormattedName) > 255 or len(@RawPath + @FormattedName) > iif(@IsUrl = 1, 4000, 260)
+					throw 50000, 'The backup filename or destination path is too long; use a shorter filename format or backup folder.', 1;
+				select @BackupPath = @RawPath, @BackupFileName = @RawPath + @FormattedName;
+				if @IsUrl = 0
+				begin
+					select @DirectoryAttempt = 0;
+					while not exists(select * from sys.dm_os_file_exists(@BackupPath) where file_is_a_directory = 1)
+					begin
+						select @DirectoryAttempt += 1;
+						begin try
+							exec @DirectoryResult = master.sys.xp_create_subdir @BackupPath;
+						end try
+						begin catch
+							if @DirectoryAttempt >= 3 and not exists(select * from sys.dm_os_file_exists(@BackupPath) where file_is_a_directory = 1) throw;
+						end catch;
+						if exists(select * from sys.dm_os_file_exists(@BackupPath) where file_is_a_directory = 1) break;
+						if @DirectoryAttempt >= 3 throw 50000, 'Backup directory creation failed.', 1;
+						-- Concurrent creators may race on shared ancestors; retry the remaining path.
+						waitfor delay '00:00:00.100';
+					end
+				end
+				if @EffectiveBackupType in ('FULL', 'DIFF')
+					select @SQL = 'backup database ' + quotename(@DatabaseName) + ' to ' + @BackupDevice + ' = N''' + replace(@BackupFileName, N'''', N'''''') + ''' with ';
+				else
+					select @SQL = 'backup log ' + quotename(@DatabaseName) + ' to ' + @BackupDevice + ' = N''' + replace(@BackupFileName, N'''', N'''''') + ''' with ';
+				select @EffectiveOptions = iif(@BackupCompression = 1, N'compression', N'no_compression');
+				if @EffectiveBackupType = 'DIFF'
+					select @EffectiveOptions += @OptionSeparator + N'differential';
+				if @IsReadOnly = 1
+					select @EffectiveOptions += @OptionSeparator + N'copy_only';
+				select @EffectiveOptions += coalesce(@OptionSeparator + @OtherBackupOptions, N'');
+				select @SQL += @EffectiveOptions;
+				print @SQL;
+				exec(@SQL);
+				if @NeedsFull = 1 and @EffectiveBackupType = 'FULL'
+				begin
+					select @DifferentialBaseLSN = null, @DifferentialBaseGUID = null;
+					select @SQL = N'use ' + quotename(@DatabaseName) + N';
+select @BaseLSN = differential_base_lsn, @BaseGUID = differential_base_guid
+from sys.database_files where file_id = 1 and type = 0;';
+					exec sys.sp_executesql @SQL, N'@BaseLSN numeric(25,0) output, @BaseGUID uniqueidentifier output',
+						@BaseLSN = @DifferentialBaseLSN output, @BaseGUID = @DifferentialBaseGUID output;
+					if @DifferentialBaseLSN is null or @DifferentialBaseGUID is null or @DifferentialBaseGUID = @PreviousBaseGUID
+						throw 50000, 'The fallback full backup did not establish a new differential base. Do not use COPY_ONLY for FullBackupIfNeeded.', 1;
+					if @BackupType = 'LOG'
+					begin
+						select @LastLogBackupLSN = null;
+						select @LastLogBackupLSN = last_log_backup_lsn from sys.database_recovery_status where database_id = db_id(@DatabaseName);
+						if @LastLogBackupLSN is null
+							throw 50000, 'The fallback full backup did not initialize log backups.', 1;
+					end
+					select @EffectiveBackupType = iif(@BackupType = 'LOG', 'LOG', null), @NeedsFull = 0;
+				end
+				else
+					select @EffectiveBackupType = null;
 			end
-			if @BackupType in ('FULL', 'DIFF')
-				select @SQL = 'backup database ' + quotename(@DatabaseName) + ' to ' + @BackupDevice + ' = N''' + replace(@BackupFileName, N'''', N'''''') + ''' with ';
-			else
-				select @SQL = 'backup log ' + quotename(@DatabaseName) + ' to ' + @BackupDevice + ' = N''' + replace(@BackupFileName, N'''', N'''''') + ''' with ';
-			select @EffectiveOptions = iif(@BackupCompression = 1, N'compression', N'no_compression');
-			if @BackupType = 'DIFF'
-				select @EffectiveOptions += @OptionSeparator + N'differential';
-			if @IsReadOnly = 1
-				select @EffectiveOptions += @OptionSeparator + N'copy_only';
-			select @EffectiveOptions += coalesce(@OptionSeparator + @OtherBackupOptions, N'');
-			select @SQL += @EffectiveOptions;
-			print @SQL;
-			exec(@SQL);
 			fetch next from c into @DatabaseName, @StandardizedDatabaseName, @IsReadOnly;
 		end
 		close c;

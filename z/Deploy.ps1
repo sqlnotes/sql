@@ -79,6 +79,7 @@ try {
             'File' {
                 $currentContext=$contexts[$step.SystemName]
                 $content = [IO.File]::ReadAllText($step.Path)
+                $relativePath=[IO.Path]::GetRelativePath((Split-Path -Parent (Resolve-Path -LiteralPath $RootPath).Path), $step.Path).Replace('\','/')
                 $hash = $null
                 if (-not $RunTests) {
                     $sha256=[Security.Cryptography.SHA256]::Create()
@@ -87,11 +88,10 @@ try {
                     $hashKey=([BitConverter]::ToString($hash)).Replace('-','')
                     if ($step.HashAllowed -and -not $DisableHashChecking -and $currentContext.SuccessfulHashes.ContainsKey($hashKey)) {
                         $currentContext.Hashes[$hashKey]=$true
-                        Write-Host "Skipped unchanged: $($step.Path)"
+                        Write-Host "Skipped unchanged: $relativePath"
                         continue
                     }
                 }
-                $relativePath=[IO.Path]::GetRelativePath((Split-Path -Parent (Resolve-Path -LiteralPath $RootPath).Path), $step.Path).Replace('\','/')
                 $logContent = $null
                 $logFileName = $null
                 if (-not $RunTests) { $logContent = Get-DeployLogContent $content; $logFileName = $relativePath }
