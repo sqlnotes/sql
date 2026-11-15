@@ -362,8 +362,8 @@ begin
 		if @InitialTransactionCount = 0 commit;
 	end try
 	begin catch
-		if cursor_status('local', 'CopyParts') >= 0 close cCopyParts;
-		if cursor_status('local', 'CopyParts') >= -1 deallocate cCopyParts;
+		if cursor_status('local', 'cCopyParts') >= 0 close cCopyParts;
+		if cursor_status('local', 'cCopyParts') >= -1 deallocate cCopyParts;
 		if @InitialTransactionCount = 0 and @@trancount > 0 rollback;
 		else if @SavepointEstablished = 1 and xact_state() = 1 rollback tran @Savepoint;
 		throw;

@@ -132,8 +132,8 @@ begin
 			end
 		end try
 		begin catch
-			if cursor_status('local', 'v') >= 0 close cQueries;
-			if cursor_status('local', 'v') > -3 deallocate cQueries;
+			if cursor_status('local', 'cQueries') >= 0 close cQueries;
+			if cursor_status('local', 'cQueries') > -3 deallocate cQueries;
 			if @ShowPlan = 0 and @@trancount > 0 rollback;
 			select @Error = left(concat(N'Partition function ', quotename(@FunctionName), N', action ', @Action, N': ', error_message()), 2048);
 			select @Failures += @Error + nchar(13) + nchar(10);

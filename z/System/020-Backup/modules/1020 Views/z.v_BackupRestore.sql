@@ -20,9 +20,9 @@ select	bs.database_name DatabaseName,
 			when bs.type = 'P' then 'Partial'
 			when bs.type = 'Q' then 'Differential Partial'
 		end BackupType,
-	bs.Backup_Start_Date BackupStartDate,
-	bs.Backup_Finish_Date BackupFinishDate,
-	datediff(second, bs.Backup_Start_Date, bs.Backup_Finish_Date) DurationInSec,
+	bs.backup_start_date BackupStartDate,
+	bs.backup_finish_date BackupFinishDate,
+	datediff(second, bs.backup_start_date, bs.backup_finish_date) DurationInSec,
 	z.fn_FormatDurationMilliseconds(datediff_big(millisecond, bs.backup_start_date, bs.backup_finish_date)) Duration,
 	convert(decimal(10, 2), bs.backup_size/1024./1024.) BackupSizeMB,
 	convert(decimal(10, 2), bs.compressed_backup_size/1024./1024.) CompressedBackupSizeMB,
@@ -59,6 +59,6 @@ select	bs.database_name DatabaseName,
 	rh.user_name RestoreLoginName,
 	bs.backup_set_id BackupSetID
 from msdb.dbo.backupset bs
-	left outer join msdb.dbo.backupmediafamily bf ON bs.media_set_id = bf.media_set_id
-	inner join msdb.dbo.backupmediaset bms ON bs.media_set_id = bms.media_set_id
+	left outer join msdb.dbo.backupmediafamily bf on bs.media_set_id = bf.media_set_id
+	inner join msdb.dbo.backupmediaset bms on bs.media_set_id = bms.media_set_id
 	left outer join msdb.dbo.restorehistory rh on rh.backup_set_id = bs.backup_set_id

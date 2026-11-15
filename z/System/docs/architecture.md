@@ -62,4 +62,4 @@ The [0.0.1 marker](../versions/0.0.1/dummy.sql) contains no database-object defi
 
 ## Database settings
 
-System owns [z.Settings and its helpers](reference/settings.md). The guarded table is in baseline, and the getter and setter are in modules. The current System source has one version folder, so baseline remains eligible on existing installations and hash checking skips unchanged ordinary scripts. Existing subsystems with multiple version folders skip baseline; fresh installations always include it. No settings are seeded or consumed automatically.
+System owns [z.Settings and its helpers](reference/settings.md). The guarded table is in baseline, and the getter and setter are in modules. The installer includes baseline when a subsystem has no version folders or when its installed version is 0.0.0 or equals the first version in `versions/`, so System's baseline remains eligible on existing 0.0.1 installations and hash checking skips unchanged ordinary scripts. Installed versions above the first version folder skip baseline. No settings are seeded or consumed automatically.

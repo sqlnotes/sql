@@ -8,7 +8,7 @@ Each z.Trace registration identifies one native SQL Server rowset trace. TraceID
 
 Configuration, create, start, stop, close, collection and abandoned cleanup reject existing caller transactions. Native SQL Trace actions cannot be rolled back with metadata.
 
-Each trace has its own receiving table and callbacks. SQL Trace evaluates filters natively: predicates are applied in `FilterOrdinal` order using each row's configured logical operator (`and`/`or`). Native filtering semantics and collation apply.
+Each trace has its own receiving table and callbacks. SQL Trace evaluates filters natively: `z.usp_TraceStart` applies predicates ordered by `ColumnID, FilterOrdinal` using each row's configured logical operator (`and`/`or`). SQL Trace groups predicates per column and combines different columns with `AND`, rather than evaluating a global cross-column `FilterOrdinal` boolean chain. Native filtering semantics and collation apply.
 
 ## Collection and transactions
 
@@ -28,7 +28,7 @@ z.usp_TraceCreate calls cleanup automatically before allocating a trace; operato
 
 System supplies sequence, partition and semaphore foundations. Trace installs before Monitoring, which owns diagnostic presets, tables and snapshot callbacks. Installation does not start capture. Internal configuration tables have guarded baselines and no foreign keys.
 
-Transition from the former collector schema requires stopped collection and empty old configuration and collector mappings before eligible baseline replay. The baseline rejects populated old state instead of guessing which server traces to close. Old collector helpers are retired. No version increment or universal upgrade migration is supplied; installations that skip baselines require an explicitly planned schema transition. Preserve diagnostic receiving tables and data.
+During normal deployment with collector calls quiesced, `TracePreScript.sql` stops and closes matching registered legacy trace generations, deletes collector mappings and clears old configuration before the baseline runs. As a direct-script fallback when the pre-script has not cleared legacy state, the baseline guard rejects populated old configuration or collector mappings instead of guessing which server traces to close. Old collector helpers are retired; diagnostic receiving tables and data are preserved.
 
 ## Transport limits
 

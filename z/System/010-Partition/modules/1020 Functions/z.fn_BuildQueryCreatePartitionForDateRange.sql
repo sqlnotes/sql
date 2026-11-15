@@ -143,7 +143,7 @@ begin
 							and value = @ID
 					)
 		begin
-			fetch first from c into @PartitionSchemeName
+			fetch first from cBoundaries into @PartitionSchemeName
 			while @@fetch_status = 0
 			begin
 				select @SQL = 'alter partition scheme '  + quotename(@PartitionSchemeName)+ ' next used ' + quotename(@FileGroup) + ';'
@@ -160,7 +160,7 @@ begin
 						+ ';if not exists(select * from sys.partition_range_values r inner join sys.partition_functions f on f.function_id = r.function_id where f.name = N' + quotename(@PartitionFunctionName, '''') + ' and r.value = @ID) alter partition function ' + quotename(@PartitionFunctionName) + '() split range (@ID);'
 			insert into @ret(SQL, Date)
 					values(@SQL, @df)
-			fetch first from c into @PartitionSchemeName
+			fetch first from cBoundaries into @PartitionSchemeName
 			while @@fetch_status = 0
 			begin
 				select @SQL = 'alter partition scheme '  + quotename(@PartitionSchemeName)+ ' next used ' + quotename(@FileGroup) + ';'

@@ -2,7 +2,7 @@
 
 [Trace](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_TraceAddFilter.sql)
 
-Append a typed predicate with a `FilterOrdinal`. NULL `@Value` adds nothing. Validates catalog column, operator and typed value; rejects truncation. Accepts `and`/`or` and `=`, `!=`, `<>`, `>`, `<`, `>=`, `<=`, `like`, `not like`; normalizes `!=` to `<>`. `LIKE` requires character data. `z.usp_TraceStart` applies filters natively in `FilterOrdinal` order.
+Append a typed predicate with a `FilterOrdinal`. NULL `@Value` adds nothing. Validates catalog column, operator and typed value; rejects truncation. Accepts `and`/`or` and `=`, `!=`, `<>`, `>`, `<`, `>=`, `<=`, `like`, `not like`; normalizes `!=` to `<>`. `LIKE` requires character data. `z.usp_TraceStart` applies filters ordered by `ColumnID, FilterOrdinal`; SQL Trace groups predicates per column and combines different columns with `AND`, rather than evaluating a global cross-column `FilterOrdinal` boolean chain.
 
 ```text
 @TraceName nvarchar(128) = null,

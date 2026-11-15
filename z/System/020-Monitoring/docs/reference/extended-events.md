@@ -113,9 +113,10 @@ partition-key conventions. DurationInMS is duration converted from microseconds;
 CPU retains the source event's native units. Repeated events can describe a batch
 and its statements separately; the four completion classes are not unique queries.
 
-Both guarded baselines only create absent tables. Existing installations above
-Monitoring version 0.0.0 skip baselines; prepare missing tables explicitly before
-running collectors. No migration or subsystem version change is supplied.
+Both guarded baselines create absent tables while preserving existing tables.
+Standard deployment includes the Monitoring baseline automatically while
+Monitoring has no version folders or is at version 0.0.0 or its first version
+folder.
 
 ## Reception limits
 

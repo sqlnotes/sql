@@ -318,8 +318,8 @@ begin
 			begin catch
 				select @Failed = 1, @ErrorNumber = error_number(), @ErrorMessage = error_message();
 				if @@trancount > 0 rollback;
-				if cursor_status('local', 'Bindings') >= 0 close cBindings;
-				if cursor_status('local', 'Bindings') > -3 deallocate cBindings;
+				if cursor_status('local', 'cBindings') >= 0 close cBindings;
+				if cursor_status('local', 'cBindings') > -3 deallocate cBindings;
 			end catch;
 			set nocount, xact_abort on;
 
@@ -347,8 +347,8 @@ begin
 	begin catch
 		if @@trancount > 0 rollback;
 		exec z.usp_SetTaskQueueAction;
-		if cursor_status('local', 'Recovery') >= 0 close cRecovery;
-		if cursor_status('local', 'Recovery') > -3 deallocate cRecovery;
+		if cursor_status('local', 'cRecovery') >= 0 close cRecovery;
+		if cursor_status('local', 'cRecovery') > -3 deallocate cRecovery;
 		if @TaskLockHeld = 1
 		begin
 			exec @ReleaseResult = z.usp_ReleaseSemaphore @SemaphoreName = @TaskSemaphore, @LockOwner = 'Session';

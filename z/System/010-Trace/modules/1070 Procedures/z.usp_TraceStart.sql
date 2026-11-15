@@ -115,10 +115,10 @@ exec @ReturnCode = sys.sp_trace_setfilter @TraceID, @ColumnID, @LogicalOperator,
 		end try
 		begin catch
 			if @@trancount > 0 rollback;
-			if cursor_status('local', 'e') >= 0 close cEvents;
-			if cursor_status('local', 'e') >= -1 deallocate cEvents;
-			if cursor_status('local', 'f') >= 0 close cFilters;
-			if cursor_status('local', 'f') >= -1 deallocate cFilters;
+			if cursor_status('local', 'cEvents') >= 0 close cEvents;
+			if cursor_status('local', 'cEvents') >= -1 deallocate cEvents;
+			if cursor_status('local', 'cFilters') >= 0 close cFilters;
+			if cursor_status('local', 'cFilters') >= -1 deallocate cFilters;
 			select @Message = concat(N'Native trace ', @SelectedTraceID, N' failed during ', @Operation, N': ', error_message());
 			print @Message;
 			throw;

@@ -60,6 +60,7 @@ Requires destination write access and DMV access: VIEW SERVER STATE on SQL Serve
 2019, or VIEW SERVER PERFORMANCE STATE on SQL Server 2022 and later. The default
 view's literal object-name and instance filters determine which counters exist
 in each sample; it may return no rows on a server whose object names differ.
-The guarded baseline creates a missing table on fresh installation. An existing
-versioned installation that skips baselines requires separate execution of the
-table definition before using the procedure.
+The guarded baseline creates a missing table while preserving existing rows;
+standard deployment includes the Monitoring baseline automatically while
+Monitoring has no version folders or is at version 0.0.0 or its first version
+folder.

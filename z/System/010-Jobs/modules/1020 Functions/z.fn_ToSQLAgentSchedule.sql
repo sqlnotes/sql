@@ -99,8 +99,8 @@ return
 					0)freq_relative_interval,
 				isnull(case when x0.Frequency in ('Weekly', 'Monthly') then x0.Interval end, 0) freq_recurrence_factor,
 				
-				isnull(cast(format(iif(x0.Frequency = 'Specific', try_convert(date, x0.ByDay ,121), x0.StartDate), 'yyyyMMdd') as int), 19900101) active_start_date,
-				isnull(cast(format(x0.EndDate, 'yyyyMMdd') as int), 99991231) active_end_date,
+				isnull(cast(convert(char(8), iif(x0.Frequency = 'Specific', try_convert(date, x0.ByDay, 121), x0.StartDate), 112) as int), 19900101) active_start_date,
+				isnull(cast(convert(char(8), x0.EndDate, 112) as int), 99991231) active_end_date,
 
 				isnull(cast(format(iif(x0.Frequency = 'Specific', cast(try_convert(datetime, x0.ByDay ,121) as time(0)), t.StartTime), 'hhmmss') as int), 0) active_start_time,
 				isnull(cast(format(iif(x0.IntradayFrequency = 'Specific', null, t.EndTime), 'hhmmss') as int), 235959) active_end_time

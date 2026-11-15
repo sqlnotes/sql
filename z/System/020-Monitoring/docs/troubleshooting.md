@@ -8,9 +8,9 @@ Empty request snapshots can be normal: the collector excludes its own session. C
 
 ## Permission and partial-operation failures
 
-CPU WorkingSetDelta is bigint in both the ring-buffer view and history table.
-If an older table still has int, run the eligible Monitoring baseline to widen
-it before collection. A Monitoring version above 0.0.0 skips that baseline.
+CPU WorkingSetDelta is bigint in both the ring-buffer view and history table;
+standard deployment runs the eligible Monitoring baseline automatically and
+widens an older int column to bigint.
 System Health collection deduplicates identical keys within one ring-buffer
 snapshot; concurrent collectors still need caller coordination.
 

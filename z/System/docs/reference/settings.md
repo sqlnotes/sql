@@ -19,11 +19,13 @@ Values are text; consumers own type conversion and validation. No settings are
 seeded and no existing routine automatically reads this table. Missing settings
 and empty values are distinct. The table does not provide encrypted secret storage.
 
-The guarded table script belongs to System's baseline. The current System source
-has one version folder, so baseline remains eligible on existing installations.
-Hash checking skips unchanged ordinary scripts; a new table script executes before
-the helpers. Fresh installations always include baseline. Existing subsystems with
-multiple version folders skip baseline. Re-running the table script preserves
+The guarded table script belongs to System's baseline. The installer includes
+baseline when a subsystem has no version folders or when its installed version
+is `0.0.0` or equals the first version in `versions/`; installed versions above
+the first version skip baseline. Because System's installed version (`0.0.1`)
+equals its first version folder, baseline remains eligible on existing
+installations. Hash checking skips unchanged ordinary scripts, while a new
+table script executes before the helpers. Re-running the table script preserves
 existing rows; it does not reconcile an existing table's schema. See the
 [deployment rules](../../../docs/deployment-process.md#source-and-plan).
 

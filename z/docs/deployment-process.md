@@ -16,9 +16,9 @@ The existing `890-SystemBeforePost/1010 Procedures` helpers are installed after 
 
 ## Baselines and identities
 
-Baseline eligibility is decided independently for each owning subsystem. Fresh/unversioned systems at 0.0.0 include baseline followed by all available versions. Existing systems with zero or one version folder also include baseline, followed by the installed version folder and higher versions when present. Existing systems with more than one version folder skip the entire baseline subtree, including its pre/post stages. Only direct numeric version folders count; reserved stage folders and .vs do not. Eligible ordinary files still use hash checking; eligible pre/post scripts always run. Children without migrations can remain 0.0.0.
+Baseline and version eligibility is decided independently for each owning subsystem after reading its database version (`0.0.0` when fresh or unversioned). When `versions` is absent or has no version subfolders, the installer deploys `baseline` and any non-version scripts in `versions/`, followed by `modules` and remaining stages. When the database version is `0.0.0` or equals the first version in `versions/`, the installer deploys `baseline` followed by all version folders from the first version through the latest version. When the database version is greater than the first version in `versions/` (up to the latest version), the installer skips the entire `baseline` subtree, including its `pre`/`post` stages, and deploys version folders starting from the installed database version onward. Only direct numeric version folders count; reserved stage folders and `.vs` do not. Eligible ordinary files still use hash checking; eligible `pre`/`post` scripts always run. Children without migrations can remain `0.0.0`.
 
-When version folders exist, a nonzero installed version older than the earliest retained version is rejected with an upgrade-path error. Upgrade using an intermediate release before using a source tree whose older migrations have been consolidated into baseline. Fresh installations can use the consolidated baseline. Versions above the latest available version remain rejected as downgrades.
+When version folders exist, a nonzero installed version older than the first version in `versions/` is rejected with an upgrade-path error and requires reinstallation. Fresh installations can use a consolidated baseline directly. Versions above the latest available version in `versions/` remain rejected as downgrades.
 
 ### Baseline, migrations and rebasing
 
@@ -38,14 +38,13 @@ reach that version by applying the later migrations after baseline creation.
 
 A deliberate rebase replaces baseline definitions with the complete schema at
 a chosen supported floor and consolidates the older migration history. For
-example, a project at 10.10.10 could rebase to 8.0.0: fresh installations start
-with the 8.0.0 baseline and apply later migrations; existing installations below
-8.0.0 no longer have a supported rolling upgrade through that source tree.
-Such installations need an intermediate release or a separately planned upgrade.
-A rebase must retain an explicit floor/version boundary and reject older existing
-installations, including existing unversioned 0.0.0 systems; baseline eligibility
-alone does not enforce that distinction. This is a policy for a future deliberate
-rebase, not a rebase of the current source tree.
+example, a project at 10.10.10 could rebase to 8.0.0: fresh installations or
+installations already at 8.0.0 deploy the 8.0.0 baseline and apply versions
+8.0.0 through 10.10.10; installations above 8.0.0 skip baseline and apply
+versions starting from their installed version; nonzero installations below
+8.0.0 are rejected and require reinstallation. An existing unversioned 0.0.0
+database must also be distinguished when a rebase raises the floor. This is a
+policy for a future deliberate rebase, not a rebase of the current source tree.
 
 CodeBase uses paths such as `/System/010-Partition`. SQL derives SystemID as GUID from MD5 of `trim(lower(CodeBase))`. Case/outer-space aliases share identity according to SQL normalization/collation; paths are not normalized independently by PowerShell. Renaming a folder, including its prefix, changes identity. The renamed Trace, Jobs, Backup and Security paths therefore initialize new subsystem owners and hashes; guarded baselines become eligible under those owners. Existing metadata history remains under the former paths; the installer does not remap it or carry its version forward. Review baseline replay before updating an existing installation.
 

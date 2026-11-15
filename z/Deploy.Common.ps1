@@ -36,6 +36,7 @@ function Get-DeployPlan {
             $target = $current
             if ($IsSystem) {
                 if ($SystemName.Length -gt 4000) { throw "Subsystem path exceeds 4000 characters: $SystemName" }
+                $IncludeBaseline = $true
                 $versionDirs = @()
                 $versionPath = Join-Path $Folder.FullName 'versions'
                 if (Test-Path -LiteralPath $versionPath -PathType Container) {
@@ -47,13 +48,13 @@ function Get-DeployPlan {
                     if ($versionDirs.Count -gt 0) {
                         $availableVersions = @($versionDirs | ForEach-Object { [version]$_.Name } | Sort-Object)
                         $target = $availableVersions[-1]
-                        if (-not $TestMode -and $target -lt $current) { throw "Downgrade rejected for ${SystemName}: installed $current, available $target." }
-                        if (-not $TestMode -and $current -gt [version]'0.0.0' -and $current -lt $availableVersions[0]) {
-                            throw "Upgrade path unavailable for ${SystemName}: installed $current is older than earliest retained version $($availableVersions[0]). Deploy an intermediate release first."
+                        if (-not $TestMode -and $current -gt $availableVersions[-1]) { throw "Downgrade rejected for ${SystemName}: installed $current, available $target." }
+                        if (-not $TestMode -and $current -gt [version]'0.0.0' -and $availableVersions[0] -gt $current) {
+                            throw "Upgrade path unavailable for ${SystemName}: installed $current is older than earliest retained version $($availableVersions[0]). Please reinstall."
                         }
+                        $IncludeBaseline = $current -eq [version]'0.0.0' -or $current -eq $availableVersions[0]
                     }
                 }
-                $IncludeBaseline = $current -eq [version]'0.0.0' -or $versionDirs.Count -le 1
                 $Version = $target.ToString()
                 if (-not $TestMode) { $steps.Add([pscustomobject]@{ Kind='Begin'; SystemName=$SystemName; Version=$Version; Path=$Folder.FullName; Phase='system'; HashAllowed=$false }) }
                 else {
@@ -69,8 +70,8 @@ function Get-DeployPlan {
             foreach ($stage in @('pre', 'baseline', 'versions', 'modules')) {
                 $stagePath = Join-Path $Folder.FullName $stage
                 if (-not (Test-Path -LiteralPath $stagePath -PathType Container)) { continue }
-                # Fresh installs and zero/one-version sources include baseline.
-                # Installed multi-version sources skip its entire subtree.
+                # Include baseline when versions has no version folders, or when the database
+                # is at 0.0.0 or the first available version; skip its subtree for later versions.
                 if (-not $TestMode -and $stage -eq 'baseline' -and -not $IncludeBaseline) { continue }
                 $stageHash = $HashAllowed -and $stage -ne 'pre'
                 if ($stage -eq 'versions') {

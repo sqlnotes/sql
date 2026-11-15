@@ -65,15 +65,16 @@ as return
 			) tn
 		outer apply (
 			select Sql = replace((
-				select string_agg(cast(N'when ''' + bt + N''' then cast(cast(o.[~_v] as ' + ct + N') as sql_variant)' as nvarchar(max)), N' ')
+				select string_agg(cast(N'when ''' + bt + N''' then cast(' + expr + N' as sql_variant)' as nvarchar(max)), N' ')
 				from (values
-						('bit','bit'),('tinyint','tinyint'),('smallint','smallint'),('int','int'),('bigint','bigint'),
-						('decimal','decimal(38,10)'),('numeric','decimal(38,10)'),('money','money'),('smallmoney','smallmoney'),
-						('float','float'),('real','real'),
-						('date','date'),('time','time'),('datetime','datetime'),('datetime2','datetime2'),('smalldatetime','smalldatetime'),('datetimeoffset','datetimeoffset'),
-						('uniqueidentifier','uniqueidentifier'),
-						('char','varchar(8000)'),('varchar','varchar(8000)'),('nchar','nvarchar(4000)'),('nvarchar','nvarchar(4000)')
-					) v(bt, ct)
+						('bit',N'cast(o.[~_v] as bit)'),('tinyint',N'cast(o.[~_v] as tinyint)'),('smallint',N'cast(o.[~_v] as smallint)'),('int',N'cast(o.[~_v] as int)'),('bigint',N'cast(o.[~_v] as bigint)'),
+						('decimal',N'cast(o.[~_v] as decimal(38,10))'),('numeric',N'cast(o.[~_v] as decimal(38,10))'),('money',N'cast(o.[~_v] as money)'),('smallmoney',N'cast(o.[~_v] as smallmoney)'),
+						('float',N'cast(o.[~_v] as float)'),('real',N'cast(o.[~_v] as real)'),
+						('date',N'cast(o.[~_v] as date)'),('time',N'cast(o.[~_v] as time)'),('datetime',N'cast(o.[~_v] as datetime)'),('datetime2',N'cast(o.[~_v] as datetime2)'),('smalldatetime',N'cast(o.[~_v] as smalldatetime)'),('datetimeoffset',N'cast(o.[~_v] as datetimeoffset)'),
+						('uniqueidentifier',N'cast(o.[~_v] as uniqueidentifier)'),
+						('binary',N'(select v from openjson(N''["'' + o.[~_v] + N''"]'') with (v varbinary(8000) ''$''))'),('varbinary',N'(select v from openjson(N''["'' + o.[~_v] + N''"]'') with (v varbinary(8000) ''$''))'),
+						('char',N'cast(o.[~_v] as varchar(8000))'),('varchar',N'cast(o.[~_v] as varchar(8000))'),('nchar',N'cast(o.[~_v] as nvarchar(4000))'),('nvarchar',N'cast(o.[~_v] as nvarchar(4000))')
+					) v(bt, expr)
 				), N'~', c.name)
 			) vcase
 	where c.object_id = @ObjectID

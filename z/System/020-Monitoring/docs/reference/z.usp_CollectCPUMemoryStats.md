@@ -47,7 +47,6 @@ VIEW SERVER PERFORMANCE STATE for these diagnostic DMVs. Destination
 insert/update/select access is required; the procedure grants no privileges.
 
 The guarded baseline creates a missing table and widens an existing int
-WorkingSetDelta column to nullable bigint without replacing rows. The installer
-runs this baseline while Monitoring is at version 0.0.0; installed versions above
-0.0.0 skip baselines and require a separate upgrade path. No version increase is
-supplied.
+WorkingSetDelta column to nullable bigint without replacing rows. Standard
+deployment includes the Monitoring baseline automatically while Monitoring has
+no version folders or is at version 0.0.0 or its first version folder.

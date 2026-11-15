@@ -112,8 +112,8 @@ begin
 		deallocate cDefinitions;
 	end try
 	begin catch
-		if cursor_status('local', 'Definitions') >= 0 close cDefinitions;
-		if cursor_status('local', 'Definitions') > -3 deallocate cDefinitions;
+		if cursor_status('local', 'cDefinitions') >= 0 close cDefinitions;
+		if cursor_status('local', 'cDefinitions') > -3 deallocate cDefinitions;
 		throw;
 	end catch;
 end;
