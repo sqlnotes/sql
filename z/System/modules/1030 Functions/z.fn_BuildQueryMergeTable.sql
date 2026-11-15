@@ -51,19 +51,19 @@ return
 	x2 as
 	(
 		select	max(TargetTableName) TargetTableName, max(x1.IsIdentity) HasIdentity, 
-				case when min(x1.PrimaryKeyOrder) = 0 then 1 else 0 end ContainNoneKeyColumn,
+				case when count(case when x1.PrimaryKeyOrder = 0 then x1.ColumnNameExcludeIdentity end) > 0 then 1 else 0 end ContainNoneKeyColumn,
 				string_agg(case when x1.PrimaryKeyOrder > 0 then 's.' + quotename(x1.ColumnName) + ' = t.' + quotename(x1.ColumnName)  end, ' and ') within group (order by x1.ColumnID) MergeKey,
-				string_agg(case when x1.IsIdentity = 0 and @ForceIdentityColumnInsert = 0 or @ForceIdentityColumnInsert = 1 then quotename(x1.ColumnName) else '' end, ', ')  within group (order by x1.ColumnID) InsertColumnList,
-				string_agg(case when x1.IsIdentity = 0 and @ForceIdentityColumnInsert = 0 or @ForceIdentityColumnInsert = 1 then 's.' + quotename(x1.ColumnName) else '' end, ', ')  within group (order by x1.ColumnID) InsertValueList,
+				string_agg(case when x1.IsIdentity = 0 and @ForceIdentityColumnInsert = 0 or @ForceIdentityColumnInsert = 1 then quotename(x1.ColumnName) end, ', ')  within group (order by x1.ColumnID) InsertColumnList,
+				string_agg(case when x1.IsIdentity = 0 and @ForceIdentityColumnInsert = 0 or @ForceIdentityColumnInsert = 1 then 's.' + quotename(x1.ColumnName) end, ', ')  within group (order by x1.ColumnID) InsertValueList,
 				string_agg(
 							case 
 								when x1.PrimaryKeyOrder = 0 then 
 											's.' + quotename(x1.ColumnNameExcludeIdentity) + ' is null and t.'+ quotename(x1.ColumnNameExcludeIdentity) + ' is not null'
 										+	' or s.' + quotename(x1.ColumnNameExcludeIdentity) + ' is not null and t.' + quotename(x1.ColumnNameExcludeIdentity) + ' is null'
 										+	' or '	+	case 
-							when SystemType = 'image' then 'cast(s.' + quotename(x1.ColumnNameExcludeIdentity) + ' as varbinary(max)) <> t.cast(' + quotename(x1.ColumnNameExcludeIdentity) + ' as varbinary(max))'
-							when SystemType = 'text' then 'cast(s.' + quotename(x1.ColumnNameExcludeIdentity) + ' as varchar(max)) <> t.cast(' + quotename(x1.ColumnNameExcludeIdentity) + ' as varchar(max))'
-							when SystemType = 'ntext' then 'cast(s.' + quotename(x1.ColumnNameExcludeIdentity) + ' as nvarchar(max)) <> t.cast(' + quotename(x1.ColumnNameExcludeIdentity) + ' as nvarchar(max))'
+							when SystemType = 'image' then 'cast(s.' + quotename(x1.ColumnNameExcludeIdentity) + ' as varbinary(max)) <> cast(t.' + quotename(x1.ColumnNameExcludeIdentity) + ' as varbinary(max))'
+							when SystemType = 'text' then 'cast(s.' + quotename(x1.ColumnNameExcludeIdentity) + ' as varchar(max)) <> cast(t.' + quotename(x1.ColumnNameExcludeIdentity) + ' as varchar(max))'
+							when SystemType = 'ntext' then 'cast(s.' + quotename(x1.ColumnNameExcludeIdentity) + ' as nvarchar(max)) <> cast(t.' + quotename(x1.ColumnNameExcludeIdentity) + ' as nvarchar(max))'
 							else 's.' + quotename(x1.ColumnNameExcludeIdentity) + ' <> t.' + quotename(x1.ColumnNameExcludeIdentity) 
 						end
 			end, ' or ')  within group (order by x1.ColumnID) UpdateWhereClause,

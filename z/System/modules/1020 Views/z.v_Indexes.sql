@@ -95,12 +95,13 @@ as
 											where ic.object_id = i.object_id
 												and ic.index_id = i.index_id
 												and ic.is_included_column = 1
-											order by ic.key_ordinal
+											order by ic.index_column_id
 											for xml path(''), type
 										).value('.', 'nvarchar(max)'),
 									1, 1, '')
 								IncludedColumns
 					) iic
-    where i.type_desc not in ('HEAP')
-        and object_schema_name(i.object_id) <> 'sys'
-        and exists(select * from sys.objects o where o.object_id = i.object_id and o.type_desc in ('USER_TABLE', 'VIEW'))
+	where i.type_desc not in ('HEAP')
+		and object_schema_name(i.object_id) <> 'sys'
+		and exists(select * from sys.objects o where o.object_id = i.object_id and o.type_desc in ('USER_TABLE', 'VIEW'))
+

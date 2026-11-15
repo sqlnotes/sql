@@ -78,9 +78,9 @@ begin
 		exec z.usp_CreateTaskQueueBatch @BatchID = @BatchID output, @BatchName = @BatchName,
 			@MaxConcurrentWorkers = @MaxConcurrentWorkers, @BatchType = N'Backup';
 
-		declare Targets cursor local fast_forward for select TaskID, DatabaseID, DatabaseName, CreateDate from @Targets order by TaskID;
-		open Targets;
-		fetch next from Targets into @TaskID, @DatabaseID, @DatabaseName, @CreateDate;
+		declare cTargets cursor local fast_forward for select TaskID, DatabaseID, DatabaseName, CreateDate from @Targets order by TaskID;
+		open cTargets;
+		fetch next from cTargets into @TaskID, @DatabaseID, @DatabaseName, @CreateDate;
 		while @@fetch_status = 0
 		begin
 			select @Wrapper = N'##backup_' + convert(nvarchar(86), @DatabaseName) + N'_' + replace(convert(nvarchar(36), newid()), N'-', N'');
@@ -104,10 +104,10 @@ end;';
 			select @Body = (select quotename(@Wrapper) command, json_query(N'[]') parameters for json path, without_array_wrapper);
 			exec z.usp_AddTaskQueueTask @BatchID = @BatchID, @TaskID = @TaskID, @TaskName = @DatabaseName,
 				@TaskBody = @Body, @SortOrder = 1, @CompletionCondition = 'Finished', @MaxRetries = 0;
-			fetch next from Targets into @TaskID, @DatabaseID, @DatabaseName, @CreateDate;
+			fetch next from cTargets into @TaskID, @DatabaseID, @DatabaseName, @CreateDate;
 		end;
-		close Targets;
-		deallocate Targets;
+		close cTargets;
+		deallocate cTargets;
 		commit;
 
 		exec z.usp_ExecuteTaskQueueBatch @BatchID = @BatchID;

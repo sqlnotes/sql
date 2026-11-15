@@ -124,10 +124,10 @@ begin
 		select @BackupFolder = @BackupFolder + @FolderSeparator
 
 	begin try
-		declare c cursor local fast_forward for
+		declare cCommands cursor local fast_forward for
 			select DatabaseName, StandardizedDatabaseName, IsReadOnly from @DatabaseList order by DataSizeMB asc;
-		open c;
-		fetch next from c into @DatabaseName, @StandardizedDatabaseName, @IsReadOnly;
+		open cCommands;
+		fetch next from cCommands into @DatabaseName, @StandardizedDatabaseName, @IsReadOnly;
 		while @@fetch_status = 0
 		begin
 			select @EffectiveBackupType = @BackupType, @NeedsFull = 0;
@@ -233,10 +233,10 @@ from sys.database_files where file_id = 1 and type = 0;';
 				else
 					select @EffectiveBackupType = null;
 			end
-			fetch next from c into @DatabaseName, @StandardizedDatabaseName, @IsReadOnly;
+			fetch next from cCommands into @DatabaseName, @StandardizedDatabaseName, @IsReadOnly;
 		end
-		close c;
-		deallocate c;
+		close cCommands;
+		deallocate cCommands;
 	end try
 	begin catch
 		throw;

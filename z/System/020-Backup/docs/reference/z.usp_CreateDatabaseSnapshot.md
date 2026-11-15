@@ -9,10 +9,9 @@ Resolve null source to the current database; default snapshot name is <source>_S
 ## Parameters and defaults
 
 ```text
-@SourceDatabaseName nvarchar(128) = null,@DatabaseSnapshotName nvarchar(128) = null
+@SourceDatabaseName nvarchar(128) = null,
+@DatabaseSnapshotName nvarchar(128) = null
 ```
-
-These are the source-declared types and defaults.
 
 ## Results, permissions, and limits
 

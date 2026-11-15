@@ -6,7 +6,7 @@
 
 System supplies z.fn_SplitString. SQL Server Agent, msdb job/schedule procedures and z.usp_AcquireSemaphore are required. The helpers do not start the Agent service.
 
-The numbered folder installs in System's alphabetical child order. Shared System modules run before feature children; System post scripts run after all children. See [System documentation](../../docs/readme.md) for deployment and orchestration. Baseline tables use existence guards; they do not reconcile an existing table schema. Module definitions use create or alter.
+See [System documentation](../../docs/readme.md) for deployment order.
 
 ## Data and control flow
 
@@ -18,11 +18,9 @@ These three functions share explicit Latin1_General_100_CI_AS comparisons for sc
 
 Schedule creation, job reconciliation, job removal and orphan cleanup acquire the same exclusive, transaction-owned application lock in the current database. Acquisition waits at most 15 seconds and fails with error 51001 on failure. Nested creation retains protection until the actual outer transaction commits or rolls back; helpers do not explicitly release it. Different databases have independent names and locks. Category creation remains outside the job transaction. Direct native/administrative operations and Agent automatic deletion do not participate in this cooperative lock.
 
-Reconciliation attaches replacement schedules before detaching old schedules by ID. Detachment and job removal preserve unused schedules. Orphan cleanup removes only unattached schedules matching the current database's literal prefix; legacy global names and other databases' schedules remain. Global cleanup via AllOrphanedSchedules=1 is rejected. Reverse conversion and name parsing support both legacy and new names, with known conversion limits listed below.
+Reconciliation attaches replacement schedules before detaching old schedules by ID. Detachment and job removal preserve unused schedules. Orphan cleanup removes only unattached schedules matching the current database's literal prefix; legacy global names and other databases' schedules remain. Global cleanup via AllOrphanedSchedules=1 is rejected. Reverse conversion and name parsing support both legacy and new names.
 
-Schedules reside in msdb but are logically owned by the database named in their prefix; jobs in the same database can reuse them. Creating/removing jobs and schedules changes msdb. Returned normalization rows describe the translation, not proof that SQL Agent accepted or executed it.
-
-Each callable reference describes writes, generated SQL, transaction boundaries, results and inputs. Supporting references describe keys, payloads and units. Procedures do not supply a blanket permission grant or one transaction around an entire administrative workflow.
+Schedules reside in msdb but are logically owned by the database named in their prefix; jobs in the same database can reuse them.
 
 An omitted StartDate uses the SQL Server local date; EndDate remains unlimited (9999-12-31). Creation captures one operation date and passes it through validation, conversion and nested schedule creation. Explicit dates and recurring ByTime defaults are unchanged. Specific derives execution dates from ByDay, ignores StartDate/EndDate, and retains date-only values as midnight.
 

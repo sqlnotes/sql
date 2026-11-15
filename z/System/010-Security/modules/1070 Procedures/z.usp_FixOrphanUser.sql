@@ -13,21 +13,24 @@ create or alter procedure z.usp_FixOrphanUser
 )
 as
 begin
-    set nocount on
-    declare @SQL nvarchar(max)
-    declare c cursor for
-        select 'alter user ' + quotename(p.name)+ ' with login = ' + quotename(s.name collate database_default)+ ';'
-        from sys.database_principals p
-			inner join sys.server_principals s on s.name collate database_default = p.name  and s.sid <> p.sid
-        where p.type_desc in ('SQL_USER')
-			and (@UserName is null or p.name = @UserName)
-    open c
-    fetch next from c into @SQL
-    while @@fetch_status = 0
-    begin
-        exec(@SQL)
-        fetch next from c into @SQL
-    end
-    close c
-    deallocate c
+	set nocount, xact_abort on;
+	declare @SQL nvarchar(max);
+	declare cUsers cursor local static for
+		select 'alter user ' + quotename(p.name) + ' with login = ' + quotename(s.name collate database_default) + ';'
+		from sys.database_principals p
+			inner join sys.server_principals s on s.name collate database_default = p.name and s.sid <> p.sid
+		where p.type_desc in ('SQL_USER')
+			and p.authentication_type_desc = 'INSTANCE'
+			and s.type_desc = 'SQL_LOGIN'
+			and (@UserName is null or p.name = @UserName);
+	open cUsers;
+	fetch next from cUsers into @SQL;
+	while @@fetch_status = 0
+	begin
+		exec(@SQL);
+		fetch next from cUsers into @SQL;
+	end
+	close cUsers;
+	deallocate cUsers;
 end
+

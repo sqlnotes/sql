@@ -7,19 +7,19 @@ Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/010-Security/d
 
 Generates SQL to recreate supported logins and non-fixed server roles.
 */
-create or alter  function z.fn_BuildQueryCopyLogin
+create or alter function z.fn_BuildQueryCopyLogin
 (
-    @SourceLogin nvarchar(128) = null, 
-    @TargetLogin nvarchar(128) = null
+	@SourceLogin nvarchar(128) = null,
+	@TargetLogin nvarchar(128) = null
 )
 returns table
 as
 return(
 		select	s.principal_id as ServerPrincipalID, s.name LoginName, s.type_desc LoginType,
-		case  
+		case
 			when s.type_desc in ('SQL_LOGIN') then
-				'create login ' + quotename(isnull(@TargetLogin, s.name)) + ' with password = ' + convert(nvarchar(max), sl.password_hash, 1) + ' Hashed' 
-				+ ', sid = ' + convert(nvarchar(max), s.sid, 1) +  isnull(', default_language = '+quotename(s.default_language_name), '')
+				'create login ' + quotename(isnull(@TargetLogin, s.name)) + ' with password = ' + convert(nvarchar(max), sl.password_hash, 1) + ' Hashed'
+				+ ', sid = ' + convert(nvarchar(max), s.sid, 1) + isnull(', default_language = '+quotename(s.default_language_name), '')
 				+ iif(sl.is_policy_checked = 1, ', check_policy = on', ', check_policy = off')
 				+ iif(is_expiration_checked = 1, ', check_expiration = on', ', check_expiration = off') + ';'
 			when s.type_desc in ('WINDOWS_LOGIN', 'WINDOWS_GROUP') then

@@ -14,8 +14,6 @@ Append z.v_ActiveSessions rows into z.TraceBlockedProcessReportActiveSessions co
 @EventName nvarchar(128) = null
 ```
 
-These are the source-declared types and defaults.
-
 ## Results, permissions, and limits
 
 No defined result set. Requires snapshot insert and sufficient DMV visibility. Snapshot reflects collection-time requests, not necessarily event-time requests.

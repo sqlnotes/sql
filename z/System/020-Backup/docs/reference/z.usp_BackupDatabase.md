@@ -108,7 +108,6 @@ Components are transformed by [z.fn_StandardizeFileName](../../../docs/reference
 Custom layouts outside [recognized filename shapes](z.fn_DecodeBackupFileName.md)
 use broader restore header discovery and require header-based cleanup.
 
-
 ## Azure and S3 destinations
 
 Supply a container/bucket URL with an optional object prefix as BackupFolder, not a complete backup filename. `https://` selects Azure Blob URL handling; `s3://` selects S3-compatible storage. The procedure appends the same server/instance/database/type/file naming layout using `/`, preserving the URL and object-prefix case. These prefixes do not require directory creation. URL destinations never call filesystem enumeration, directory creation or cleanup.

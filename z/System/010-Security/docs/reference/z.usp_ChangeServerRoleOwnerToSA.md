@@ -12,8 +12,6 @@ Change ownership of visible SERVER_ROLE principals whose owning_principal_id dif
 @CurrentOwnerName nvarchar(128) = null
 ```
 
-These are the source-declared types and defaults.
-
 ## Results, permissions, and limits
 
 No defined result set. Requires native authority to alter selected server-role ownership; literal sa must exist.

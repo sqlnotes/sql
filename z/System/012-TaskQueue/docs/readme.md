@@ -29,11 +29,7 @@ accepted failure or either-outcome condition do not by themselves stop the batch
 Stopping replaces cancellation. The worker applies these execution semantics; the table
 alone does not implement them.
 
-Create requires the BatchID argument. A supplied value is used unchanged; NULL
-generates a System datetime-encoded ID using z.SeqGeneralID and
-z.fn_GenerateZSequenceID. Use OUTPUT to receive the generated ID. Direct table
-inserts must supply their own ID; there is no table ID default. CreatedAtUTC
-records creation time independently of the chosen ID.
+`z.usp_CreateTaskQueueBatch` accepts an optional `@BatchID = null output` argument. A supplied value is used unchanged; `NULL` generates a System datetime-encoded ID using `z.SeqGeneralID` and `z.fn_GenerateZSequenceID`. Pass `OUTPUT` to receive the generated ID. Direct table inserts must supply their own ID; there is no table ID default. `CreatedAtUTC` records creation time independently of the chosen ID.
 
 Storage is nonpartitioned on the database default filegroup with row compression.
 The nonclustered index IX_z_TaskQueueBatch_Status supports status-based batch
@@ -231,7 +227,7 @@ Stopped batch state on its next dispatch pass; an empty ready batch is Completed
 
 | Procedure | Parameters | Behavior |
 | --- | --- | --- |
-| z.usp_CreateTaskQueueBatch | BatchID OUTPUT (required; NULL generates), BatchName, Description = NULL, MaxConcurrentWorkers = 0, BatchType = Unclassified | Insert Draft with supplied/generated BatchID and a new ExecutionID |
+| z.usp_CreateTaskQueueBatch | BatchID = NULL OUTPUT (NULL generates), BatchName, Description = NULL, MaxConcurrentWorkers = 0, BatchType = Unclassified | Insert Draft with supplied/generated BatchID and a new ExecutionID |
 | z.usp_AddTaskQueueTask | TaskBody, batch selector and optional task parameters | Add one task to a Draft batch |
 | z.usp_StartTaskQueueBatch | BatchID = NULL, BatchName = NULL | Set a Draft batch Ready without scanning tasks |
 | z.usp_StopTaskQueueBatch | BatchID = NULL, BatchName = NULL | Set Stopped to prevent new claims; do not kill active tasks |
@@ -246,7 +242,7 @@ eligible for workers, and unique constraints handle duplicate IDs and names.
 The other lifecycle procedures use simple begin/commit transactions and the
 batch gate for atomic allocation and state changes. Successful nested calls
 leave the outer transaction open; their error handler rolls back the active
-transaction. The gate remains held until the outer transaction ends. Audit
+transaction. The gate remains held until the outer transaction ends.
 All lifecycle procedures clear Action and ActionID on success and failure through
 z.usp_SetTaskQueueAction. The worker still requires no
 ambient transaction and implicit transactions off. Start only changes Draft to

@@ -6,15 +6,13 @@
 
 System supplies z.SeqGeneralID, PS_SchemaZPartitionGeneric and PS_SchemaZPartitionGenericDateTime. Server DMVs, Extended Events, and msdb Database Mail supply external data. System orchestration can schedule collection through Jobs. [Trace](../../010-Trace/docs/readme.md) supplies the SQL Trace framework for monitoring presets and installs before Monitoring.
 
-The numbered folder installs in System's alphabetical child order. Shared System modules run before feature children; System post scripts run after all children. See [System documentation](../../docs/readme.md) for deployment and orchestration. Baseline tables use existence guards; they do not reconcile an existing table schema. Module definitions use create or alter.
+See [System documentation](../../docs/readme.md) for deployment order.
 
 ## Data and control flow
 
 `z.v_ActiveSessions` reads live requests; `z.usp_TakeSnapshotActiveSessions` appends them to `z.ActiveSessions`. `z.usp_CollectSystemHealthEvents` reads the system_health ring buffer, passes its XML to the pure decoder `z.fn_ExtractSystemHealthEvent`, filters events and persists their XML in `z.SystemHealthEvent`. Resource/space views read native catalogs directly. `z.usp_CheckDatabaseMail` configures server and msdb mail infrastructure separately from those collectors.
 
 Snapshots capture requests at collection time, not a full session history. Query text, plans, login names, and client details can be sensitive. Database Mail configuration is an administrative operation that changes server settings and msdb; it is not a health-only check.
-
-Each callable reference describes writes, generated SQL, transaction boundaries, results and inputs. Supporting references describe keys, payloads and units. Procedures do not supply a blanket permission grant or one transaction around an entire administrative workflow.
 
 ## Integration constraints
 

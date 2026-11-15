@@ -62,8 +62,6 @@ BlockerQuery nvarchar(max),
 BlockerLastExecutedCommand nvarchar(max),
 ```
 
-
-
 ## z.SystemHealthEvent
 
 [Source](../../baseline/2020%20Tables/z.SystemHealthEvent.sql)
@@ -79,15 +77,11 @@ EventHash uniqueidentifier not null,
 EventBody xml not null,
 ```
 
-
-
 ## z.v_ActiveSessions
 
 [Source](../../modules/1020%20Views/z.v_ActiveSessions.sql)
 
 Current sys.dm_exec_requests joined to sessions/connections and SQL-text/query-plan functions, excluding @@SPID. All six left outer joins explicitly use LOOP join hints. Outputs SessionID, StartDate, BlockerSessionID, DurationInSecond, Status, Command, WaitType, WaitTime, WaitResource, LastWaitType, CPU, Reads, Writes, LogicalReads, TotalElapsedTime, DatabaseName, SQLText, QueryPlan, GrantedMemory, NestedLevel, RowCount, OpenTranCount, TransactionIsolationLevel, ExecutingManagedCode, MaxVersionTraversed, AverageVersionChainTraversed, TranDurationInSecond, LoginName, HostName, HostAddress, ApplicationName, BlockerLoginName, BlockerHostName, BlockerAddress, BlockerApplicationName, BlockerQuery, BlockerLastExecutedCommand. ExecutingManagedCode exposes sys.dm_exec_requests.executing_managed_code (bit). A left join to sys.dm_tran_active_snapshot_database_transactions on session_id supplies MaxVersionTraversed (max_version_chain_traversed), AverageVersionChainTraversed (average_version_chain_traversed), and TranDurationInSecond (elapsed_time_seconds); these are null when no transaction matches. Multiple matching transactions can produce multiple rows per request. Blocker columns use blocking_session_id to look up session, connection and request details. BlockerQuery contains the active blocker batch text, falling back to its connection most_recent_sql_handle when no active SQL handle is available (including sleeping blockers); it does not identify the exact statement that acquired a lock. BlockerLastExecutedCommand exposes sys.dm_exec_input_buffer.event_info for the blocker session through OUTER APPLY, including sleeping sessions; it is the last submitted command, not proof of completion or the lock-acquiring statement. The function requires VIEW SERVER STATE on SQL Server 2019 or VIEW SERVER PERFORMANCE STATE on SQL Server 2022 and later. Missing or special negative blocker IDs yield null blocker details. Multiple blocker requests or connections can also multiply rows. Not idle-session inventory; outer joins can yield null details.
-
-
 
 ## z.v_ActiveSessionsNoPlan
 
@@ -120,8 +114,6 @@ See [the collector](z.usp_CollectCPUMemoryStats.md) for permissions and behavior
 [Source](../../modules/1020%20Views/z.v_CPUMemoryStats.sql)
 
 Scheduler-monitor ring-buffer XML -> RecordID, Date, SystemIdle, SQLProcessUtilization, Other, UserModeTime, KernelModeTime, PageFaults, WorkingSetDelta, MemoryUtilizationPercentage. Other=100-idle-SQL percentage; mode times are 100ns units. The view exposes the current ring buffer; use z.usp_CollectCPUMemoryStats to persist observations in z.CPUMemoryStats.
-
-
 
 ## z.v_IndexSpaceUsed
 

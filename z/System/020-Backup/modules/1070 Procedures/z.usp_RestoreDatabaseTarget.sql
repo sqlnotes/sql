@@ -305,9 +305,9 @@ begin
 		or isnull(b.IsDamaged, 1) <> 0 or isnull(b.IsSnapshot, 1) <> 0 or isnull(b.HasIncompleteMetaData, 1) <> 0 or b.FirstFork <> b.LastFork or b.ForkPointLSN is not null)
 		throw 50000, 'A selected backup has incomplete, damaged, snapshot or unsupported recovery-fork metadata.', 1;
 	-- Validate media labels only for the selected sequence, not every retained file.
-	declare Media cursor local fast_forward for select BackupFile from #MediaPlan group by BackupFile order by min(Ordinal);
-	open Media;
-	fetch next from Media into @Path;
+	declare cMedia cursor local fast_forward for select BackupFile from #MediaPlan group by BackupFile order by min(Ordinal);
+	open cMedia;
+	fetch next from cMedia into @Path;
 	while @@fetch_status = 0
 	begin
 		truncate table #Label;
@@ -315,21 +315,21 @@ begin
 		insert #Label exec(@Sql);
 		if (select count(*) from #Label) <> 1 or exists(select * from #Label where FamilyCount <> 1 or FamilyCount is null or FamilySequenceNumber <> 1)
 			throw 50000, 'Selected striped or ambiguous media is not supported; provide complete single-file media.', 1;
-		fetch next from Media into @Path;
+		fetch next from cMedia into @Path;
 	end
-	close Media;
-	deallocate Media;
+	close cMedia;
+	deallocate cMedia;
 	-- Accumulate file identities in native restore order; each new file belongs to its introducing command.
 	create table #StepFiles
 	(
 		FileID bigint, LogicalName sysname, Type char(1), UniqueID uniqueidentifier,
 		PhysicalName nvarchar(4000), CreateLSN numeric(25,0), DropLSN numeric(25,0), IsPresent bit
 	);
-	declare Logs cursor local fast_forward for
+	declare cLogs cursor local fast_forward for
 		select p.Ordinal, p.BackupType, p.BackupFile, p.Position, p.FirstLSN, p.LastLSN, b.DatabaseName from #MediaPlan p
 			join #Backups b on b.BackupID = p.BackupID where p.BackupType in ('DIFF', 'LOG') order by p.Ordinal;
-	open Logs;
-	fetch next from Logs into @CurrentOrdinal, @StepType, @Path, @Position, @StepFirstLSN, @StepLastLSN, @StepSourceName;
+	open cLogs;
+	fetch next from cLogs into @CurrentOrdinal, @StepType, @Path, @Position, @StepFirstLSN, @StepLastLSN, @StepSourceName;
 	while @@fetch_status = 0
 	begin
 		exec z.usp_ReadBackupFileList @BackupFile = @Path, @Position = @Position, @FileListJson = @FileListJson output, @ReturnResult = 0;
@@ -354,16 +354,16 @@ begin
 		insert #FileMap (FileID, LogicalName, Type, UniqueID, OriginalPath, AddedOrdinal, SourceDatabaseName)
 			select l.FileID, l.LogicalName, l.Type, l.UniqueID, l.PhysicalName, @CurrentOrdinal, @StepSourceName from #StepFiles l
 				where not exists(select * from #FileMap m where m.FileID = l.FileID);
-		fetch next from Logs into @CurrentOrdinal, @StepType, @Path, @Position, @StepFirstLSN, @StepLastLSN, @StepSourceName;
+		fetch next from cLogs into @CurrentOrdinal, @StepType, @Path, @Position, @StepFirstLSN, @StepLastLSN, @StepSourceName;
 	end
-	close Logs;
-	deallocate Logs;
+	close cLogs;
+	deallocate cLogs;
 	if exists(select * from #FileMap where DestinationPath is null and SourceDatabaseName <> @TargetDatabaseName)
 		and (@TargetDatabaseName like N'%[<>:"/\|?*]%' or right(@TargetDatabaseName, 1) in (N'.', N' '))
 		throw 50000, 'The destination database name cannot be used safely in physical filenames.', 1;
-	declare FileMap cursor local fast_forward for select FileID, LogicalName, Type, OriginalPath, SourceDatabaseName from #FileMap where DestinationPath is null order by AddedOrdinal, FileID;
-	open FileMap;
-	fetch next from FileMap into @FileID, @Logical, @Type, @Original, @FileSourceName;
+	declare cFileMap cursor local fast_forward for select FileID, LogicalName, Type, OriginalPath, SourceDatabaseName from #FileMap where DestinationPath is null order by AddedOrdinal, FileID;
+	open cFileMap;
+	fetch next from cFileMap into @FileID, @Logical, @Type, @Original, @FileSourceName;
 	while @@fetch_status = 0
 	begin
 		select @Original = replace(@Original, N'\', N'/'), @Slash = charindex(N'/', reverse(replace(@Original, N'\', N'/')));
@@ -381,10 +381,10 @@ begin
 		select @Destination = @Destination + iif(right(@Destination, 1) in (N'/', N'\'), N'', @Separator) + @Name;
 		if len(@Destination) > 260 throw 50000, 'A destination database-file path exceeds 260 characters.', 1;
 		update #FileMap set DestinationPath = @Destination where FileID = @FileID;
-		fetch next from FileMap into @FileID, @Logical, @Type, @Original, @FileSourceName;
+		fetch next from cFileMap into @FileID, @Logical, @Type, @Original, @FileSourceName;
 	end
-	close FileMap;
-	deallocate FileMap;
+	close cFileMap;
+	deallocate cFileMap;
 	select @PrimaryPath = DestinationPath from #FileMap where FileID = 1;
 	if exists(select * from #FileMap where DestinationPath is null) throw 50000, 'A destination file mapping is incomplete.', 1;
 	if exists(select * from #FileMap group by case when @IsLinux = 1 then DestinationPath else lower(DestinationPath) end having count(*) > 1)

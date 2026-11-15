@@ -9,10 +9,11 @@ Compare transformed database-user and server-login names for WINDOWS/INSTANCE au
 ## Parameters and defaults
 
 ```text
-@UserNameContains nvarchar(128) = null,@UserNameReplacedWith nvarchar(128) = null,@LoginNameContains nvarchar(128) = null,@LoginNameReplacedWith nvarchar(128) = null
+@UserNameContains nvarchar(128) = null,
+@UserNameReplacedWith nvarchar(128) = null,
+@LoginNameContains nvarchar(128) = null,
+@LoginNameReplacedWith nvarchar(128) = null
 ```
-
-These are the source-declared types and defaults.
 
 ## Results, permissions, and limits
 

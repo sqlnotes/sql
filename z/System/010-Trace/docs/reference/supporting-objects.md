@@ -50,23 +50,17 @@ Registered native traces, destinations, creator session/login. Status Running/St
 
 SQL Trace column catalog -> ColumnID, ColumnName, SystemDataType, DataType, MaxSize, Definition, IsFilterable, IsRepeatable, IsRepeatedBase. Converts image/text definitions to varbinary(max)/nvarchar(max).
 
-
-
 ## z.v_TraceEvent
 
 [Source](../../modules/1020%20Views/z.v_TraceEvent.sql)
 
 SQL Trace category/event catalog -> TraceEventID, CategoryName, EventName.
 
-
-
 ## z.v_TraceEventColumn
 
 [Source](../../modules/1020%20Views/z.v_TraceEventColumn.sql)
 
 Allowed event/column bindings -> TraceEventID, CategoryName, EventName, ColumnID, ColumnName, DataType, MaxSize and three capability flags.
-
-
 
 ## z.v_TraceMetaData
 

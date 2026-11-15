@@ -21,6 +21,6 @@ begin
 		and IsExecuting = 1
 	if @@rowcount > 0
 	begin
-		exec msdb..sp_stop_job @job_id = @JobID;
+		exec msdb.dbo.sp_stop_job @job_id = @JobID;
 	end
 end

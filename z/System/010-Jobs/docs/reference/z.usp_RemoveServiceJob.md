@@ -12,8 +12,6 @@ Acquire the current database's exclusive transaction-owned job/schedule applicat
 @Name nvarchar(255)
 ```
 
-These are the source-declared types and defaults.
-
 ## Results, permissions, and limits
 
 No defined result set. Requires applicable msdb Agent permissions. Schedule rows are retained; use z.usp_RemoveOrphanedSchedule for database-scoped cleanup.

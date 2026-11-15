@@ -18,12 +18,13 @@ create or alter procedure z.usp_StartTaskQueueBatch
 as
 begin
 	set nocount on;
-	declare @ActionID uniqueidentifier = newid(), @BatchSemaphore nvarchar(200);
+	declare @ActionID uniqueidentifier = newid(), @Slot int, @BatchSemaphore nvarchar(200);
 	begin try
 		begin tran;
 		exec z.usp_ResolveTaskQueueBatch @BatchID = @BatchID output, @BatchName = @BatchName;
 		select @BatchSemaphore = N'z.TaskQueue.Batch:' + convert(nvarchar(20), @BatchID);
-		exec z.usp_AcquireSemaphore @SemaphoreName = @BatchSemaphore, @TotalCount = 1, @LockOwner = 'Transaction';
+		exec @Slot = z.usp_AcquireSemaphore @SemaphoreName = @BatchSemaphore, @TotalCount = 1, @LockOwner = 'Transaction';
+		if @Slot <= 0 throw 50000, 'Cannot acquire the TaskQueue batch semaphore.', 1;
 		exec z.usp_SetTaskQueueAction @Action = N'Start', @ActionID = @ActionID;
 		update z.TaskQueueBatch set Status = 'Ready' where BatchID = @BatchID and Status = 'Draft';
 		if @@rowcount = 0 throw 50000, 'Only a Draft batch can be started.', 1;

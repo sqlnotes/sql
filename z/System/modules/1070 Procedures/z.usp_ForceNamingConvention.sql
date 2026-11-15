@@ -57,9 +57,9 @@ begin
 		insert @Objects (ObjectID) values (@ObjectID);
 	end
 
-	declare SelectorCursor cursor local static for select distinct Name from @Entries where Selector = 'Table';
-	open SelectorCursor;
-	fetch next from SelectorCursor into @Entry;
+	declare cSelectors cursor local static for select distinct Name from @Entries where Selector = 'Table';
+	open cSelectors;
+	fetch next from cSelectors into @Entry;
 	while @@fetch_status = 0
 	begin
 		if datalength(@Entry) > 1034
@@ -90,10 +90,10 @@ begin
 		if not exists (select 1 from sys.objects where object_id = @ObjectID and type in ('U', 'V'))
 			throw 50001, '@TableNames contains an unknown table or view in the current database.', 1;
 		if not exists (select 1 from @Objects where ObjectID = @ObjectID) insert @Objects (ObjectID) values (@ObjectID);
-		fetch next from SelectorCursor into @Entry;
+		fetch next from cSelectors into @Entry;
 	end
-	close SelectorCursor;
-	deallocate SelectorCursor;
+	close cSelectors;
+	deallocate cSelectors;
 	if not exists (select 1 from @Schemas) and not exists (select 1 from @Objects)
 		throw 50001, 'Supply at least one schema or table through @SchemaNames, @TableNames or @TableName.', 1;
 
@@ -124,10 +124,10 @@ begin
 		return;
 	end
 
-	declare RenameCursor cursor local static for
+	declare cRenames cursor local static for
 		select ObjectName, NewName, ObjectType from #RenamePlan order by ObjectName, ObjectType, NewName;
-	open RenameCursor;
-	fetch next from RenameCursor into @ObjectName, @NewName, @ObjectType;
+	open cRenames;
+	fetch next from cRenames into @ObjectName, @NewName, @ObjectType;
 	while @@fetch_status = 0
 	begin
 		begin try
@@ -138,8 +138,8 @@ begin
 			if isnull(@IgnoreError, 0) = 0 throw;
 			print error_message();
 		end catch
-		fetch next from RenameCursor into @ObjectName, @NewName, @ObjectType;
+		fetch next from cRenames into @ObjectName, @NewName, @ObjectType;
 	end
-	close RenameCursor;
-	deallocate RenameCursor;
+	close cRenames;
+	deallocate cRenames;
 end

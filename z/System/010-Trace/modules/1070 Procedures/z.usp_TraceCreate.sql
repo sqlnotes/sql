@@ -99,7 +99,8 @@ begin
 		begin catch
 			print N'Failed to close an unregistered native trace; manual review is required.';
 		end catch;
+		select @TraceID = null;
 		throw;
 	end catch;
 end;
-go
+

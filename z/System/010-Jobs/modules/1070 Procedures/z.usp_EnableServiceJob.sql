@@ -17,5 +17,5 @@ begin
 	declare @JobID uniqueidentifier 
 	select @JobID = z.fn_GetServiceJobID(@Name)
 	if @JobID is not null
-		exec msdb..sp_update_job @job_id = @JobID, @enabled = 1;
+		exec msdb.dbo.sp_update_job @job_id = @JobID, @enabled = 1;
 end

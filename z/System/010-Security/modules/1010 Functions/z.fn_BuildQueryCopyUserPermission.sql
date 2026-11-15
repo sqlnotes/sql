@@ -37,7 +37,7 @@ begin
 			d.type_desc DatabasePrincipalType, quotename(d.name) collate database_default DatabasePrincipalName,
 			quotename(a.name) as AssemblyName,
 			quotename(schema_name(t.schema_id)) + '.' + quotename(t.name) TypeName,
-			quotename(schema_name(t.schema_id)) + '.' + quotename(x.name) as XMLSchemaCollectionName,
+			quotename(schema_name(x.schema_id)) + '.' + quotename(x.name) as XMLSchemaCollectionName,
 			quotename(mt.name) as MessageType,
 			quotename(c.name) as ContractName,
 			quotename(s.name) as ServiceName,
@@ -49,7 +49,7 @@ begin
 			quotename(ak.name) as AsymmetricKeyName,
 			quotename(cer.name) as CertificateName,
 			quotename(sp.name) as SearchPropertyListName,
-			sc.name as CredentialName,
+			quotename(sc.name) as CredentialName,
 			quotename(el.language) as LanguageName
 		from x0
 			left join sys.database_principals d on d.principal_id = x0.MajorID
@@ -86,7 +86,7 @@ begin
 							when PermissionState = 'GRANT' then 'grant ' + PermissionType + ' on ' + FullObjectName + ' to ' + TargetUser + ';'
 							when PermissionState = 'GRANT_WITH_GRANT_OPTION' then 'grant ' + PermissionType + ' on ' + FullObjectName + ' to ' + TargetUser + ' with grant option;'
 							when PermissionState = 'DENY' then 'deny ' + PermissionType + ' on ' + FullObjectName + ' to ' + TargetUser + ';'
-							when PermissionState = 'REVOKE' then 'revoke ' + PermissionType + ' on ' + FullObjectName + ' to ' + TargetUser + ';'
+							when PermissionState = 'REVOKE' then 'revoke ' + PermissionType + ' on ' + FullObjectName + ' from ' + TargetUser + ';'
 						end
 					when ClassDesc = 'SCHEMA' then 
 						case 
@@ -157,7 +157,7 @@ begin
 					when ClassDesc = 'SERVICE' then 
 						case 
 							when PermissionState = 'GRANT' then 'grant ' + PermissionType + ' on service::' + ServiceName + ' to ' + TargetUser + ';'
-							when PermissionState = 'GRANT_WITH_GRANT_OPTION' then 'grant ' + PermissionType + ' on SERVICE::' + ServiceName + ' to ' + TargetUser + ' with grant option;'
+							when PermissionState = 'GRANT_WITH_GRANT_OPTION' then 'grant ' + PermissionType + ' on service::' + ServiceName + ' to ' + TargetUser + ' with grant option;'
 							when PermissionState = 'DENY' then 'deny ' + PermissionType + ' on service::' + ServiceName + ' to ' + TargetUser + ';'
 							when PermissionState = 'REVOKE' then 'revoke ' + PermissionType + ' on service::' + ServiceName + ' from ' + TargetUser + ';'
 						end
@@ -167,13 +167,6 @@ begin
 							when PermissionState = 'GRANT_WITH_GRANT_OPTION' then 'grant ' + PermissionType + ' on remote service binding::' + RemoteServiceBindingName + ' to ' + TargetUser + ' with grant option;'
 							when PermissionState = 'DENY' then 'deny ' + PermissionType + ' on remote service binding::' + RemoteServiceBindingName + ' to ' + TargetUser + ';'
 							when PermissionState = 'REVOKE' then 'revoke ' + PermissionType + ' on remote service binding::' + RemoteServiceBindingName + ' from ' + TargetUser + ';'
-						end
-					when ClassDesc = 'ROUTE' then 
-						case 
-							when PermissionState = 'GRANT' then 'grant ' + PermissionType + ' on route::' + RouteName + ' to ' + TargetUser + ';'
-							when PermissionState = 'GRANT_WITH_GRANT_OPTION' then 'grant ' + PermissionType + ' on route::' + RouteName + ' to ' + TargetUser + ' with grant option;'
-							when PermissionState = 'DENY' then 'deny ' + PermissionType + ' on route::' + RouteName + ' to ' + TargetUser + ';'
-							when PermissionState = 'REVOKE' then 'revoke ' + PermissionType + ' on route::' + RouteName + ' from ' + TargetUser + ';'
 						end
 					when ClassDesc = 'ROUTE' then 
 						case 
@@ -241,17 +234,16 @@ begin
 				end SQL
 			from x1
 	)
-    insert into @ret(Type, SQL)
+	insert into @ret(Type, SQL)
 		select x2.Type, x2.SQL
 		from x2
 		where x2.SQL is not null
 
 	insert into @ret(Type, SQL)
-	select 'RoleMember', 'alter role ' + quotename(r.name) + ' add member ' + quotename(p.name) + ';'
+	select 'RoleMember', 'alter role ' + quotename(r.name) + ' add member ' + quotename(isnull(@TargetUser, p.name)) + ';'
 	from sys.database_principals p
 		inner join sys.database_role_members rm on rm.member_principal_id = p.principal_id
 		inner join sys.database_principals r on r.principal_id = rm.role_principal_id
 	where p.name = @SourceUser
 	return
 end
-go

@@ -12,8 +12,6 @@ Resolve the current database-prefixed job ID through z.fn_GetServiceJobID, using
 @Name nvarchar(255)
 ```
 
-These are the source-declared types and defaults.
-
 ## Results, permissions, and limits
 
 No defined result set. Requires applicable msdb Agent permissions.

@@ -10,8 +10,6 @@ Call z.usp_BackupDatabase for AllDatabases, FULL, compression enabled, stats = 1
 
 None.
 
-These are the source-declared types and defaults.
-
 ## Results, permissions, and limits
 
 No parameters or defined result set. Inherits backup permissions, file creation, and error behavior.

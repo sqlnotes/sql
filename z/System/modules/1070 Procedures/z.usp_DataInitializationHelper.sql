@@ -72,14 +72,14 @@ set identity_insert ' + @FullObjectName + ' on;' else '' end
 	' + @Data + '
 )
 merge ' + @FullObjectName + ' t
-using s on '+stuff((select 'and s.'+ quotename(columnName)+'= t.'+ quotename(columnName) from #SourceSchema where PrimaryKeyOrder > 0 order by ColumnID for xml path('')), 1, 4,'')+'
+using s on '+stuff((select ' and s.'+ quotename(ColumnName)+' = t.'+ quotename(ColumnName) from #SourceSchema where PrimaryKeyOrder > 0 order by ColumnID for xml path(''), type).value('.', 'nvarchar(max)'), 1, 5,'')+'
 when not matched then
-	insert ('+stuff((select ','+ quotename(columnName) from #SourceSchema order by ColumnID for xml path('')), 1, 1,'')+')
-	values('+stuff((select ',s.'+ quotename(columnName) from #SourceSchema order by ColumnID for xml path('')), 1, 1,'')+')
+	insert ('+stuff((select ','+ quotename(ColumnName) from #SourceSchema order by ColumnID for xml path(''), type).value('.', 'nvarchar(max)'), 1, 1,'')+')
+	values('+stuff((select ',s.'+ quotename(ColumnName) from #SourceSchema order by ColumnID for xml path(''), type).value('.', 'nvarchar(max)'), 1, 1,'')+')
 '
 		+case when @ForceMatchedDataUpdate = 1 and exists(select * from #SourceSchema where PrimaryKeyOrder = 0) then 
-				'when matched and ('+stuff((select ' or s.'+ quotename(columnName)+' is null and t.'+ quotename(columnName)+' is not null or s.'+ quotename(columnName)+' is not null and t.'+ quotename(columnName)+' is null or s.'+ quotename(columnName)+' <> t.'+ quotename(columnName) from #SourceSchema where PrimaryKeyOrder = 0 order by ColumnID for xml path(''), type).value('.','nvarchar(max)'), 1, 4,'')+') then 
-update set '+stuff((select ', t.'+ quotename(columnName)+'= s.'+ quotename(columnName) from #SourceSchema where PrimaryKeyOrder = 0 order by ColumnID for xml path('')), 1, 1,'')
+				'when matched and ('+stuff((select ' or s.'+ quotename(ColumnName)+' is null and t.'+ quotename(ColumnName)+' is not null or s.'+ quotename(ColumnName)+' is not null and t.'+ quotename(ColumnName)+' is null or s.'+ quotename(ColumnName)+' <> t.'+ quotename(ColumnName) from #SourceSchema where PrimaryKeyOrder = 0 order by ColumnID for xml path(''), type).value('.','nvarchar(max)'), 1, 4,'')+') then 
+update set '+stuff((select ', t.'+ quotename(ColumnName)+' = s.'+ quotename(ColumnName) from #SourceSchema where PrimaryKeyOrder = 0 order by ColumnID for xml path(''), type).value('.', 'nvarchar(max)'), 1, 2,'')
 	else ''
 	end+'
 ;'
@@ -87,4 +87,4 @@ update set '+stuff((select ', t.'+ quotename(columnName)+'= s.'+ quotename(colum
 set identity_insert ' + @FullObjectName + ' off;' else '' end
 	exec z.usp_PrintString @SQL
 end
-go
+

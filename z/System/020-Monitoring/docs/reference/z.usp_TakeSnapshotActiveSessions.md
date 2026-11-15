@@ -10,8 +10,6 @@ Insert current z.v_ActiveSessions rows into z.ActiveSessions; SnapshotDate and A
 
 None.
 
-These are the source-declared types and defaults.
-
 ## Results, permissions, and limits
 
 No defined result set. Requires insert access and sufficient DMV visibility.

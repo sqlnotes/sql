@@ -12,8 +12,6 @@ Resolve the current database-prefixed job by Name and call msdb Agent start oper
 @Name nvarchar(255)
 ```
 
-These are the source-declared types and defaults.
-
 ## Results, permissions, and limits
 
 No defined result set. Requires applicable msdb Agent permissions; starting is asynchronous and does not return job completion status.

@@ -25,11 +25,11 @@ begin
 		@ReturnCode int, @LogicalOperator int, @ComparisonOperator int, @Value sql_variant, @Definition nvarchar(128),
 		@SQL nvarchar(max), @Message nvarchar(2048), @Operation nvarchar(128),
 		@CreatorLoginTime datetime = (select login_time from sys.dm_exec_sessions where session_id = @@spid);
-	declare t cursor local static read_only for
+	declare cTraces cursor local static read_only for
 		select TraceID from z.v_TraceOwned
 		where (@TraceName is null or Name = @TraceName) and (@TraceID is null or TraceID = @TraceID) and Status <> 'Running';
-	open t;
-	fetch next from t into @SelectedTraceID;
+	open cTraces;
+	fetch next from cTraces into @SelectedTraceID;
 	while @@fetch_status = 0
 	begin
 		begin try
@@ -53,10 +53,10 @@ begin
 			-- Native rowset SPID bindings cannot be removed. Configuration is frozen
 			-- after native event binding begins; repeated Start reapplies the same bindings.
 			select @Operation = N'configure events';
-			declare e cursor local static read_only for
+			declare cEvents cursor local static read_only for
 				select EventID, ColumnID from z.TraceEventColumn where TraceID = @SelectedTraceID order by EventID, ColumnID;
-			open e;
-			fetch next from e into @EventID, @ColumnID;
+			open cEvents;
+			fetch next from cEvents into @EventID, @ColumnID;
 			while @@fetch_status = 0
 			begin
 				exec @ReturnCode = sys.sp_trace_setevent @SelectedTraceID, @EventID, @ColumnID, 1;
@@ -65,10 +65,10 @@ begin
 					select @Message = concat(N'Native trace ', @SelectedTraceID, N': ', @Operation, N' failed for event ', @EventID, N', column ', @ColumnID, N'; return code ', @ReturnCode, N'.');
 					throw 50000, @Message, 1;
 				end;
-				fetch next from e into @EventID, @ColumnID;
+				fetch next from cEvents into @EventID, @ColumnID;
 			end;
-			close e;
-			deallocate e;
+			close cEvents;
+			deallocate cEvents;
 			select @Operation = N'clear filters';
 			exec @ReturnCode = sys.sp_trace_setfilter @SelectedTraceID, null, 0, 0, null;
 			if @ReturnCode <> 0
@@ -78,14 +78,14 @@ begin
 			end;
 			-- Native filters group predicates by column; separate columns are combined by SQL Trace.
 			select @Operation = N'configure filters';
-			declare f cursor local static read_only for
+			declare cFilters cursor local static read_only for
 				select f.ColumnID, case f.LogicOperator when 'and' then 0 else 1 end,
 					case f.ComparisonOperator when '=' then 0 when '<>' then 1 when '>' then 2 when '<' then 3 when '>=' then 4 when '<=' then 5 when 'like' then 6 when 'notlike' then 7 end,
 					f.Value, case c.Definition when N'nvarchar(max)' then N'nvarchar(4000)' when N'varbinary(max)' then N'varbinary(8000)' else c.Definition end
 				from z.TraceFilter f inner join z.v_TraceColumn c on c.ColumnID = f.ColumnID
 				where f.TraceID = @SelectedTraceID order by f.ColumnID, f.FilterOrdinal;
-			open f;
-			fetch next from f into @ColumnID, @LogicalOperator, @ComparisonOperator, @Value, @Definition;
+			open cFilters;
+			fetch next from cFilters into @ColumnID, @LogicalOperator, @ComparisonOperator, @Value, @Definition;
 			while @@fetch_status = 0
 			begin
 				select @SQL = N'declare @FilterValue ' + @Definition + N' = convert(' + @Definition + N', @Value);
@@ -98,10 +98,10 @@ exec @ReturnCode = sys.sp_trace_setfilter @TraceID, @ColumnID, @LogicalOperator,
 					select @Message = concat(N'Native trace ', @SelectedTraceID, N': ', @Operation, N' failed for column ', @ColumnID, N'; return code ', @ReturnCode, N'.');
 					throw 50000, @Message, 1;
 				end;
-				fetch next from f into @ColumnID, @LogicalOperator, @ComparisonOperator, @Value, @Definition;
+				fetch next from cFilters into @ColumnID, @LogicalOperator, @ComparisonOperator, @Value, @Definition;
 			end;
-			close f;
-			deallocate f;
+			close cFilters;
+			deallocate cFilters;
 			select @Operation = N'start';
 			exec @ReturnCode = sys.sp_trace_setstatus @SelectedTraceID, 1;
 			if @ReturnCode <> 0
@@ -115,17 +115,17 @@ exec @ReturnCode = sys.sp_trace_setfilter @TraceID, @ColumnID, @LogicalOperator,
 		end try
 		begin catch
 			if @@trancount > 0 rollback;
-			if cursor_status('local', 'e') >= 0 close e;
-			if cursor_status('local', 'e') >= -1 deallocate e;
-			if cursor_status('local', 'f') >= 0 close f;
-			if cursor_status('local', 'f') >= -1 deallocate f;
+			if cursor_status('local', 'e') >= 0 close cEvents;
+			if cursor_status('local', 'e') >= -1 deallocate cEvents;
+			if cursor_status('local', 'f') >= 0 close cFilters;
+			if cursor_status('local', 'f') >= -1 deallocate cFilters;
 			select @Message = concat(N'Native trace ', @SelectedTraceID, N' failed during ', @Operation, N': ', error_message());
 			print @Message;
 			throw;
 		end catch;
-		fetch next from t into @SelectedTraceID;
+		fetch next from cTraces into @SelectedTraceID;
 	end;
-	close t;
-	deallocate t;
+	close cTraces;
+	deallocate cTraces;
 end;
 go

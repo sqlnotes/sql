@@ -37,13 +37,10 @@ begin
 
 	select	@SessionContext1 = session_context(N'z.usp_TakeSnapshotActiveSessionsForBlockedProcessReport-1'),
 			@SessionContext2 = session_context(N'z.usp_TakeSnapshotActiveSessionsForBlockedProcessReport-2')
-	if @SessionContext1 is not null
-	begin
-		if cast(@SessionContext1 as bigint) = @TransactionID
-			return
-		if cast(@SessionContext2 as datetime) = @Date
-			return
-	end
+	if @SessionContext1 is not null and cast(@SessionContext1 as bigint) = @TransactionID
+		return
+	if @SessionContext2 is not null and cast(@SessionContext2 as datetime) = @Date
+		return
 	
 	exec sp_set_session_context N'z.usp_TakeSnapshotActiveSessionsForBlockedProcessReport-1', @TransactionID
 	exec sp_set_session_context N'z.usp_TakeSnapshotActiveSessionsForBlockedProcessReport-2', @Date
@@ -53,4 +50,4 @@ begin
 		select  @TraceSequence, SessionID, StartDate, BlockerSessionID, DurationInSecond, Status, Command, WaitType, WaitTime, WaitResource, LastWaitType, CPU, Reads, Writes, LogicalReads, TotalElapsedTime, DatabaseName, SQLText, /*QueryPlan,*/ GrantedMemory, NestedLevel, [RowCount], OpenTranCount, TransactionIsolationLevel, ExecutingManagedCode, MaxVersionTraversed, AverageVersionChainTraversed, TranDurationInSecond, LoginName, HostName, HostAddress, ApplicationName, BlockerLoginName, BlockerHostName, BlockerAddress, BlockerApplicationName, BlockerQuery, BlockerLastExecutedCommand
 	from z.v_ActiveSessions
 end
-GO
+

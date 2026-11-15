@@ -21,11 +21,11 @@ begin
 	declare @TaskID int, @Body nvarchar(max), @Command nvarchar(4000), @Parameters nvarchar(max),
 		@SchemaName sysname, @ProcedureName sysname, @ObjectID int, @LockResource nvarchar(255), @IsTemporary bit;
 	declare @ParameterMetadata table(ParameterName sysname, TypeName sysname);
-	declare Definitions cursor local fast_forward for
+	declare cDefinitions cursor local fast_forward for
 		select TaskID, TaskBody from z.TaskQueueTasks where BatchID = @BatchID order by TaskID;
 	begin try
-		open Definitions;
-		fetch next from Definitions into @TaskID, @Body;
+		open cDefinitions;
+		fetch next from cDefinitions into @TaskID, @Body;
 		while @@fetch_status = 0
 		begin
 			if @RequireIdle = 1
@@ -106,14 +106,14 @@ begin
 				)
 					throw 50000, 'A task parameter name or metadata type is unsupported.', 1;
 			end;
-			fetch next from Definitions into @TaskID, @Body;
+			fetch next from cDefinitions into @TaskID, @Body;
 		end;
-		close Definitions;
-		deallocate Definitions;
+		close cDefinitions;
+		deallocate cDefinitions;
 	end try
 	begin catch
-		if cursor_status('local', 'Definitions') >= 0 close Definitions;
-		if cursor_status('local', 'Definitions') > -3 deallocate Definitions;
+		if cursor_status('local', 'Definitions') >= 0 close cDefinitions;
+		if cursor_status('local', 'Definitions') > -3 deallocate cDefinitions;
 		throw;
 	end catch;
 end;

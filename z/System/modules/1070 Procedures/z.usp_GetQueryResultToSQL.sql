@@ -26,7 +26,7 @@ begin
 			c.max_length DataLength, isnull(type_name(c.system_type_id), type_name(c.user_type_id)) BaseType,
 			case when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) = 'timestamp' then 'binary(8)' else isnull(type_name(c.system_type_id), type_name(c.user_type_id)) end +
 			case 
-				when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) in ('binary', 'char', 'nchar') then '('+cast(c.max_length as varchar(20))+')'
+				when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) in ('binary', 'char') then '('+cast(c.max_length as varchar(20))+')'
 				when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) in ('nchar') then '('+cast(c.max_length/2 as varchar(20))+')'
 				when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) in ('datetime2', 'datetimeoffset', 'time') then '('+cast(c.scale as varchar(20))+')'
 				when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) in ('decimal', 'numeric') then '('+cast(c.precision as varchar(20))+','+cast(c.scale as varchar(20))+')'
@@ -83,31 +83,30 @@ from #t', '''','''''')+''')
 		select @SQL = cast(''select '+stuff((select ',cast('+quotename(ColumnName) +' as '+DataType+') as '+quotename(ColumnName)
 		from x0
 		order by ColumnID asc
-		for xml path(''), type).value('.', 'varchar(max)'),1,1,'') + ''' as nvarchar(max)) + ''
+		for xml path(''), type).value('.', 'nvarchar(max)'),1,1,'') + ''' as nvarchar(max)) + ''
 from (
 		values(''+stuff((select ''
-			,''+Data  from #Data order by ID for xml path(''''), type).value(''.'', ''varchar(max)''),1,7,'''')+''
+			,''+Data  from #Data order by ID for xml path(''''), type).value(''.'', ''nvarchar(max)''),1,7,'''')+''
 	) v('+stuff((select ','+quotename(ColumnName)
 		from x0
 		order by ColumnID asc
-		for xml path(''), type).value('.', 'varchar(max)'),1,1,'') + ')''
+		for xml path(''), type).value('.', 'nvarchar(max)'),1,1,'') + ')''
 	end
 	else
 	begin
 		select @SQL = cast(''select top 0 '+stuff((select ',cast('+quotename(ColumnName) +' as '+DataType+') as '+quotename(ColumnName)
 		from x0
 		order by ColumnID asc
-		for xml path(''), type).value('.', 'varchar(max)'),1,1,'') + ''' as nvarchar(max)) + ''
+		for xml path(''), type).value('.', 'nvarchar(max)'),1,1,'') + ''' as nvarchar(max)) + ''
 		from (
 				values(''+stuff((select ''
-					,''+Data  from #Data order by ID for xml path(''''), type).value(''.'', ''varchar(max)''),1,9,'''')+''
+					,''+Data  from #Data order by ID for xml path(''''), type).value(''.'', ''nvarchar(max)''),1,9,'''')+''
 			) v('+stuff((select ','+quotename(ColumnName)
 		from x0
 		order by ColumnID asc
-		for xml path(''), type).value('.', 'varchar(max)'),1,1,'') + ')''
+		for xml path(''), type).value('.', 'nvarchar(max)'),1,1,'') + ')''
 	end
 	'
 	--select @SQL	
 	exec sp_executesql @SQL, N'@Query nvarchar(max), @SQL nvarchar(max) output', @Query, @SQL output
 end
-go

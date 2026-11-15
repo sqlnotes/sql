@@ -27,13 +27,13 @@ begin
 		throw 50000, N'Expected creator session ID and login time must be supplied together.', 1;
 	declare @SelectedTraceID int, @CreatorSessionID int, @CreatorLoginTime datetime,
 		@ReturnCode int, @Message nvarchar(2048), @CurrentLoginTime datetime = (select login_time from sys.dm_exec_sessions where session_id = @@spid);
-	declare t cursor local static read_only for
+	declare cTraces cursor local static read_only for
 		select TraceID, CreatorSessionID, CreatorLoginTime from z.Trace
 		where (@TraceName is not null or @TraceID is not null or (CreatorSessionID = @@spid and CreatorLoginTime = @CurrentLoginTime))
 			and (@TraceName is null or Name = @TraceName) and (@TraceID is null or TraceID = @TraceID)
 			and (@ExpectedCreatorSessionID is null or (CreatorSessionID = @ExpectedCreatorSessionID and CreatorLoginTime = @ExpectedCreatorLoginTime));
-	open t;
-	fetch next from t into @SelectedTraceID, @CreatorSessionID, @CreatorLoginTime;
+	open cTraces;
+	fetch next from cTraces into @SelectedTraceID, @CreatorSessionID, @CreatorLoginTime;
 	while @@fetch_status = 0
 	begin
 		begin try
@@ -85,9 +85,9 @@ begin
 			if @@trancount > 0 rollback;
 			throw;
 		end catch;
-		fetch next from t into @SelectedTraceID, @CreatorSessionID, @CreatorLoginTime;
+		fetch next from cTraces into @SelectedTraceID, @CreatorSessionID, @CreatorLoginTime;
 	end;
-	close t;
-	deallocate t;
+	close cTraces;
+	deallocate cTraces;
 end;
 go

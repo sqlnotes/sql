@@ -9,10 +9,9 @@ Generate create statements for SQL/Windows logins, Windows groups, and non-fixed
 ## Parameters and defaults
 
 ```text
-@SourceLogin nvarchar(128) = null, @TargetLogin nvarchar(128) = null
+@SourceLogin nvarchar(128) = null, 
+@TargetLogin nvarchar(128) = null
 ```
-
-These are the source-declared types and defaults. Table-valued-function callers must supply arguments or the `default` keyword explicitly.
 
 ## Results, permissions, and limits
 

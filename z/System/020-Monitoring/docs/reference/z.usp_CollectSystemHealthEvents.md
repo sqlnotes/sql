@@ -24,8 +24,6 @@ the server's system_health session.
 
 None.
 
-These are the source-declared types and defaults.
-
 ## Results, permissions, and limits
 
 No defined result set. Existing stored rows are retained; ring-buffer data only is collected.

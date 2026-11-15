@@ -10,8 +10,6 @@ Generate z.v_TraceMetaData (event/column capability matrix) and z.v_TraceDefinit
 
 None.
 
-These are the source-declared types and defaults.
-
 ## Results, permissions, and limits
 
 No parameters or defined result set. Requires view DDL, trace/catalog visibility and extended-property authority. Column set varies with server trace catalog.

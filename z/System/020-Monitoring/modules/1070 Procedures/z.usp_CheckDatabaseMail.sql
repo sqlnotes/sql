@@ -62,7 +62,7 @@ begin
 	end
 	declare @SQL nvarchar(max)
 	select @SQL = (
-					select 'exec msdb.dbo.sysmail_delete_principalprofile_sp @principal_name=N''guest'', @profile_name=N'''+p.name+''';'
+					select 'exec msdb.dbo.sysmail_delete_principalprofile_sp @principal_name=N''guest'', @profile_name=N''' + replace(p.name, N'''', N'''''') + ''';'
 					from msdb.dbo.sysmail_profile  p
 						inner join msdb.dbo.sysmail_principalprofile pp on p.profile_id = pp.profile_id
 					where pp.principal_sid = 0x00
@@ -72,5 +72,4 @@ begin
 	exec(@SQL)
 	exec msdb.dbo.sysmail_add_principalprofile_sp @principal_name = N'guest', @profile_name = @ProfileName, @is_default = 1
 end
-GO
 

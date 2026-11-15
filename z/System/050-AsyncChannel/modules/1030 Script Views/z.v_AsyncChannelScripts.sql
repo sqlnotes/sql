@@ -95,7 +95,7 @@ as
 				f.t1 + N'exec z.usp_AsyncChannelGetConversationHandle @AsyncChannelID = ' + cast(v.AsyncChannelID as nvarchar(10)) + N', @ConversationHandle = @Handle output, @MaxRowsPerMessage = @MaxRows output;' + f.nl +
 				f.t1 + N'if @Handle is null' + f.nl +
 				f.t2 + N'return;' + f.nl + f.nl +
-				f.t1 + N'declare Chunks cursor local static for' + f.nl +
+				f.t1 + N'declare cChunks cursor local static for' + f.nl +
 				f.t2 + N'select string_agg(c.Json, N'','')' + f.nl +
 				f.t2 + N'from (' + f.nl +
 				f.t4 + N'select' + f.nl +
@@ -106,8 +106,8 @@ as
 				f.t3 + N') c' + f.nl +
 				f.t2 + N'group by c.ChunkID' + f.nl +
 				f.t2 + N'order by c.ChunkID;' + f.nl +
-				f.t1 + N'open Chunks;' + f.nl +
-				f.t1 + N'fetch next from Chunks into @Payload;' + f.nl +
+				f.t1 + N'open cChunks;' + f.nl +
+				f.t1 + N'fetch next from cChunks into @Payload;' + f.nl +
 				f.t1 + N'while @@fetch_status = 0' + f.nl +
 				f.t1 + N'begin' + f.nl +
 				f.t2 + N'set @Attempt = 0;' + f.nl +
@@ -130,10 +130,10 @@ as
 				f.t5 + N'throw;' + f.nl +
 				f.t3 + N'end catch' + f.nl +
 				f.t2 + N'end' + f.nl +
-				f.t2 + N'fetch next from Chunks into @Payload;' + f.nl +
+				f.t2 + N'fetch next from cChunks into @Payload;' + f.nl +
 				f.t1 + N'end' + f.nl +
-				f.t1 + N'close Chunks;' + f.nl +
-				f.t1 + N'deallocate Chunks;' + f.nl +
+				f.t1 + N'close cChunks;' + f.nl +
+				f.t1 + N'deallocate cChunks;' + f.nl +
 				N'end'
 			),
 			(50, N'Enqueue', v.EnqueueProcedure,
@@ -270,21 +270,21 @@ as
 				f.t3 + N'else' + f.nl +
 				f.t3 + N'begin' + f.nl +
 				f.t4 + N'set @LastActivity = sysutcdatetime();' + f.nl +
-				f.t4 + N'declare c cursor local fast_forward for' + f.nl +
+				f.t4 + N'declare cMessages cursor local fast_forward for' + f.nl +
 				-- DialogTimer rows are consumed by the receive and nothing else: not logged, not ended, no catalog lookup.
 				f.t5 + N'select ConversationHandle, MessageTypeID, Payload from @Msgs where IsPayload = 0 and MessageTypeID <> @TimerTypeID;' + f.nl +
-				f.t4 + N'open c;' + f.nl +
-				f.t4 + N'fetch next from c into @Handle, @MsgTypeID, @Payload;' + f.nl +
+				f.t4 + N'open cMessages;' + f.nl +
+				f.t4 + N'fetch next from cMessages into @Handle, @MsgTypeID, @Payload;' + f.nl +
 				f.t4 + N'while @@fetch_status = 0' + f.nl +
 				f.t4 + N'begin' + f.nl +
 				f.t5 + N'select @Level = iif(@MsgTypeID = @ErrorTypeID, ''Error'', ''Info''), @Info = case @MsgTypeID when @EndDialogTypeID then N''EndDialog'' when @ErrorTypeID then N''Error'' else N''Unknown message type '' + cast(@MsgTypeID as nvarchar(10)) end;' + f.nl +
 				f.t5 + N'exec z.usp_AsyncChannelLog @AsyncChannelID = @AsyncChannelID, @Level = @Level, @Info = @Info, @Payload = @Payload, @SessionID = @@spid, @ConversationHandle = @Handle;' + f.nl +
 				f.t5 + N'if @MsgTypeID in (@EndDialogTypeID, @ErrorTypeID)' + f.nl +
 				f.t6 + N'end conversation @Handle;' + f.nl +
-				f.t5 + N'fetch next from c into @Handle, @MsgTypeID, @Payload;' + f.nl +
+				f.t5 + N'fetch next from cMessages into @Handle, @MsgTypeID, @Payload;' + f.nl +
 				f.t4 + N'end' + f.nl +
-				f.t4 + N'close c;' + f.nl +
-				f.t4 + N'deallocate c;' + f.nl + f.nl +
+				f.t4 + N'close cMessages;' + f.nl +
+				f.t4 + N'deallocate cMessages;' + f.nl + f.nl +
 				-- Processing runs for payload rows and for DialogTimer rows (a timer is a wake-up for the Processing procedure).
 				f.t4 + N'if exists (select 1 from @Msgs where IsPayload = 1 or MessageTypeID = @TimerTypeID)' + f.nl +
 				f.t4 + N'begin' + f.nl +

@@ -12,8 +12,6 @@ For SQL_USER principals with same-named visible server principals and mismatched
 @UserName nvarchar(128) = null
 ```
 
-These are the source-declared types and defaults.
-
 ## Results, permissions, and limits
 
 No defined result set. Requires permission to alter selected users and visibility of server principals.

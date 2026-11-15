@@ -158,17 +158,20 @@ create or alter procedure z.usp_GetQueryResultToSQL
 )
 ```
 
-Executes trusted @Query and returns select-from-values SQL in @SQL output using first-result metadata/temp tables. Query can have effects; needs its permissions. No internal transaction. Temporal precision/nchar limitations in troubleshooting.
+Executes trusted @Query and returns select-from-values SQL in @SQL output using first-result metadata/temp tables. Query can have effects; needs its permissions. No internal transaction. Temporal values use style 120 (second precision).
 
 ## z.usp_PrintString
 
 [Source](../../modules/1070%20Procedures/z.usp_PrintString.sql)
 
 ```sql
-create or alter procedure z.usp_PrintString (@str nvarchar(max))
+create or alter procedure z.usp_PrintString
+(
+	@Str nvarchar(max)
+)
 ```
 
-Uses z.fn_SplitLines to print nvarchar input by lines, then chunks up to 4000 characters with unlimited recursion. No persisted writes/result set; long lines become multiple messages.
+Uses z.fn_SplitLines to print nvarchar input by lines (preserving empty lines), chunking lines longer than 4000 characters via `z.fn_SplitStringFixedLength` with `option (maxrecursion 0)`. No persisted writes/result set.
 
 ## z.usp_RefeshAllSQLModules
 
@@ -205,7 +208,7 @@ create or alter procedure z.usp_RemoveSchemaZ
 )
 ```
 
-Confirm=1 attempts destructive removal of z plan guides/objects, generic partitions, itself/schema. Completion is not reliable: a retained Async service can block its queue drop on older installations, dependency ordering is incomplete, and types/XML schema collections are omitted. No transaction or safe progress guarantee; errors print and retry, and it removes itself before the final schema drop. Agent/Broker artifacts are not comprehensively removed. Needs broad DDL. See [removal limitations](../troubleshooting.md#removal).
+`@Confirm = 1` removes `z` plan guides, schema objects (ordering child constraints and triggers before parent tables, and dropping bound Service Broker services before queues), user-defined types, XML schema collections, shared AsyncChannel Broker contracts/message types, generic partition schemes/functions, itself, and schema `z`. Skips and retries dependent objects across passes without hanging if an external dependency blocks removal. Requires broad DDL permissions. See [removal limitations](../troubleshooting.md#removal).
 
 ## z.usp_SetLargeValueOutOfRow
 

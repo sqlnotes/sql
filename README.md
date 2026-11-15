@@ -20,9 +20,5 @@ Read [deployment](z/docs/deploy.md) before running `z/Deploy.ps1`. Review each
 feature's prerequisites and limitations before using its examples. Installation
 does not automatically configure every operational feature.
 
-The documentation beside the code is the authoritative developer reference.
-Reference pages link to SQL definitions and describe current behavior, including
-known limitations. The former wiki and separate legacy guides are retired.
-
 For deployment mechanics and authoring scripts, see the
 [deployment developer guide](z/docs/readme.md).

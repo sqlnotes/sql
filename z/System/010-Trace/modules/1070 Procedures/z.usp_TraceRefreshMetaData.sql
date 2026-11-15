@@ -87,7 +87,7 @@ from sys.trace_categories tc
 										+'')''
 								from sys.fn_trace_getfilterinfo(t.id) f
 									inner join sys.trace_columns tc on tc.trace_column_id = f.columnid
-								where f.columnid = i.columnID
+								where f.columnid = i.columnid
 								for xml path(''''), type
 						).value(''.'', ''nvarchar(max)'') Filter
 				) f

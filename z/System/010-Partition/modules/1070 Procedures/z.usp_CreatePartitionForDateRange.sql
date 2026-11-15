@@ -71,20 +71,20 @@ begin
 		exec @LockResult = z.usp_AcquireSemaphore @SemaphoreName = @Resource, @TotalCount = 1, @LockOwner = 'Session', @LockTimeout = 0;
 		if @LockResult <= 0 throw 50000, 'Another session is managing this partition function.', 1;
 		select @LockHeld = 1;
-		declare c cursor local static for
+		declare cQueries cursor local static for
 			select SQL
 			from z.fn_BuildQueryCreatePartitionForDateRange(null, @FunctionName, @PartitionRangeType, @PartitionRangeTypeInterval, @DateFrom, @DateTo, @NumberOfPartitions, @FileGroup)
 			order by Ordinal;
-		open c;
+		open cQueries;
 		begin tran;
-		fetch next from c into @SQL;
+		fetch next from cQueries into @SQL;
 		while @@fetch_status = 0
 		begin
 			exec sys.sp_executesql @SQL;
-			fetch next from c into @SQL;
+			fetch next from cQueries into @SQL;
 		end
-		close c;
-		deallocate c;
+		close cQueries;
+		deallocate cQueries;
 		commit;
 		exec z.usp_ReleaseSemaphore @SemaphoreName = @Resource, @LockOwner = 'Session';
 	end try

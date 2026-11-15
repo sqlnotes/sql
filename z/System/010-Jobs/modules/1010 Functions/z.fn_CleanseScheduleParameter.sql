@@ -112,7 +112,7 @@ Internal error: An expression services limit has been reached. Please look for p
 													case
 														when a.Value like '%first%' or a.Value like '%1st%' then 'First'
 														when a.Value like '%second%' or a.Value like '%2nd%' then 'Second'
-														when a.Value like '%third%' or a.Value like '%3rd%' then 'third'
+														when a.Value like '%third%' or a.Value like '%3rd%' then 'Third'
 														when a.Value like '%Fourth%' or a.Value like '%4th%' then 'Fourth'
 														when a.Value like '%Last%' then 'Last'
 													end + ' ' +
@@ -207,7 +207,7 @@ Internal error: An expression services limit has been reached. Please look for p
 								)
 					end 
 				end ByTime,
-				isnull(case when Frequency <> 'Specific' then @StartDate else try_convert(date, ByDay, 121) end, '1990-01-01') StartDate,
+				isnull(case when Frequency <> 'Specific' then @StartDate else try_convert(date, left(ltrim(ByDay), 10), 121) end, '1990-01-01') StartDate,
 				isnull(case when Frequency <> 'Specific' then @EndDate end, '9999-12-31') EndDate
 		from x0
 	),

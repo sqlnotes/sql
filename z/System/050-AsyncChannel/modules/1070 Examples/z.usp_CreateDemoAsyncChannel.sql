@@ -5,45 +5,16 @@ Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/050-AsyncChannel/modules/1070%20Examples/z.usp_CreateDemoAsyncChannel.sql
 Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/050-AsyncChannel/docs/reference/z.usp_CreateDemoAsyncChannel.md
 
-Opt-in construction example with usage comments before the definition; creates a manual Demo channel and its authored objects.
-*/
-/*
-Creates the Demo channel as a worked example of building an AsyncChannel.
-Install the framework first; enable Service Broker in the database separately before sending data.
-Run the following statements in the same database, outside an explicit or implicit transaction:
+Creates the manual Demo channel, destination table, interface view and idempotent processor.
 
+Usage (enable Service Broker first and run outside an active transaction):
 	exec z.usp_CreateDemoAsyncChannel @AsyncChannelID = 0, @ActivatorPoolID = 0;
 	go
-
 	insert into z.AsyncChannel_Demo_Interface (RecordID, Description, Date)
 		values (1, N'First asynchronous row', '2026-01-01T12:00:00'),
 			   (2, N'Second asynchronous row', '2026-01-01T12:01:00');
-
-	-- Manual activation makes the receive/processing step visible. Run it after the insert commits; it waits briefly for delivery.
-	-- Broker delivery can be asynchronous: if no rows have arrived yet, invoke it again.
 	exec z.usp_AsyncChannel_Demo_Activator;
 	select RecordID, Description, Date from z.AsyncChannel_Demo order by RecordID;
-
-The creator performs these steps atomically:
-1. Create a destination table and author its empty <TableName>_Interface view; do not add v_.
-2. Register a processing pool and a Manual channel, then generate its codecs, enqueue trigger,
-   enqueue procedure, queue/service, activator and initial processing scaffold.
-3. Replace that new scaffold with application processing after its deserializer exists.
-   The processor decodes only payload messages and upserts by RecordID, so replay is idempotent.
-
-To build your own channel, copy the steps and replace the Demo object names, interface columns,
-registry IDs and processing body. The interface columns define the generated codec signatures.
-For automatic activation, use ActivationType = 'Auto' after supplying the actual processing body.
-
-This procedure sends no data itself and is never invoked by installation. It fails on an existing
-Demo registration, pool or object rather than resetting or overwriting application work. Choose
-unused IDs if 0 is already registered. The fixed Demo names permit only one demo per database.
-
-When finished, z.usp_AsyncChannelRemove @AsyncChannelID = 0 removes the channel registration and
-generated objects, with forced cleanup of pending conversations. It preserves the authored
-z.AsyncChannel_Demo_Interface view, z.usp_AsyncChannel_Demo_Process procedure, destination table
-and pool registration. Remove those separately only after reviewing retained data and pool use.
-Substitute your chosen ID in cleanup if you did not use 0.
 */
 create or alter procedure z.usp_CreateDemoAsyncChannel
 (

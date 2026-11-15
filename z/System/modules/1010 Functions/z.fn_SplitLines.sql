@@ -16,7 +16,7 @@ as return
 (
 	with x0	as
 	(
-		select	cast(1 as bigint) as StartPosition, isnull(cast(datalength(@Str)/2 as bigint), 0) TotalLength, 1 SeparatorLength, 
+		select	cast(1 as bigint) as StartPosition, isnull(cast(len(@Str + N'.') - 1 as bigint), 0) TotalLength, 1 SeparatorLength, 
 				cast(char(0x0d) as nvarchar(1)) Separator1, cast(char(0x0a) as nvarchar(1)) Separator2
 	),
 	x1 as
@@ -26,7 +26,7 @@ as return
 					when a1.NextSeparatorPosition1 > 0 and a1.NextSeparatorPosition2 = 0 then 1
 					when a1.NextSeparatorPosition1 = 0 and a1.NextSeparatorPosition2 > 0 then 1
 					when a1.NextSeparatorPosition1 > 0 and a1.NextSeparatorPosition2 > 0 then 
-						case when abs(a1.NextSeparatorPosition1 - a1.NextSeparatorPosition2) = 1 then 2 else 1 end
+						case when a1.NextSeparatorPosition2 - a1.NextSeparatorPosition1 = 1 then 2 else 1 end
 					else 0
 				end SeparatorLength, 
 				a1.Separator1, a1.Separator2,
@@ -51,7 +51,7 @@ as return
 					when a2.NextSeparatorPosition1 > 0 and a2.NextSeparatorPosition2 = 0 then 1
 					when a2.NextSeparatorPosition1 = 0 and a2.NextSeparatorPosition2 > 0 then 1
 					when a2.NextSeparatorPosition1 > 0 and a2.NextSeparatorPosition2 > 0 then 
-						case when abs(a2.NextSeparatorPosition1 - a2.NextSeparatorPosition2) = 1 then 2 else 1 end						
+						case when a2.NextSeparatorPosition2 - a2.NextSeparatorPosition1 = 1 then 2 else 1 end						
 					else 0
 				end SeparatorLength, 
 				a2.Separator1, a2.Separator2,

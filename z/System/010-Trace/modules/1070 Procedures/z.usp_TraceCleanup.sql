@@ -22,11 +22,11 @@ begin
 		throw 50000, N'Trace cleanup requires full server session visibility.', 1;
 	declare @TraceID int, @CreatorSessionID int, @CreatorLoginTime datetime,
 		@ReturnCode int, @Message nvarchar(2048);
-	declare t cursor local static read_only for
+	declare cTraces cursor local static read_only for
 		select TraceID, CreatorSessionID, CreatorLoginTime from z.Trace r
 		where not exists(select 1 from sys.dm_exec_sessions s where s.session_id = r.CreatorSessionID and s.login_time = r.CreatorLoginTime);
-	open t;
-	fetch next from t into @TraceID, @CreatorSessionID, @CreatorLoginTime;
+	open cTraces;
+	fetch next from cTraces into @TraceID, @CreatorSessionID, @CreatorLoginTime;
 	while @@fetch_status = 0
 	begin
 		-- Lock the exact registration until its native resource and metadata are retired.
@@ -80,9 +80,9 @@ begin
 			if @@trancount > 0 rollback;
 			throw;
 		end catch;
-		fetch next from t into @TraceID, @CreatorSessionID, @CreatorLoginTime;
+		fetch next from cTraces into @TraceID, @CreatorSessionID, @CreatorLoginTime;
 	end;
-	close t;
-	deallocate t;
+	close cTraces;
+	deallocate cTraces;
 end;
 go

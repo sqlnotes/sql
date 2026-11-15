@@ -56,14 +56,14 @@ begin
 		if @ImplicitTransactions = 1 set implicit_transactions on;
 		throw 50001, N'No retention policy exists for the selected partition function.', 1;
 	end
-	declare f cursor local static for
+	declare cFiles cursor local static for
 		select PartitionFunctionName, PartitionRangeType, PartitionRangeTypeInterval, ForwardedPartitionCount,
 			   NextPartitionFileGroup, PartitionsToKeep, ArchivedSwappedPartitions
 		from z.PartitionedTableDataRetention
 		where @PartitionFunctionName is null or PartitionFunctionName = @PartitionFunctionName
 		order by PartitionFunctionName;
-	open f;
-	fetch next from f into @FunctionName, @Period, @Interval, @Forward, @FileGroup, @Keep, @Retain;
+	open cFiles;
+	fetch next from cFiles into @FunctionName, @Period, @Interval, @Forward, @FileGroup, @Keep, @Retain;
 	while @@fetch_status = 0
 	begin
 		select @Locked = 0, @Action = 'Validate', @ActualName = null;
@@ -95,14 +95,14 @@ begin
 				-- Execute-only preflight avoids nested INSERT EXEC for callers capturing preview.
 				if @ShowPlan = 0
 				begin
-					declare v cursor local static for
+					declare cQueries cursor local static for
 						select distinct i.object_id, quotename(object_schema_name(i.object_id)) + N'.' + quotename(object_name(i.object_id)), n.Number
 						from sys.indexes i join sys.partition_schemes s on s.data_space_id = i.data_space_id
 							join sys.partition_functions pf on pf.function_id = s.function_id cross join #PartitionPlan p
 							cross apply(values(p.PartitionNumber), (case when p.Action = 'ExpireBoundary' and pf.boundary_value_on_right = 1 then p.PartitionNumber + 1 end)) n(Number)
 						where pf.name = @FunctionName and i.index_id in (0, 1) and n.Number is not null and p.Action in ('ExtendBoundaries', 'ExpireBoundary');
-					open v;
-					fetch next from v into @ObjectID, @Source, @Number;
+					open cQueries;
+					fetch next from cQueries into @ObjectID, @Source, @Number;
 					while @@fetch_status = 0
 					begin
 						select @Target = quotename(object_schema_name(@ObjectID)) + N'.' + quotename(N'PartitionPreview_' + convert(nvarchar(20), @ObjectID));
@@ -110,10 +110,10 @@ begin
 						insert into #PartitionCopyPreview
 							exec z.usp_CopyTableSchema @FullSourceTableName = @Source, @FullTargetTableName = @Target,
 								@PartitionNumber = @Number, @DropTargetTableIfExists = 0, @CopyIdentity = 1, @ShowPlan = 1;
-						fetch next from v into @ObjectID, @Source, @Number;
+						fetch next from cQueries into @ObjectID, @Source, @Number;
 					end
-					close v;
-					deallocate v;
+					close cQueries;
+					deallocate cQueries;
 				end
 				if @ShowPlan = 1
 				begin
@@ -132,8 +132,8 @@ begin
 			end
 		end try
 		begin catch
-			if cursor_status('local', 'v') >= 0 close v;
-			if cursor_status('local', 'v') > -3 deallocate v;
+			if cursor_status('local', 'v') >= 0 close cQueries;
+			if cursor_status('local', 'v') > -3 deallocate cQueries;
 			if @ShowPlan = 0 and @@trancount > 0 rollback;
 			select @Error = left(concat(N'Partition function ', quotename(@FunctionName), N', action ', @Action, N': ', error_message()), 2048);
 			select @Failures += @Error + nchar(13) + nchar(10);
@@ -145,10 +145,10 @@ begin
 			exec @LockResult = z.usp_ReleaseSemaphore @SemaphoreName = @LockResource, @LockOwner = 'Session';
 			select @Locked = 0;
 		end
-		fetch next from f into @FunctionName, @Period, @Interval, @Forward, @FileGroup, @Keep, @Retain;
+		fetch next from cFiles into @FunctionName, @Period, @Interval, @Forward, @FileGroup, @Keep, @Retain;
 	end
-	close f;
-	deallocate f;
+	close cFiles;
+	deallocate cFiles;
 	if @ShowPlan = 1
 		select PartitionFunctionName, Ordinal, Action, TableName, PartitionNumber, SQL from #PartitionPreview order by PartitionFunctionName, Ordinal;
 	else if @Failures <> N''

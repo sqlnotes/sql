@@ -17,7 +17,7 @@ as return
 (
 	with x0	as
 	(
-		select cast(1 as bigint) as StartPosition, cast(datalength(@Str)/2 as bigint) TotalLength
+		select cast(1 as bigint) as StartPosition, cast(len(@Str + N'.') - 1 as bigint) TotalLength
 		where isnull(@Length, 0) > 0
 	),
 	x1 as

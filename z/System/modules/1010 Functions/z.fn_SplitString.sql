@@ -17,7 +17,7 @@ as return
 (
 	with x0	as
 	(
-		select cast(1 as bigint) as StartPosition, isnull(cast(datalength(@Str)/2 as bigint), 0) TotalLength, isnull(cast(datalength(@Separator)/2 as bigint), 0) SeparatorLength
+		select cast(1 as bigint) as StartPosition, isnull(cast(len(@Str + N'.') - 1 as bigint), 0) TotalLength, isnull(cast(len(@Separator + N'.') - 1 as bigint), 0) SeparatorLength
 	),
 	x1 as
 	(

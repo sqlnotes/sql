@@ -86,12 +86,12 @@ begin
 			if @Slot <= 0 throw 50000, 'Cannot acquire the TaskQueue batch semaphore.', 1;
 
 			-- Holding the task semaphore is authoritative. Session identifiers are diagnostic.
-			declare Recovery cursor local fast_forward for
+			declare cRecovery cursor local fast_forward for
 				select BatchID, TaskID from z.TaskQueueTasks
 				where Status = 'Running' and BatchID = @WorkBatchID
 				order by BatchID, TaskID;
-			open Recovery;
-			fetch next from Recovery into @RecoveryBatchID, @RecoveryTaskID;
+			open cRecovery;
+			fetch next from cRecovery into @RecoveryBatchID, @RecoveryTaskID;
 			while @@fetch_status = 0
 			begin
 				select @RecoverySemaphore = N'z.TaskQueue.Task:' + convert(nvarchar(20), @RecoveryBatchID) + N':' + convert(nvarchar(11), @RecoveryTaskID);
@@ -117,10 +117,10 @@ begin
 						select @RecoveryLockHeld = 0;
 					end;
 				end;
-				fetch next from Recovery into @RecoveryBatchID, @RecoveryTaskID;
+				fetch next from cRecovery into @RecoveryBatchID, @RecoveryTaskID;
 			end;
-			close Recovery;
-			deallocate Recovery;
+			close cRecovery;
+			deallocate cRecovery;
 
 			-- Terminal unmet conditions stop the batch; a retryable failure is not terminal.
 			select @ActionID = newid();
@@ -286,10 +286,10 @@ begin
 				if exists (select 1 from @Bindings where ParameterType is null)
 					throw 50000, 'A task parameter is unknown, output-only or has an unsupported type.', 1;
 				select @Declarations = N'', @Arguments = N'';
-				declare Bindings cursor local fast_forward for
+				declare cBindings cursor local fast_forward for
 					select ParameterIndex, convert(sysname, ParameterName), ParameterType from @Bindings order by ParameterIndex;
-				open Bindings;
-				fetch next from Bindings into @ParameterIndex, @ParameterName, @ParameterType;
+				open cBindings;
+				fetch next from cBindings into @ParameterIndex, @ParameterName, @ParameterType;
 				while @@fetch_status = 0
 				begin
 					select @VariableName = N'@P' + convert(nvarchar(11), @ParameterIndex);
@@ -298,10 +298,10 @@ begin
 						+ N', case when [type] = 0 then null else value end) from openjson(@Body, ''$.parameters['
 						+ convert(nvarchar(11), @ParameterIndex) + N']'') where [key] = ''value'';' + nchar(13) + nchar(10),
 						@Arguments = @Arguments + case when @Arguments = N'' then N' ' else N', ' end + @ParameterName + N' = ' + @VariableName;
-					fetch next from Bindings into @ParameterIndex, @ParameterName, @ParameterType;
+					fetch next from cBindings into @ParameterIndex, @ParameterName, @ParameterType;
 				end;
-				close Bindings;
-				deallocate Bindings;
+				close cBindings;
+				deallocate cBindings;
 				select @Sql = @Declarations + N'exec @Code = ' + @ExecutableCommand + @Arguments + N';', @ReturnCode = null;
 				exec sys.sp_executesql @Sql, N'@Body nvarchar(max), @Code int output', @Body = @TaskBody, @Code = @ReturnCode output;
 				if @@trancount <> 0
@@ -318,8 +318,8 @@ begin
 			begin catch
 				select @Failed = 1, @ErrorNumber = error_number(), @ErrorMessage = error_message();
 				if @@trancount > 0 rollback;
-				if cursor_status('local', 'Bindings') >= 0 close Bindings;
-				if cursor_status('local', 'Bindings') > -3 deallocate Bindings;
+				if cursor_status('local', 'Bindings') >= 0 close cBindings;
+				if cursor_status('local', 'Bindings') > -3 deallocate cBindings;
 			end catch;
 			set nocount, xact_abort on;
 
@@ -347,8 +347,8 @@ begin
 	begin catch
 		if @@trancount > 0 rollback;
 		exec z.usp_SetTaskQueueAction;
-		if cursor_status('local', 'Recovery') >= 0 close Recovery;
-		if cursor_status('local', 'Recovery') > -3 deallocate Recovery;
+		if cursor_status('local', 'Recovery') >= 0 close cRecovery;
+		if cursor_status('local', 'Recovery') > -3 deallocate cRecovery;
 		if @TaskLockHeld = 1
 		begin
 			exec @ReleaseResult = z.usp_ReleaseSemaphore @SemaphoreName = @TaskSemaphore, @LockOwner = 'Session';

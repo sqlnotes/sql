@@ -12,8 +12,6 @@ In a transaction protected by the current database's exclusive job/schedule appl
 @AllOrphanedSchedules bit = 0
 ```
 
-These are the source-declared types and defaults.
-
 ## Results, permissions, and limits
 
 No defined result set. Requires msdb schedule-deletion authority. Cleanup is limited to the current database prefix. The legacy parameter remains for signature compatibility; NULL and 0 use scoped cleanup, and 1 is rejected.

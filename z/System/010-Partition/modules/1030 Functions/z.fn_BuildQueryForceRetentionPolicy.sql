@@ -131,9 +131,9 @@ begin
 			else N'convert(' + @DataType + N',convert(datetime2(7),' + quotename(convert(nvarchar(40), convert(datetime2(7), @FirstNewDate), 126), '''') + N',126))' end,
 			   @LowerLiteral = case when @Maximum is null then null when @BaseType = 'bigint' then convert(nvarchar(100), @Maximum)
 			else N'convert(' + @DataType + N',convert(datetime2(7),' + quotename(convert(nvarchar(40), convert(datetime2(7), @Maximum), 126), '''') + N',126))' end;
-		declare c cursor local static for select ObjectID, Source, quotename(SchemaName) + N'.' + quotename(TableName + N'_Partition_SplitHold'), ColumnName from @Tables order by Source;
-		open c;
-		fetch next from c into @ObjectID, @Source, @Target, @Column;
+		declare cSplitTables cursor local static for select ObjectID, Source, quotename(SchemaName) + N'.' + quotename(TableName + N'_Partition_SplitHold'), ColumnName from @Tables order by Source;
+		open cSplitTables;
+		fetch next from cSplitTables into @ObjectID, @Source, @Target, @Column;
 		while @@fetch_status = 0
 		begin
 			select @Predicate = case when @LowerLiteral is not null
@@ -154,10 +154,10 @@ alter table ' + @Source + N' switch partition ' + convert(nvarchar(20), @Fanout)
 alter table ' + @Target + N' switch to ' + @Source + N' partition ' + convert(nvarchar(20), @Fanout) + N';
 drop table ' + @Target + N';
 ';
-			fetch next from c into @ObjectID, @Source, @Target, @Column;
+			fetch next from cSplitTables into @ObjectID, @Source, @Target, @Column;
 		end
-		close c;
-		deallocate c;
+		close cSplitTables;
+		deallocate cSplitTables;
 		-- Each boundary script declares @ID; execute in separate scopes inside the same transaction.
 		select @SQL = string_agg(convert(nvarchar(max), N'exec sys.sp_executesql N''' + replace(SQL, N'''', N'''''') + N''';'), nchar(13) + nchar(10)) within group(order by Ordinal) from @Splits;
 		insert into @Ret(Name, SQL, Action, PartitionNumber) values('Extend future boundaries', N'if @@trancount > 0 or @@options & 2 = 2
@@ -179,14 +179,14 @@ end catch;', 'ExtendBoundaries', @Fanout);
 		outer apply z.fn_SqlVariantToDateTime(case when @BaseType = 'bigint' then r.value else convert(sql_variant, null) end) d
 		where r.function_id = @FunctionID and @PartitionsToKeep >= 0 and
 			case when @BaseType = 'bigint' then convert(datetime2(7), d.Value) else convert(datetime2(7), case when @BaseType <> 'bigint' then r.value end) end <= @FirstPeriodToKeep;
-	declare b cursor local static for
+	declare cBatches cursor local static for
 		select r.boundary_id, r.value, case when @BaseType = 'bigint' then convert(datetime2(7), d.Value) else convert(datetime2(7), case when @BaseType <> 'bigint' then r.value end) end
 		from sys.partition_range_values r outer apply z.fn_SqlVariantToDateTime(case when @BaseType = 'bigint' then r.value else convert(sql_variant, null) end) d
 		where r.function_id = @FunctionID and @PartitionsToKeep >= 0 and
 			case when @BaseType = 'bigint' then convert(datetime2(7), d.Value) else convert(datetime2(7), case when @BaseType <> 'bigint' then r.value end) end <= @FirstPeriodToKeep
 		order by r.boundary_id desc;
-	open b;
-	fetch next from b into @BoundaryID, @Boundary, @BoundaryDate;
+	open cBatches;
+	fetch next from cBatches into @BoundaryID, @Boundary, @BoundaryDate;
 	while @@fetch_status = 0
 	begin
 		select @Suffix = convert(nvarchar(8), @BoundaryDate, 112) + case when @PartitionRangeType in ('Minute', 'Hourly') then N'_' + replace(convert(nvarchar(5), @BoundaryDate, 108), N':', N'') else N'' end,
@@ -220,8 +220,8 @@ end catch;', 'ExtendBoundaries', @Fanout);
 		begin
 			delete from @Ret;
 			insert into @Ret(Name, SQL, Action) values('Error', N'throw 50001, ' + quotename(@Error, '''') + N', 1;', 'Error');
-			close b;
-			deallocate b;
+			close cBatches;
+			deallocate cBatches;
 			return;
 		end
 		select @PreviousBoundary = null, @NextBoundary = null;
@@ -238,9 +238,9 @@ end catch;', 'ExtendBoundaries', @Fanout);
 			else N'convert(' + @DataType + N',convert(datetime2(7),' + quotename(convert(nvarchar(40), convert(datetime2(7), case when @BaseType <> 'bigint' then @PreviousBoundary end), 126), '''') + N',126))' end,
 			@UpperLiteral = case when @NextBoundary is null then null when @BaseType = 'bigint' then convert(nvarchar(100), @NextBoundary)
 			else N'convert(' + @DataType + N',convert(datetime2(7),' + quotename(convert(nvarchar(40), convert(datetime2(7), case when @BaseType <> 'bigint' then @NextBoundary end), 126), '''') + N',126))' end;
-		declare t cursor local static for select ObjectID, Source, quotename(SchemaName) + N'.' + quotename(TableName + N'_Partition_' + @Suffix), ColumnName from @Tables order by Source;
-		open t;
-		fetch next from t into @ObjectID, @Source, @Target, @Column;
+		declare cTargetTables cursor local static for select ObjectID, Source, quotename(SchemaName) + N'.' + quotename(TableName + N'_Partition_' + @Suffix), ColumnName from @Tables order by Source;
+		open cTargetTables;
+		fetch next from cTargetTables into @ObjectID, @Source, @Target, @Column;
 		while @@fetch_status = 0
 		begin
 			select @OutSQL += N'if object_id(' + (N'N''' + replace(@Target, N'''', N'''''') + N'''') + N') is not null throw 50001, N''Expired partition target already exists.'', 1;
@@ -272,10 +272,10 @@ alter table ' + @MergeTarget + N' switch to ' + @Source + N' partition ' + conve
 drop table ' + @MergeTarget + N';
 ';
 			end
-			fetch next from t into @ObjectID, @Source, @Target, @Column;
+			fetch next from cTargetTables into @ObjectID, @Source, @Target, @Column;
 		end
-		close t;
-		deallocate t;
+		close cTargetTables;
+		deallocate cTargetTables;
 		select @UpperLiteral = case when @BaseType = 'bigint' then convert(nvarchar(100), @Boundary)
 			else N'convert(' + @DataType + N',convert(datetime2(7),' + quotename(convert(nvarchar(40), convert(datetime2(7), @Boundary), 126), '''') + N',126))' end;
 		insert into @Ret(Name, SQL, Action, PartitionNumber) values('Partition Swapout boundary ' + convert(varchar(40), @BoundaryDate, 126), N'if @@trancount > 0 or @@options & 2 = 2
@@ -293,10 +293,10 @@ begin catch
 	if @@trancount > 0 rollback;
 	throw;
 end catch;', 'ExpireBoundary', @BoundaryID);
-		fetch next from b into @BoundaryID, @Boundary, @BoundaryDate;
+		fetch next from cBatches into @BoundaryID, @Boundary, @BoundaryDate;
 	end
-	close b;
-	deallocate b;
+	close cBatches;
+	deallocate cBatches;
 	return;
 end
 go

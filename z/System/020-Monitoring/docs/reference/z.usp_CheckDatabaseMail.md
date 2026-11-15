@@ -9,10 +9,11 @@ Enable show advanced options and Database Mail XPs when needed. Create a missing
 ## Parameters and defaults
 
 ```text
-@ProfileName nvarchar(128) = 'Default Email',@DisplayName nvarchar(128) = 'Database Alert',@DefaultEmailAddress nvarchar(128) = 'aaa@bbb.com',@Password nvarchar(128) = 'passwrod'
+@ProfileName nvarchar(128) = 'Default Email',
+@DisplayName nvarchar(128) = 'Database Alert',
+@DefaultEmailAddress nvarchar(128) = 'aaa@bbb.com',
+@Password nvarchar(128) = 'passwrod'
 ```
-
-These are the source-declared types and defaults.
 
 ## Results, permissions, and limits
 

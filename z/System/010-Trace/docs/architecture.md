@@ -8,7 +8,7 @@ Each z.Trace registration identifies one native SQL Server rowset trace. TraceID
 
 Configuration, create, start, stop, close, collection and abandoned cleanup reject existing caller transactions. Native SQL Trace actions cannot be rolled back with metadata.
 
-Each trace has its own receiving table and callbacks. SQL Trace evaluates filters natively: predicates are grouped by column; different columns are combined with AND. Predicates within a column retain their configured AND/OR order. Native filtering semantics and collation apply.
+Each trace has its own receiving table and callbacks. SQL Trace evaluates filters natively: predicates are applied in `FilterOrdinal` order using each row's configured logical operator (`and`/`or`). Native filtering semantics and collation apply.
 
 ## Collection and transactions
 
@@ -20,9 +20,9 @@ An externally stopped or closed trace normally leaves polling; other selected tr
 
 ## Abandoned traces
 
-z.Trace records CreatorSessionID and CreatorLoginTime. z.usp_TraceCleanup removes registrations whose original session/login no longer exists, stopping and closing only a matching registered native rowset trace. An idle connected owner keeps its traces. A recycled session ID does not keep a previous owner's trace alive. Cleanup locks the registration and acts on its TraceID; unregistered SQL Server traces are outside its scope. There is no separate native ID or start-time tag. If a trace is closed outside the framework and its ID is reused while its registration remains, that reuse cannot be distinguished by ID alone. Use the framework lifecycle APIs to keep registrations synchronized.
+z.Trace records CreatorSessionID and CreatorLoginTime. z.usp_TraceCleanup removes registrations whose original session/login no longer exists, stopping and closing only a matching registered native rowset trace. An idle connected owner keeps its traces. A recycled session ID does not keep a previous owner's trace alive. Cleanup locks the registration and acts on its TraceID; unregistered SQL Server traces are outside its scope. Use the framework lifecycle APIs to keep registrations synchronized.
 
-TraceCreate and Monitoring startup call cleanup; operators can also invoke it explicitly. Cleanup requires full server session visibility. It never infers abandonment from the absence of an active request.
+z.usp_TraceCreate calls cleanup automatically before allocating a trace; operators can also invoke it explicitly. Cleanup requires full server session visibility. It never infers abandonment from the absence of an active request.
 
 ## Installation and transition
 

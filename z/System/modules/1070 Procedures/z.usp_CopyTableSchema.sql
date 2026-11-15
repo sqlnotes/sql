@@ -340,7 +340,7 @@ begin
 	end
 
 	set xact_abort on;
-	declare CopyParts cursor local fast_forward for
+	declare cCopyParts cursor local fast_forward for
 		select Definition from #CopySchemaScript order by Ordinal, PartName;
 	begin try
 		if @InitialTransactionCount = 0 begin tran;
@@ -349,21 +349,21 @@ begin
 			save tran @Savepoint;
 			select @SavepointEstablished = 1;
 		end
-		open CopyParts;
-		fetch next from CopyParts into @SQL;
+		open cCopyParts;
+		fetch next from cCopyParts into @SQL;
 		while @@fetch_status = 0
 		begin
 			if @PrintCode = 1 exec z.usp_PrintString @SQL;
 			exec sys.sp_executesql @SQL;
-			fetch next from CopyParts into @SQL;
+			fetch next from cCopyParts into @SQL;
 		end
-		close CopyParts;
-		deallocate CopyParts;
+		close cCopyParts;
+		deallocate cCopyParts;
 		if @InitialTransactionCount = 0 commit;
 	end try
 	begin catch
-		if cursor_status('local', 'CopyParts') >= 0 close CopyParts;
-		if cursor_status('local', 'CopyParts') >= -1 deallocate CopyParts;
+		if cursor_status('local', 'CopyParts') >= 0 close cCopyParts;
+		if cursor_status('local', 'CopyParts') >= -1 deallocate cCopyParts;
 		if @InitialTransactionCount = 0 and @@trancount > 0 rollback;
 		else if @SavepointEstablished = 1 and xact_state() = 1 rollback tran @Savepoint;
 		throw;

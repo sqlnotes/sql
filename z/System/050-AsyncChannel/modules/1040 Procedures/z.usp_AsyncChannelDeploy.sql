@@ -16,19 +16,19 @@ as
 begin
 	set nocount, xact_abort on;
 	declare @GeneratedScript nvarchar(max)
-	declare Scripts cursor local static for
+	declare cScripts cursor local static for
 		select GeneratedScript
 		from z.v_AsyncChannelScripts
 		where AsyncChannelID = @AsyncChannelID
 			and (NeedDeployment = 1 or (@ForceDeployment = 1 and ObjectType not in ('Interface','Queue','Service','Processing')))
 		order by Ordinal
-	open Scripts
-	fetch next from Scripts into @GeneratedScript
+	open cScripts
+	fetch next from cScripts into @GeneratedScript
 	while @@fetch_status = 0
 	begin
 		exec(@GeneratedScript)
-		fetch next from Scripts into @GeneratedScript
+		fetch next from cScripts into @GeneratedScript
 	end
-	close Scripts
-	deallocate Scripts
+	close cScripts
+	deallocate cScripts
 end

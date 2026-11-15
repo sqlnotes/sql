@@ -121,12 +121,12 @@ begin
 	select	@df = iif(@DateFrom <= @DateTo, @DateFrom, @DateTo),
 			@dt = iif(@DateFrom <= @DateTo, @DateTo, @DateFrom)
 
-	declare c cursor static local for
+	declare cBoundaries cursor static local for
 		select name
 		from sys.partition_schemes 
 		where function_id = @PartitonFunctionID
 		order by name
-	open c
+	open cBoundaries
 
 	while @df <= @dt
 	begin
@@ -149,7 +149,7 @@ begin
 				select @SQL = 'alter partition scheme '  + quotename(@PartitionSchemeName)+ ' next used ' + quotename(@FileGroup) + ';'
 				insert into @ret(SQL, Date)
 					values(@SQL, @df)
-				fetch next from c into @PartitionSchemeName
+				fetch next from cBoundaries into @PartitionSchemeName
 			end
 
 			select @SQL = 'declare @ID ' + @DataType + ' = '
@@ -166,7 +166,7 @@ begin
 				select @SQL = 'alter partition scheme '  + quotename(@PartitionSchemeName)+ ' next used ' + quotename(@FileGroup) + ';'
 				insert into @ret(SQL, Date)
 					values(@SQL, @df)
-				fetch next from c into @PartitionSchemeName
+				fetch next from cBoundaries into @PartitionSchemeName
 			end
 		end
 		
@@ -179,8 +179,8 @@ begin
 							when 'Yearly' then dateadd(year, @PartitionRangeTypeInterval, @df)
 						end
 	end
-	close c
-	deallocate c
+	close cBoundaries
+	deallocate cBoundaries
 	return
 end
 go

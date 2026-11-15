@@ -21,7 +21,7 @@ create or alter function z.fn_BuildQueryMergeTable
 returns table
 ```
 
-Returns Query plus TargetTableName, HasIdentity, ContainNoneKeyColumn, MergeKey, InsertColumnList, InsertValueList, UpdateWhereClause, UpdateValueList. Generates a merge template with a source-query placeholder using `z.v_Objects`; it does not execute the merge. Keys default to the catalog primary key. Explicit `@PrimaryKeys` and `@ExcludedColumns` are comma-separated raw column names with outer spaces trimmed, not bracketed SQL fragments. Generated column references use `quotename()`, including reserved words and embedded closing brackets; computed and rowversion columns are omitted. Identity omission/legacy LOB branches can still generate invalid SQL; see [troubleshooting](../troubleshooting.md).
+Returns Query plus TargetTableName, HasIdentity, ContainNoneKeyColumn, MergeKey, InsertColumnList, InsertValueList, UpdateWhereClause, UpdateValueList. Generates a merge template with a source-query placeholder using `z.v_Objects`; it does not execute the merge. Keys default to the catalog primary key. Explicit `@PrimaryKeys` and `@ExcludedColumns` are comma-separated raw column names with outer spaces trimmed, not bracketed SQL fragments. Generated column references use `quotename()`, including reserved words and embedded closing brackets; computed and rowversion columns are omitted. When `@ForceIdentityColumnInsert = 0`, identity columns are omitted from the insert lists.
 
 ## z.fn_DecodeZSequenceID
 
@@ -127,7 +127,7 @@ create or alter function z.fn_GetPeriodStart
 returns datetime
 ```
 
-Returns datetime period start for Second, Minute, Hourly, Daily, Weekly, Monthly or Yearly. Default anchor is year 0006; Weekly defaults to Monday 1900-01-01 independently of @@datefirst; an explicit StartDate anchors multiweek intervals to the Monday of its week. Positive interval required but not validated. Arithmetic/return range can fail.
+Returns datetime period start for Second, Minute, Hourly, Daily, Weekly, Monthly or Yearly. Default anchor is year 0006; Weekly defaults to Monday 1900-01-01 independently of @@datefirst; an explicit StartDate anchors multiweek intervals to the Monday of its week. `@Interval = 0` returns NULL; negative or out-of-range intervals can overflow datetime bounds.
 
 ## z.fn_IsAmazonRDS
 
@@ -211,9 +211,9 @@ create or alter function z.fn_SplitLines
 returns table
 ```
 
-Returns Ordinal/Value rows splitting CR/LF recursively. Empty/null input gives no rows. For input without supplementary Unicode characters, leading, repeated and trailing separators retain empty values, including a final empty row after a trailing separator. Select ordered explicitly; long input may need maxrecursion override.
+Returns Ordinal/Value rows splitting CR, LF, and CRLF recursively. Empty/null input gives no rows. Leading, repeated and trailing separators retain empty values, including a final empty row after a trailing separator and an empty row between adjacent LF+CR (`\n\r`). Supports supplementary Unicode characters under `_SC` collations and preserves trailing spaces. Select ordered explicitly; inputs with more than 100 lines require `option (maxrecursion 0)`.
 
-Formerly `z.fn_ReadLinesFromString`; update callers before deploying. System post removes the old name. The current implementation also treats adjacent LFCR as one separator and can include newline characters in the last row for supplementary Unicode under SC collations.
+Formerly `z.fn_ReadLinesFromString`; update callers before deploying. System post removes the old name.
 
 ## z.fn_FormatDurationMilliseconds
 

@@ -54,15 +54,15 @@ begin
 		if exists
 		(
 			select 1 from #Callbacks g
-			where object_id(g.ProcedureName, N'P') is null or parsename(g.ProcedureName, 2) is null or parsename(g.ProcedureName, 3) is not null
+			where object_id(g.ProcedureName, N'P') is null or parsename(g.ProcedureName, 2) is null or parsename(g.ProcedureName, 3) is not null or parsename(g.ProcedureName, 4) is not null
 				or exists(select 1 from (values(N'@TraceSequence'),(N'@TraceID'),(N'@EventName')) p(Name)
 					where not exists(select 1 from sys.parameters s where s.object_id = object_id(g.ProcedureName, N'P') and s.name = p.Name))
 		)
 			throw 50000, N'Trace callbacks must be existing two-part procedures accepting @TraceSequence, @TraceID and @EventName.', 1;
 		-- Hold the destination lock for DDL only, never for collection.
-		declare d cursor local static for select distinct ReceivingTable from #Traces order by ReceivingTable;
-		open d;
-		fetch next from d into @ReceivingTable;
+		declare cDestinations cursor local static for select distinct ReceivingTable from #Traces order by ReceivingTable;
+		open cDestinations;
+		fetch next from cDestinations into @ReceivingTable;
 		while @@fetch_status = 0
 		begin
 			if parsename(@ReceivingTable, 2) is null or parsename(@ReceivingTable, 3) is not null or parsename(@ReceivingTable, 4) is not null
@@ -84,17 +84,17 @@ begin
 				throw 50000, N'Trace receiving tables require noncomputed, nonidentity, nonnullable TraceSequence bigint, EventID int and EventName nvarchar(128) or wider.', 1;
 			if object_id(@ReceivingTable, N'U') is null
 			begin
-				select @SQL = N'create table ' + quotename(parsename(@ReceivingTable, 2)) + N'.' + quotename(parsename(@ReceivingTable, 1)) + N' (TraceSequence bigint not null constraint ' + quotename(N'DF_TraceReceiver_' + replace(convert(nvarchar(36), newid()), N'-', N''))
+				select @SQL = N'create table ' + quotename(parsename(@ReceivingTable, 2)) + N'.' + quotename(parsename(@ReceivingTable, 1)) + N' (TraceSequence bigint not null constraint ' + quotename(left(N'DF_' + parsename(@ReceivingTable, 2) + N'_' + parsename(@ReceivingTable, 1) + N'_TraceSequence', 128))
 					+ N' default(datediff_big(second, ''1900-01-01'', getutcdate()) * 268435456 | next value for z.SeqGeneralID), EventID int not null, EventName nvarchar(128) not null, constraint '
 					+ quotename(left(N'PK_' + parsename(@ReceivingTable, 2) + N'_' + parsename(@ReceivingTable, 1), 128)) + N' primary key clustered(TraceSequence) with (data_compression = page) on PS_SchemaZPartitionGeneric(TraceSequence)) on PS_SchemaZPartitionGeneric(TraceSequence);';
 				exec sys.sp_executesql @SQL;
 			end;
-			declare c cursor local fast_forward for select c.ColumnName, c.Definition from #Columns c
+			declare cColumns cursor local fast_forward for select c.ColumnName, c.Definition from #Columns c
 				where exists(select 1 from #SelectedColumns b inner join #Traces t on t.TraceID = b.TraceID
 					where t.ReceivingTable = @ReceivingTable and b.ColumnID = c.ColumnID)
 				order by c.ColumnID;
-			open c;
-			fetch next from c into @EventName, @Definition;
+			open cColumns;
+			fetch next from cColumns into @EventName, @Definition;
 			while @@fetch_status = 0
 			begin
 				if not exists(select 1 from sys.columns where object_id = object_id(@ReceivingTable) and name = @EventName)
@@ -102,15 +102,15 @@ begin
 					select @SQL = N'alter table ' + quotename(parsename(@ReceivingTable, 2)) + N'.' + quotename(parsename(@ReceivingTable, 1)) + N' add ' + quotename(@EventName) + N' ' + @Definition + N' null;';
 					exec sys.sp_executesql @SQL;
 				end;
-				fetch next from c into @EventName, @Definition;
+				fetch next from cColumns into @EventName, @Definition;
 			end;
-			close c;
-			deallocate c;
+			close cColumns;
+			deallocate cColumns;
 			commit;
-			fetch next from d into @ReceivingTable;
+			fetch next from cDestinations into @ReceivingTable;
 		end;
-		close d;
-		deallocate d;
+		close cDestinations;
+		deallocate cDestinations;
 		select @Declarations = (select N', @C' + convert(nvarchar(10), ColumnID) + N' ' + Definition from #Columns order by ColumnID for xml path(''), type).value('.', 'nvarchar(max)'),
 			@Reset = (select N', @C' + convert(nvarchar(10), ColumnID) + N' = null' from #Columns order by ColumnID for xml path(''), type).value('.', 'nvarchar(max)');
 		select @Decode =
@@ -130,9 +130,9 @@ begin
 				end + N';'
 			from #Columns order by ColumnID for xml path(''), type
 		).value('.', 'nvarchar(max)');
-		declare r cursor local static read_only for select TraceID, ReceivingTable from #Traces order by TraceID;
-		open r;
-		fetch next from r into @TraceID, @ReceivingTable;
+		declare cRoutes cursor local static read_only for select TraceID, ReceivingTable from #Traces order by TraceID;
+		open cRoutes;
+		fetch next from cRoutes into @TraceID, @ReceivingTable;
 		while @@fetch_status = 0
 		begin
 			select @ColumnNames = (select N', ' + quotename(c.ColumnName) from #Columns c
@@ -151,13 +151,13 @@ begin
 					insert ' + quotename(parsename(@ReceivingTable, 2)) + N'.' + quotename(parsename(@ReceivingTable, 1))
 					+ N' (TraceSequence, EventID, EventName' + @ColumnNames + N')
 						values (@TraceSequence, @EventID, @EventName' + @Values + N');';
-			declare g cursor local static read_only for
+			declare cCallbacks cursor local static read_only for
 				select EventName, quotename(parsename(ProcedureName, 2)) + N'.' + quotename(parsename(ProcedureName, 1))
 				from #Callbacks where TraceID = @TraceID
 					and (EventName = N'all' or not exists(select 1 from #Callbacks where TraceID = @TraceID and EventName = N'all'))
 				order by EventName;
-			open g;
-			fetch next from g into @EventName, @Callback;
+			open cCallbacks;
+			fetch next from cCallbacks into @EventName, @Callback;
 			while @@fetch_status = 0
 			begin
 				select @Routes += N'
@@ -166,16 +166,16 @@ begin
 						select @Operation = N''callback ' + replace(@Callback, '''', '''''') + N''';
 						exec ' + @Callback + N' @TraceSequence = @TraceSequence, @TraceID = @CurrentTraceID, @EventName = @EventName;
 					end;';
-				fetch next from g into @EventName, @Callback;
+				fetch next from cCallbacks into @EventName, @Callback;
 			end;
-			close g;
-			deallocate g;
+			close cCallbacks;
+			deallocate cCallbacks;
 			select @Routes += N'
 				end;';
-			fetch next from r into @TraceID, @ReceivingTable;
+			fetch next from cRoutes into @TraceID, @ReceivingTable;
 		end;
-		close r;
-		deallocate r;
+		close cRoutes;
+		deallocate cRoutes;
 		select @SQL = N'declare @EventID int, @EventName nvarchar(128), @ColumnID int, @Data varbinary(max), @TraceSequence bigint,
 	@BatchCount int = 0, @BatchStarted datetime2(7), @ReadEvents int, @FetchStatus int, @FrameLength int,
 	@CurrentTraceID int, @CurrentName nvarchar(128), @Operation nvarchar(600),
@@ -283,11 +283,11 @@ end catch;';
 	end try
 	begin catch
 		if @@trancount > 0 rollback;
-		declare e cursor local static read_only for
+		declare cErrorCleanup cursor local static read_only for
 			select s.TraceID, s.CreatorLoginTime from #CleanupTraces s inner join z.Trace t on t.TraceID = s.TraceID
 				and t.CreatorSessionID = @@spid and t.CreatorLoginTime = s.CreatorLoginTime;
-		open e;
-		fetch next from e into @TraceID, @CleanupLoginTime;
+		open cErrorCleanup;
+		fetch next from cErrorCleanup into @TraceID, @CleanupLoginTime;
 		while @@fetch_status = 0
 		begin
 			begin try
@@ -297,17 +297,17 @@ end catch;';
 			begin catch
 				print N'Trace error cleanup failed; run z.usp_TraceCleanup after the owner disconnects.';
 			end catch;
-			fetch next from e into @TraceID, @CleanupLoginTime;
+			fetch next from cErrorCleanup into @TraceID, @CleanupLoginTime;
 		end;
-		close e;
-		deallocate e;
+		close cErrorCleanup;
+		deallocate cErrorCleanup;
 		throw;
 	end catch;
-	declare x cursor local static read_only for
+	declare cCloseCleanup cursor local static read_only for
 		select s.TraceID, s.CreatorLoginTime from #CleanupTraces s inner join z.Trace t on t.TraceID = s.TraceID
 			and t.CreatorSessionID = @@spid and t.CreatorLoginTime = s.CreatorLoginTime;
-	open x;
-	fetch next from x into @TraceID, @CleanupLoginTime;
+	open cCloseCleanup;
+	fetch next from cCloseCleanup into @TraceID, @CleanupLoginTime;
 	while @@fetch_status = 0
 	begin
 		begin try
@@ -316,7 +316,7 @@ end catch;';
 		end try
 		begin catch
 			-- Attempt every remaining selected trace, then rethrow this first close error.
-			fetch next from x into @TraceID, @CleanupLoginTime;
+			fetch next from cCloseCleanup into @TraceID, @CleanupLoginTime;
 			while @@fetch_status = 0
 			begin
 				begin try
@@ -326,15 +326,15 @@ end catch;';
 				begin catch
 					print N'Additional trace cleanup failed; run z.usp_TraceCleanup after the owner disconnects.';
 				end catch;
-				fetch next from x into @TraceID, @CleanupLoginTime;
+				fetch next from cCloseCleanup into @TraceID, @CleanupLoginTime;
 			end;
-			close x;
-			deallocate x;
+			close cCloseCleanup;
+			deallocate cCloseCleanup;
 			throw;
 		end catch;
-		fetch next from x into @TraceID, @CleanupLoginTime;
+		fetch next from cCloseCleanup into @TraceID, @CleanupLoginTime;
 	end;
-	close x;
-	deallocate x;
+	close cCloseCleanup;
+	deallocate cCloseCleanup;
 end;
-go
+

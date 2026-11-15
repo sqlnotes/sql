@@ -18,11 +18,11 @@ begin
 		begin
 			select @SQL = N'
 declare @TraceID int, @Started datetime, @Stopped datetime, @ReturnCode int;
-declare n cursor local static read_only for
+declare cTraces cursor local static read_only for
 	select TraceID, ' + iif(col_length(N'z.TraceCollectorTrace', N'NativeStartTime') is null, N'convert(datetime, null)', N'NativeStartTime') + N', NativeStopTime
 	from z.TraceCollectorTrace with (tablockx, holdlock);
-open n;
-fetch next from n into @TraceID, @Started, @Stopped;
+open cTraces;
+fetch next from cTraces into @TraceID, @Started, @Stopped;
 while @@fetch_status = 0
 begin
 	if exists(select 1 from sys.traces where id = @TraceID and is_default = 0 and is_rowset = 1
@@ -60,10 +60,10 @@ begin
 			and stop_time = @Stopped and (@Started is null or start_time = @Started))
 			throw 50000, N''A previous trace generation remains open after installation cleanup.'', 1;
 	end;
-	fetch next from n into @TraceID, @Started, @Stopped;
+	fetch next from cTraces into @TraceID, @Started, @Stopped;
 end;
-close n;
-deallocate n;
+close cTraces;
+deallocate cTraces;
 delete z.TraceCollectorTrace;';
 			exec sys.sp_executesql @SQL;
 		end;

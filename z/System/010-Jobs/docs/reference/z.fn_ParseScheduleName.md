@@ -12,8 +12,6 @@ ScheduleName nvarchar(128) -> normalized schedule columns. Accept legacy `Schema
 @ScheduleName nvarchar(128)
 ```
 
-These are the source-declared types and defaults. Table-valued-function callers must supply arguments or the `default` keyword explicitly.
-
 ## Results, permissions, and limits
 
 No writes or explicit transaction. Requires function access; schedule conversion does not validate a deployed Agent schedule. See subsystem troubleshooting for known conversion defects.

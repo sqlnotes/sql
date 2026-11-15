@@ -140,9 +140,9 @@ end
 	if @JobID is not null
 	begin
 		insert into #JobSchedule
-			exec msdb..sp_help_jobschedule @job_name = @JobName
+			exec msdb.dbo.sp_help_jobschedule @job_name = @JobName
 		insert into #Steps
-			exec msdb..sp_help_jobstep @job_name = @JobName
+			exec msdb.dbo.sp_help_jobstep @job_name = @JobName
 		if exists(select * from #Steps s where s.step_id not between 1 and 11
 			or (s.step_id not in (1, 2) and not exists(select * from @ManagedStepNames n where n.StepName = s.step_name)))
 			throw 51000, 'The existing job has additional steps; remove them explicitly before reapplying its definition.', 1;
@@ -157,19 +157,19 @@ end
 		begin
 			-- Free all changed names before restoring them, including arbitrary managed-name cycles.
 			declare @TemporaryStepName nvarchar(128)
-			declare RenameSteps cursor local fast_forward for
+			declare cRenameSteps cursor local fast_forward for
 				select s.step_id from #Steps s join @DesiredSteps d on d.StepID = s.step_id
 				where s.step_name <> d.StepName order by s.step_id
-			open RenameSteps
-			fetch next from RenameSteps into @StepID
+			open cRenameSteps
+			fetch next from cRenameSteps into @StepID
 			while @@fetch_status = 0
 			begin
 				select @TemporaryStepName = N'Schema z repair ' + convert(nvarchar(36), newid())
 				exec msdb.dbo.sp_update_jobstep @job_id = @JobID, @step_id = @StepID, @step_name = @TemporaryStepName
-				fetch next from RenameSteps into @StepID
+				fetch next from cRenameSteps into @StepID
 			end
-			close RenameSteps
-			deallocate RenameSteps
+			close cRenameSteps
+			deallocate cRenameSteps
 		end
 	end
 	else
@@ -178,10 +178,10 @@ end
 		exec msdb.dbo.sp_add_job @job_name= @JobName, @enabled = 1, @notify_level_eventlog = 0, @notify_level_email = 0, @notify_level_netsend = 0, @notify_level_page = 0, @delete_level = @DeleteAfterExecution, @description = @Description, @category_name = @CategoryName, @owner_login_name = null, @job_id = @JobID output
 		select @RebuildSteps = 1, @IsNewJob = 1
 	end
-	declare ManagedSteps cursor local fast_forward for
+	declare cManagedSteps cursor local fast_forward for
 		select StepID, StepName, Command, DatabaseName, OnSuccessAction, OnFailAction from @DesiredSteps order by StepID
-	open ManagedSteps
-	fetch next from ManagedSteps into @StepID, @StepName, @StepCommand, @StepDatabase, @OnSuccessAction, @OnFailAction
+	open cManagedSteps
+	fetch next from cManagedSteps into @StepID, @StepName, @StepCommand, @StepDatabase, @OnSuccessAction, @OnFailAction
 	while @@fetch_status = 0
 	begin
 		if @RebuildSteps = 1
@@ -196,10 +196,10 @@ end
 			if exists(select * from #Steps where step_id = @StepID and command <> @StepCommand)
 				exec msdb.dbo.sp_update_jobstep @job_id = @JobID, @step_id = @StepID, @command = @StepCommand
 		end
-		fetch next from ManagedSteps into @StepID, @StepName, @StepCommand, @StepDatabase, @OnSuccessAction, @OnFailAction
+		fetch next from cManagedSteps into @StepID, @StepName, @StepCommand, @StepDatabase, @OnSuccessAction, @OnFailAction
 	end
-	close ManagedSteps
-	deallocate ManagedSteps
+	close cManagedSteps
+	deallocate cManagedSteps
 	if @IsNewJob = 1 exec msdb.dbo.sp_add_jobserver @job_id = @JobID, @server_name = N'(local)'
 	exec msdb.dbo.sp_update_job @job_id = @JobID, @start_step_id = 1, @description = @Description, @category_name = @CategoryName, @delete_level = @DeleteAfterExecution
 	-- put it here for now.
@@ -214,15 +214,15 @@ end
 		end
 	end
 
-	declare c cursor local for
+	declare cCleanupSchedules cursor local for
 		select isnull(a.ScheduleID, b.schedule_id) ScheduleID,
 			case when a.ScheduleID is null then 'D' when b.schedule_id is null then 'I' end Operation
 		from #ScheduleIDs a
 			full outer join #JobSchedule b on a.ScheduleID = b.schedule_id
 		where a.ScheduleID is null or b.schedule_id is null
 		order by Operation desc -- Attach the replacement schedules before detaching the previous ones.
-	open c
-	fetch next from c into @ScheduleID, @Operation
+	open cCleanupSchedules
+	fetch next from cCleanupSchedules into @ScheduleID, @Operation
 	while @@fetch_status = 0
 	begin
 		if @Operation = 'D'
@@ -233,10 +233,10 @@ end
 		begin
 			exec msdb.dbo.sp_attach_schedule @job_id = @JobID, @schedule_id = @ScheduleID
 		end
-		fetch next from c into @ScheduleID, @Operation
+		fetch next from cCleanupSchedules into @ScheduleID, @Operation
 	end
-	close c
-	deallocate c
+	close cCleanupSchedules
+	deallocate cCleanupSchedules
 	commit
 	end try
 	begin catch

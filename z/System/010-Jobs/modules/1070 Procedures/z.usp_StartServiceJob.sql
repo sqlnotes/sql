@@ -17,5 +17,5 @@ begin
 	declare @JobID uniqueidentifier 
 	select @JobID = z.fn_GetServiceJobID(@Name)
 	if @JobID is not null
-		exec msdb..sp_start_job @job_id = @JobID;
+		exec msdb.dbo.sp_start_job @job_id = @JobID;
 end

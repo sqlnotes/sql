@@ -113,9 +113,9 @@ begin
 		exec @LockResult = z.usp_AcquireSemaphore @SemaphoreName = @LockName, @TotalCount = 1, @LockOwner = 'Session', @LockTimeout = 0;
 		if @LockResult <= 0 throw 50000, 'A backup or cleanup is already active for this database folder.', 1;
 		select @LockHeld = 1;
-		declare Folders cursor local fast_forward for select Name from (values(N'FULL'),(N'DIFF'),(N'LOG')) f(Name);
-		open Folders;
-		fetch next from Folders into @TypeFolder;
+		declare cFolders cursor local fast_forward for select Name from (values(N'FULL'),(N'DIFF'),(N'LOG')) f(Name);
+		open cFolders;
+		fetch next from cFolders into @TypeFolder;
 		while @@fetch_status = 0
 		begin
 			select @Folder = @Root + @Separator + @TypeFolder;
@@ -139,10 +139,10 @@ begin
 							or parent_directory collate Latin1_General_100_CI_AS = (@Folder + @Separator) collate Latin1_General_100_CI_AS)
 							and full_filesystem_path collate Latin1_General_100_CI_AS = (@Folder + @Separator + file_or_directory_name) collate Latin1_General_100_CI_AS));
 			end
-			fetch next from Folders into @TypeFolder;
+			fetch next from cFolders into @TypeFolder;
 		end
-		close Folders;
-		deallocate Folders;
+		close cFolders;
+		deallocate cFolders;
 		if exists(select Path from #Files group by Path having count(*) > 1) throw 50000, 'Duplicate inventory paths; cleanup refused.', 1;
 
 		if @UseBackupHeader = 1
@@ -160,9 +160,9 @@ begin
 			end
 			while @Pass <= 2 and @SkipReason is null
 			begin
-				declare Media cursor local fast_forward for select Path, Fingerprint from #Files order by Path;
-				open Media;
-				fetch next from Media into @Path, @ExpectedFingerprint;
+				declare cMedia cursor local fast_forward for select Path, Fingerprint from #Files order by Path;
+				open cMedia;
+				fetch next from cMedia into @Path, @ExpectedFingerprint;
 				while @@fetch_status = 0 and @SkipReason is null
 				begin
 					truncate table #Header;
@@ -202,10 +202,10 @@ begin
 							DifferentialBaseGUID = h.DifferentialBaseGUID, BackupSetGUID = h.BackupSetGUID, IsCopyOnly = h.IsCopyOnly, Fingerprint = @Fingerprint
 							from #Files f cross join #Header h where f.Path = @Path;
 					end
-					fetch next from Media into @Path, @ExpectedFingerprint;
+					fetch next from cMedia into @Path, @ExpectedFingerprint;
 				end
-				close Media;
-				deallocate Media;
+				close cMedia;
+				deallocate cMedia;
 				if @Pass = 1 and @SkipReason is null
 				begin
 					select top(1) @AnchorStart = BackupStartDate, @AnchorFirstLSN = FirstLSN from #Files
@@ -265,9 +265,9 @@ begin
 		if @SkipReason is null
 		begin
 			create table #CurrentPaths(Path nvarchar(4000) collate Latin1_General_100_BIN2, LastWriteTime datetime2(7), SizeInBytes bigint);
-			declare CurrentFolders cursor local fast_forward for select Name from (values(N'FULL'),(N'DIFF'),(N'LOG')) f(Name);
-			open CurrentFolders;
-			fetch next from CurrentFolders into @TypeFolder;
+			declare cCurrentFolders cursor local fast_forward for select Name from (values(N'FULL'),(N'DIFF'),(N'LOG')) f(Name);
+			open cCurrentFolders;
+			fetch next from cCurrentFolders into @TypeFolder;
 			while @@fetch_status = 0
 			begin
 				select @Folder = @Root + @Separator + @TypeFolder;
@@ -288,10 +288,10 @@ begin
 							or parent_directory collate Latin1_General_100_CI_AS = (@Folder + @Separator) collate Latin1_General_100_CI_AS)
 							and full_filesystem_path collate Latin1_General_100_CI_AS = (@Folder + @Separator + file_or_directory_name) collate Latin1_General_100_CI_AS));
 				end
-				fetch next from CurrentFolders into @TypeFolder;
+				fetch next from cCurrentFolders into @TypeFolder;
 			end
-			close CurrentFolders;
-			deallocate CurrentFolders;
+			close cCurrentFolders;
+			deallocate cCurrentFolders;
 			if exists(select Path, LastWriteTime, SizeInBytes from #CurrentPaths except select Path, LastWriteTime, SizeInBytes from #Files)
 				or exists(select Path, LastWriteTime, SizeInBytes from #Files except select Path, LastWriteTime, SizeInBytes from #CurrentPaths)
 				select @SkipReason = N'Backup inventory changed before deletion; no files deleted.';
@@ -303,20 +303,20 @@ begin
 		end
 		if @ShowPlan = 0 and @SkipReason is null
 		begin
-			declare Deletions cursor local fast_forward for select Path from #Files where Action = N'DELETE'
+			declare cDeletions cursor local fast_forward for select Path from #Files where Action = N'DELETE'
 				order by case BackupType when 5 then 1 when 2 then 2 else 3 end, BackupFinishDate, Path;
-			open Deletions;
-			fetch next from Deletions into @Path;
+			open cDeletions;
+			fetch next from cDeletions into @Path;
 			while @@fetch_status = 0
 			begin
 				exec @DeleteResult = master.dbo.xp_delete_file 0, @Path;
 				if @DeleteResult <> 0 or @DeleteResult is null or exists(select * from sys.dm_os_file_exists(@Path) where file_exists = 1 or file_is_a_directory = 1)
 					throw 50000, 'Exact backup file deletion failed; remaining files were preserved.', 1;
 				update #Files set Action = N'DELETED' where Path = @Path;
-				fetch next from Deletions into @Path;
+				fetch next from cDeletions into @Path;
 			end
-			close Deletions;
-			deallocate Deletions;
+			close cDeletions;
+			deallocate cDeletions;
 		end
 		exec z.usp_ReleaseSemaphore @SemaphoreName = @LockName, @LockOwner = 'Session';
 		select @LockHeld = 0;

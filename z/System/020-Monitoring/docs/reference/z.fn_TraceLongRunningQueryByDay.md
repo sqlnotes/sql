@@ -12,8 +12,6 @@ Read retained z.TraceLongRunningQuery rows whose TraceSequence is at least the g
 @Days int
 ```
 
-These are the source-declared types and defaults. Table-valued-function callers must supply arguments or the `default` keyword explicitly.
-
 ## Results, permissions, and limits
 
 Returns Date and counts labelled [1.3-5], [5-10], [10-15], [15-20], [20-25], [25-30], [30-60], [60-90], [90-120], [120-180], [180-240], [240+]. Labels use seconds; first bucket counts any duration below 5 seconds, not a separately enforced 1.3-second lower bound. Read-only.

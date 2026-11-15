@@ -109,9 +109,9 @@ begin
 	end try
 	begin catch
 		-- Startup can fail before CollectAndClose takes responsibility for cleanup.
-		declare c cursor local static read_only for select TraceID from @CreatedTraces;
-		open c;
-		fetch next from c into @TraceID;
+		declare cCreatedTraces cursor local static read_only for select TraceID from @CreatedTraces;
+		open cCreatedTraces;
+		fetch next from cCreatedTraces into @TraceID;
 		while @@fetch_status = 0
 		begin
 			begin try
@@ -121,10 +121,10 @@ begin
 			begin catch
 				print concat(N'CollectTrace cleanup failed for trace ', @TraceID, N': ', error_message());
 			end catch;
-			fetch next from c into @TraceID;
+			fetch next from cCreatedTraces into @TraceID;
 		end;
-		close c;
-		deallocate c;
+		close cCreatedTraces;
+		deallocate cCreatedTraces;
 		throw;
 	end catch;
 end;

@@ -16,14 +16,14 @@
 
 ## Semaphore wait
 
-No overall timeout exists. Nonpositive capacity creates endless retries. The resource becomes a session-context key prefixed with `Semaphore-`, subject to SQL Server key length. Use short names and positive, consistent capacities.
+`z.usp_AcquireSemaphore` validates `@SemaphoreName`, `@TotalCount > 0`, `@LockOwner` (`Transaction` or `Session`), and `@LockTimeout >= -1`. Waits are bounded by `@LockTimeout` (`-1` waits indefinitely; `0` does not wait). Session context keys are derived from `SHA2_256` of `db_id()`, owner, and semaphore name.
 
 ## Generated SQL
 
 Schema copy preserves identity seed/increment when requested and selects table/index/default categories independently. It does not clone foreign keys, CHECK constraints, triggers, permissions or extended properties. `@ShowPlan = 1` returns ordered scripts without generated-SQL execution; `@PrintCode = 1` alone prints and executes. With `@CopyTableSchema = 0`, an existing target is required. See [schema-copy behavior and limits](reference/schema-copy.md).
 
-`z.fn_BuildQueryMergeTable` leaves a source-query placeholder. Identity omission can produce empty list entries; legacy text/image comparisons emit invalid `t.cast(...)`. `z.usp_GetQueryResultToSQL` uses temporal style 120 (fractional precision can be lost) and uses byte length for its `nchar` type branch. Validate output against representative data.
+`z.fn_BuildQueryMergeTable` leaves a source-query placeholder (`--<<YourQuery>>`). `z.usp_GetQueryResultToSQL` formats temporal values with style 120 (sub-second fractional precision is truncated). Validate generated output against representative data.
 
 ## Removal
 
-`z.usp_RemoveSchemaZ` cannot reliably guarantee complete removal. On installations retaining older Async objects, it attempts to drop `z.AsyncSender` without first dropping its service, `z.Async.sender`, which blocks queue removal. Its object-parent ordering does not resolve foreign-key or schema-bound dependencies; caught drop failures can retry indefinitely. User-defined types and XML schema collections are not cleaned up, and an unsupported object kind can prematurely end the loop. It drops itself before attempting the schema drop, so a final failure can leave a partially removed schema without the removal procedure. It is destructive, does not guarantee complete SQL Agent/Broker cleanup, and is not a deployment rollback mechanism.
+`z.usp_RemoveSchemaZ` drops `z` plan guides, schema objects (including bound Service Broker services before queues), user-defined types, XML schema collections, shared AsyncChannel Broker contracts/message types, generic partition schemes/functions, itself, and schema `z`. External objects outside schema `z` (such as SQL Agent jobs in `msdb` or cross-schema references) are not automatically removed and can block dropping referenced objects or schema `z`.

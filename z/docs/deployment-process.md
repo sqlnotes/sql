@@ -1,12 +1,12 @@
 # Deployment process
 
-[Installer guide](readme.md) Â· [Metadata reference](reference.md)
+[Installer guide](readme.md) · [Metadata reference](reference.md)
 
 ## Source and plan
 
 [Deploy.ps1](../Deploy.ps1) orchestrates execution. [Deploy.Common.ps1](../Deploy.Common.ps1) defines traversal/connection/RPC helpers. [Deploy.sql](../Deploy.sql) bootstraps database/schema and current metadata; it requires SQLcmd mode and DatabaseName substitution.
 
-Each folder visits pre â†’ baseline â†’ versions â†’ modules â†’ direct SQL files â†’ other folders alphabetically â†’ post. Files sort by filename with ordinal case-insensitive comparison. Version children parse as .NET Version and sort numerically. The installed version is included, along with newer versions; hashing normally prevents unchanged replay.
+Each folder visits pre -> baseline -> versions -> modules -> direct SQL files -> other folders alphabetically -> post. Files sort by filename with ordinal case-insensitive comparison. Version children parse as .NET Version and sort numerically. The installed version is included, along with newer versions; hashing normally prevents unchanged replay.
 
 Only nonreserved children of subsystem roots become separately owned/versioned systems. Reserved names are pre, baseline, versions, modules, post, tests, docs. Descendants within a reserved stage organize that stage's files. Docs are excluded. Linked/reparse-point folders and invalid version paths are rejected.
 

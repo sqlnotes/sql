@@ -58,7 +58,7 @@ begin
 	set nocount on;
 	declare @ActionID uniqueidentifier = newid(), @Slot int, @BatchSemaphore nvarchar(200);
 	begin try
-		if left(trim(translate(@TaskBody, nchar(9) + nchar(10) + nchar(13), N'   ')), 1) <> N'{'
+		if @TaskBody is null or left(trim(translate(@TaskBody, nchar(9) + nchar(10) + nchar(13), N'   ')), 1) <> N'{'
 			throw 50000, 'TaskBody must be one JSON object containing the executable command and parameters.', 1;
 		begin tran;
 		exec z.usp_ResolveTaskQueueBatch @BatchID = @BatchID output, @BatchName = @BatchName;

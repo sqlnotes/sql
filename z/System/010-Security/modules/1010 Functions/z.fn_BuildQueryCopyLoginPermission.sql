@@ -93,15 +93,15 @@ begin
 				end SQL
 			from x1
 	)
-    insert into @ret(Type, SQL)
+	insert into @ret(Type, SQL)
 		select x2.Type, x2.SQL
 		from x2
 		where x2.SQL is not null
 
 	insert into @ret(Type, SQL)
-	select 'RoleMember', 'alter server role ' + quotename(r.name) + ' add member ' + quotename(p.name) + ';'
+	select 'RoleMember', 'alter server role ' + quotename(r.name) + ' add member ' + quotename(isnull(@TargetLogin, p.name)) + ';'
 	from sys.server_principals p
-		inner join sys.database_role_members rm on rm.member_principal_id = p.principal_id
+		inner join sys.server_role_members rm on rm.member_principal_id = p.principal_id
 		inner join sys.server_principals r on r.principal_id = rm.role_principal_id
 	where p.name = @SourceLogin
 	return

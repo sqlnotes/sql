@@ -14,7 +14,7 @@ create or alter procedure z.usp_CreateDatabaseSnapshot
 )
 as
 begin
-	set xact_abort on
+	set nocount, xact_abort on;
 	select @SourceDatabaseName = db_name(db_id(isnull(@SourceDatabaseName, db_name())))
 	if @SourceDatabaseName is null
 	begin
@@ -28,7 +28,7 @@ begin
 	end
 	
 	declare @SQL nvarchar(max), @Proc sysname = quotename(@SourceDatabaseName)+'..sp_executesql'
-	declare @t table(name sysname, physical_name sysname, i int identity(1,1))
+	declare @t table(name sysname, physical_name nvarchar(260), i int identity(1,1))
 	insert into @t
 		exec @Proc N'select name, physical_name from sys.database_files where type = 0'
 	if @@rowcount = 0
@@ -36,15 +36,16 @@ begin
 		throw 50000, 'Unknown error.', 1;
 	end
 
-	select @SQL = 'create database '+ quotename(@DatabaseSnapshotName) + ' on '
+	select @SQL = N'create database ' + quotename(@DatabaseSnapshotName) + N' on '
 		+ stuff(
 					(
-						select ', (name = '+quotename(name)+', filename = ''' + physical_name + '.' + replace(@DatabaseSnapshotName, ' ', '') + ''')'
+						select N', (name = ' + quotename(name) + N', filename = N''' + replace(physical_name + N'.' + replace(@DatabaseSnapshotName, N' ', N''), N'''', N'''''') + N''')'
 						from @t
 						order by i
 						for xml path(''), type
 					).value('.', 'nvarchar(max)')
 				, 1, 2, '')
-		+ ' as snapshot of '+quotename(@SourceDatabaseName)+' ;'
+		+ N' as snapshot of ' + quotename(@SourceDatabaseName) + N';'
 	exec(@SQL)
 end
+
