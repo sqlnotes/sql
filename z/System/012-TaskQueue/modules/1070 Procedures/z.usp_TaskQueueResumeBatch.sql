@@ -21,7 +21,7 @@ begin
 	declare @ActionID uniqueidentifier = newid();
 	begin try
 		begin tran;
-		exec z.usp_TaskQueueResolveBatch @BatchID = @BatchID output, @BatchName = @BatchName;
+		exec z.usp_TaskQueueResolveBatch @BatchID = @BatchID output, @BatchName = @BatchName output;
 		exec z.usp_TaskQueueLockBatchForChange @BatchID = @BatchID;
 		if not exists (select 1 from z.TaskQueueBatch where BatchID = @BatchID and Status = 'Stopped')
 			throw 50000, 'Only a Stopped batch can be resumed.', 1;

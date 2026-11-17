@@ -5,7 +5,7 @@ Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/012-TaskQueue/modules/1070%20Procedures/z.usp_TaskQueueExecuteBatch.sql
 Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/012-TaskQueue/docs/readme.md#execute-a-batch-with-agent-workers
 
-Runs a Draft batch using temporary unscheduled Agent jobs and waits for their completion.
+Runs a Draft or Ready batch using temporary unscheduled Agent jobs and finalizes its status after they exit.
 */
 create or alter procedure z.usp_TaskQueueExecuteBatch
 (
@@ -21,9 +21,10 @@ begin
 		throw 50000, 'Batch execution requires no transaction and implicit transactions off.', 1;
 	declare	@MaxConcurrentWorkers int, @WorkerNumber int = 1, @ExecutionID uniqueidentifier,
 			@Name nvarchar(255), @Command nvarchar(max), @JobID uniqueidentifier,
+			@Now datetime2(7), @LaunchStartedAtUTC datetime2(7),
 			@Status varchar(16), @Error nvarchar(4000);
 	declare @Jobs table (WorkerNumber int primary key, Name nvarchar(255), JobID uniqueidentifier not null);
-	exec z.usp_TaskQueueResolveBatch @BatchID = @BatchID output, @BatchName = @BatchName;
+	exec z.usp_TaskQueueResolveBatch @BatchID = @BatchID output, @BatchName = @BatchName output;
 	begin try
 		begin tran;
 		exec z.usp_TaskQueueStartBatch @BatchID = @BatchID, @MaxConcurrentWorkers = @MaxConcurrentWorkers output, @RequireWorkerLimit = 1, @ExecutionID = @ExecutionID output;
@@ -41,8 +42,13 @@ begin
 			insert @Jobs (WorkerNumber, Name, JobID) values (@WorkerNumber, @Name, @JobID);
 			select	@WorkerNumber += 1;
 		end;
+		select	@Now = sysutcdatetime();
+		-- The gate makes this stamp distinct even when Resume retains the execution ID.
+		select	@LaunchStartedAtUTC = case when StartedAtUTC is null or StartedAtUTC < @Now then @Now
+				else dateadd(nanosecond, 100, StartedAtUTC) end
+		from z.TaskQueueBatch where BatchID = @BatchID;
 		update z.TaskQueueBatch
-			set Status = 'Running', StartedAtUTC = getutcdate()
+			set Status = 'Running', StartedAtUTC = @LaunchStartedAtUTC, LastErrorMessage = null
 		where BatchID = @BatchID;
 		commit;
 		select	@WorkerNumber = 1;
@@ -60,17 +66,16 @@ begin
 			end;
 			select	@WorkerNumber += 1;
 		end;
-		while exists
-		(
-			select	1 from @Jobs j
-				inner join msdb.dbo.sysjobs b on b.job_id = j.JobID
-		)
+		while exists(	select *
+						from @Jobs j
+							inner join msdb.dbo.sysjobs b on b.job_id = j.JobID
+					)
 		begin
 			waitfor delay '00:00:01';
 		end;
 		begin tran;
 		exec z.usp_TaskQueueLockBatchForChange @BatchID = @BatchID;
-		if not exists (select 1 from z.TaskQueueBatch where BatchID = @BatchID and ExecutionID = @ExecutionID)
+		if not exists (select 1 from z.TaskQueueBatch where BatchID = @BatchID and ExecutionID = @ExecutionID and StartedAtUTC = @LaunchStartedAtUTC)
 			throw 50000, 'The batch execution changed before finalization.', 1;
 		select	@Status = Status, @Error = LastErrorMessage from z.TaskQueueBatch where BatchID = @BatchID;
 		if @Status = 'Ready'

@@ -9,7 +9,7 @@ Adds one task to a Draft batch.
 ExecutorProcedure names the executor; Parameters is passed unchanged as its
 @Parameters nvarchar(max) argument. The executor owns interpreting the payload.
 No target existence, procedure metadata or payload-member validation is performed.
-Supply BatchID or BatchName; both must match if supplied together. Null TaskID and
+Supply BatchID or BatchName; BatchID takes priority when both are supplied. Null TaskID and
 SortOrder allocate the next values in that batch. TaskID is returned through OUTPUT.
 Null TaskName becomes 'Task - <TaskID>'; null AvailableAtUTC uses current UTC.
 Uses the current caller transaction and its batch semaphore when present.
@@ -36,7 +36,7 @@ begin
 	set nocount on;
 	declare @ActionID uniqueidentifier = newid();
 	begin try
-		exec z.usp_TaskQueueResolveBatch @BatchID = @BatchID output, @BatchName = @BatchName;
+		exec z.usp_TaskQueueResolveBatch @BatchID = @BatchID output, @BatchName = @BatchName output;
 		exec z.usp_TaskQueueLockBatchForChange @BatchID = @BatchID;
 		if not exists (select 1 from z.TaskQueueBatch where BatchID = @BatchID and Status = 'Draft')
 			throw 50000, 'Tasks can only be added to a Draft batch.', 1;

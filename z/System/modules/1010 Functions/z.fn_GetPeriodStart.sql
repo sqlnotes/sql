@@ -27,7 +27,7 @@ begin
 							when 'Monthly' then dateadd(month, datediff_big(month, StartDate, @Date) / nullif(@Interval, 0) * @Interval, StartDate)
 							when 'Yearly' then dateadd(year, datediff_big(year, StartDate, @Date) / nullif(@Interval, 0) * @Interval, StartDate)
 						end
-				from (select convert(datetime2, isnull(@StartDate, '0006-01-01'), 121) StartDate) d
+				from (select convert(datetime2, isnull(@StartDate, '2020-01-01'), 121) StartDate) d
 					cross apply
 					(
 						select	dateadd(day, -((datediff(day, '1900-01-01', a.AnchorDate) % 7 + 7) % 7), a.AnchorDate) WeekStartDate

@@ -21,7 +21,7 @@ begin
 	declare @ActionID uniqueidentifier = newid(), @ExecutionID uniqueidentifier = newid(), @Now datetime2(7) = sysutcdatetime();
 	begin try
 		begin tran;
-		exec z.usp_TaskQueueResolveBatch @BatchID = @BatchID output, @BatchName = @BatchName;
+		exec z.usp_TaskQueueResolveBatch @BatchID = @BatchID output, @BatchName = @BatchName output;
 		exec z.usp_TaskQueueLockBatchForChange @BatchID = @BatchID;
 		if exists (select 1 from z.v_TaskQueueRunningTasks where BatchID = @BatchID)
 			throw 50000, 'The batch has Running tasks; wait for completion or recover ownership before changing it.', 1;

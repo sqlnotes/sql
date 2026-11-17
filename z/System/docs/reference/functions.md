@@ -127,7 +127,11 @@ create or alter function z.fn_GetPeriodStart
 returns datetime
 ```
 
-Returns datetime period start for Second, Minute, Hourly, Daily, Weekly, Monthly or Yearly. Default anchor is year 0006; Weekly defaults to Monday 1900-01-01 independently of @@datefirst; an explicit StartDate anchors multiweek intervals to the Monday of its week. `@Interval = 0` returns NULL; negative or out-of-range intervals can overflow datetime bounds.
+Returns datetime period start for Second, Minute, Hourly, Daily, Weekly, Monthly or Yearly. Default anchor is 2020-01-01; Weekly defaults to Monday 1900-01-01 independently of @@datefirst; an explicit StartDate anchors multiweek intervals to the Monday of its week.
+
+The default anchor changed from 0006-01-01 for all nonweekly periods, so intervals can align differently; pass an explicit StartDate to retain a previous alignment. Nonweekly calculations retain integer division toward zero: for dates before the anchor, multi-unit intervals can return a boundary after the input date.
+
+On SQL Server 2019/2022, Second offsets must fit an int (approximately 68 years from the anchor); older explicit anchors or distant dates can still overflow. `@Interval = 0` returns NULL; negative or out-of-range intervals can overflow datetime bounds.
 
 ## z.fn_IsAmazonRDS
 
