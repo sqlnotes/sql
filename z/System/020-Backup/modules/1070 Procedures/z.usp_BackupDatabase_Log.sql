@@ -10,8 +10,8 @@ Runs transaction-log backups with the wrapper's predefined destination and optio
 create or alter procedure z.usp_BackupDatabase_Log
 as
 begin
-	exec z.usp_BackupDatabase	@Databases = 'AllDatabases', @BackupType = 'Log', 
-								@BackupFolder = '\\Share\backup\MSSQL\', 
+	exec z.usp_BackupDatabase	@Databases = 'AllDatabases', @BackupType = 'Log',
+								@BackupFolder = '\\Share\backup\MSSQL\',
 								@BackupCompression = 1, @OtherBackupOptions = null
 end
 GO

@@ -20,93 +20,91 @@ begin
 		exec sp_describe_first_result_set @Query
 	;with x0 as
 	(
-		select
-
-			c.name ColumnName, cast(c.column_ordinal as int) ColumnID,
-			c.max_length DataLength, isnull(type_name(c.system_type_id), type_name(c.user_type_id)) BaseType,
-			case when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) = 'timestamp' then 'binary(8)' else isnull(type_name(c.system_type_id), type_name(c.user_type_id)) end +
-			case 
-				when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) in ('binary', 'char') then '('+cast(c.max_length as varchar(20))+')'
-				when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) in ('nchar') then '('+cast(c.max_length/2 as varchar(20))+')'
-				when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) in ('datetime2', 'datetimeoffset', 'time') then '('+cast(c.scale as varchar(20))+')'
-				when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) in ('decimal', 'numeric') then '('+cast(c.precision as varchar(20))+','+cast(c.scale as varchar(20))+')'
-				when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) in ('varchar') then '('+case when c.max_length = -1 then 'max' else cast(c.max_length as varchar(20)) end+')'
-				when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) in ('nvarchar') then '('+case when c.max_length = -1 then 'max' else cast(c.max_length/2 as varchar(20)) end+')'
-				when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) in ('varbinary') then '('+case when c.max_length = -1 then 'max' else cast(c.max_length as varchar(20)) end+')'
-				else ''
-			end DataType,
-			cast(c.is_nullable as bit) IsNullable,
-			c.collation_name as CollationName,
-			cast(case when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) = 'timestamp' then 1 else 0 end as bit) IsTimestamp,
-			type_name(c.system_type_id) SystemType,
-			type_name(c.user_type_id) UserType,
-			c.max_length MaxLength
+		select	c.name ColumnName, cast(c.column_ordinal as int) ColumnID,
+				c.max_length DataLength, isnull(type_name(c.system_type_id), type_name(c.user_type_id)) BaseType,
+				case when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) = 'timestamp' then 'binary(8)' else isnull(type_name(c.system_type_id), type_name(c.user_type_id)) end +
+				case
+					when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) in ('binary', 'char') then '('+cast(c.max_length as varchar(20))+')'
+					when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) in ('nchar') then '('+cast(c.max_length/2 as varchar(20))+')'
+					when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) in ('datetime2', 'datetimeoffset', 'time') then '('+cast(c.scale as varchar(20))+')'
+					when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) in ('decimal', 'numeric') then '('+cast(c.precision as varchar(20))+','+cast(c.scale as varchar(20))+')'
+					when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) in ('varchar') then '('+case when c.max_length = -1 then 'max' else cast(c.max_length as varchar(20)) end+')'
+					when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) in ('nvarchar') then '('+case when c.max_length = -1 then 'max' else cast(c.max_length/2 as varchar(20)) end+')'
+					when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) in ('varbinary') then '('+case when c.max_length = -1 then 'max' else cast(c.max_length as varchar(20)) end+')'
+					else ''
+				end DataType,
+				cast(c.is_nullable as bit) IsNullable,
+				c.collation_name as CollationName,
+				cast(case when isnull(type_name(c.system_type_id), type_name(c.user_type_id)) = 'timestamp' then 1 else 0 end as bit) IsTimestamp,
+				type_name(c.system_type_id) SystemType,
+				type_name(c.user_type_id) UserType,
+				c.max_length MaxLength
 		from @ResultDefinition c
 	)
-	select @SQL = cast('
+	select	@SQL = cast('
 	declare @RecordExists bit = 1
 	create table #t(' as nvarchar(max)) +stuff((select ',' + quotename(ColumnName) + ' ' + DataType
-		from x0
-		order by ColumnID
-		for xml path(''), type).value('.', 'nvarchar(max)'), 1, 1, '') +')
+			from x0
+			order by ColumnID
+			for xml path(''), type).value('.', 'nvarchar(max)'), 1, 1, '') +')
 	insert into #t
 		exec(@Query)
 	if not exists(select * from #t)
 	begin
-		select @RecordExists = 0
+		select	@RecordExists = 0
 		insert into #t
 			values('+stuff((select ',null'
-		from x0
-		order by ColumnID
-		for xml path(''), type).value('.', 'nvarchar(max)'), 1, 1, '')+')
+			from x0
+			order by ColumnID
+			for xml path(''), type).value('.', 'nvarchar(max)'), 1, 1, '')+')
 	end
 	create table #Data(ID int identity(1,1) primary key, Data nvarchar(max))
 	insert into #Data(Data)
 		exec(''' + replace('select  ''('''+stuff((
-										select '+'',''+'+
-											
-													case 
-														when BaseType in ('image', 'binary', 'varbinary', 'timestamp'/*, 'Hierarchyid'*/) then 'case when '+quotename(ColumnName)+' is null then ''null'' else convert(varchar(max),cast('+quotename(ColumnName)+' as varbinary(max)), 1) end'														when BaseType in ('tinyint', 'smallint', 'int', 'real', 'float', 'bit', 'decimal', 'numeric', 'bigint', 'smallmoney', 'money') then 'case when '+quotename(ColumnName)+' is null then ''null'' else cast('+quotename(ColumnName)+' as varchar(100)) end'
-														when BaseType in ('date', 'time', 'datetime2', 'datetimeoffset', 'smalldatetime', 'datetime') then  'case when '+quotename(ColumnName)+' is null then ''null'' else ''N''''''+replace(convert(nvarchar(max) , '+quotename(ColumnName)+', 120), '''''''', '''''''''''')+'''''''' end'
-														else 'case when '+quotename(ColumnName)+' is null then ''null'' else ''N''''''+replace(convert(nvarchar(max) , '+quotename(ColumnName)+'), '''''''', '''''''''''')+'''''''' end'
-													end
+										 select	'+'',''+'+
 
-		from x0
-		order by ColumnID 
-										asc
-		for xml path(''), type
-										).value('.', 'nvarchar(max)'),1,4,'') 
-									+ '+'')''
+													 case
+														 when BaseType in ('image', 'binary', 'varbinary', 'timestamp'/*, 'Hierarchyid'*/) then 'case when '+quotename(ColumnName)+' is null then ''null'' else convert(varchar(max),cast('+quotename(ColumnName)+' as varbinary(max)), 1) end'														when BaseType in ('tinyint', 'smallint', 'int', 'real', 'float', 'bit', 'decimal', 'numeric', 'bigint', 'smallmoney', 'money') then 'case when '+quotename(ColumnName)+' is null then ''null'' else cast('+quotename(ColumnName)+' as varchar(100)) end'
+														 when BaseType in ('date', 'time', 'datetime2', 'datetimeoffset', 'smalldatetime', 'datetime') then  'case when '+quotename(ColumnName)+' is null then ''null'' else ''N''''''+replace(convert(nvarchar(max) , '+quotename(ColumnName)+', 120), '''''''', '''''''''''')+'''''''' end'
+														 else 'case when '+quotename(ColumnName)+' is null then ''null'' else ''N''''''+replace(convert(nvarchar(max) , '+quotename(ColumnName)+'), '''''''', '''''''''''')+'''''''' end'
+													 end
+
+			from x0
+			order by ColumnID
+										 asc
+			for xml path(''), type
+										 ).value('.', 'nvarchar(max)'),1,4,'')
+									 + '+'')''
 from #t', '''','''''')+''')
 	if @RecordExists = 1
 	begin
 		select @SQL = cast(''select '+stuff((select ',cast('+quotename(ColumnName) +' as '+DataType+') as '+quotename(ColumnName)
-		from x0
-		order by ColumnID asc
-		for xml path(''), type).value('.', 'nvarchar(max)'),1,1,'') + ''' as nvarchar(max)) + ''
+			from x0
+			order by ColumnID asc
+			for xml path(''), type).value('.', 'nvarchar(max)'),1,1,'') + ''' as nvarchar(max)) + ''
 from (
 		values(''+stuff((select ''
 			,''+Data  from #Data order by ID for xml path(''''), type).value(''.'', ''nvarchar(max)''),1,7,'''')+''
 	) v('+stuff((select ','+quotename(ColumnName)
-		from x0
-		order by ColumnID asc
-		for xml path(''), type).value('.', 'nvarchar(max)'),1,1,'') + ')''
+			from x0
+			order by ColumnID asc
+			for xml path(''), type).value('.', 'nvarchar(max)'),1,1,'') + ')''
 	end
 	else
 	begin
 		select @SQL = cast(''select top 0 '+stuff((select ',cast('+quotename(ColumnName) +' as '+DataType+') as '+quotename(ColumnName)
-		from x0
-		order by ColumnID asc
-		for xml path(''), type).value('.', 'nvarchar(max)'),1,1,'') + ''' as nvarchar(max)) + ''
+			from x0
+			order by ColumnID asc
+			for xml path(''), type).value('.', 'nvarchar(max)'),1,1,'') + ''' as nvarchar(max)) + ''
 		from (
 				values(''+stuff((select ''
 					,''+Data  from #Data order by ID for xml path(''''), type).value(''.'', ''nvarchar(max)''),1,9,'''')+''
 			) v('+stuff((select ','+quotename(ColumnName)
-		from x0
-		order by ColumnID asc
-		for xml path(''), type).value('.', 'nvarchar(max)'),1,1,'') + ')''
+			from x0
+			order by ColumnID asc
+			for xml path(''), type).value('.', 'nvarchar(max)'),1,1,'') + ')''
 	end
 	'
-	--select @SQL	
+	--select @SQL
 	exec sp_executesql @SQL, N'@Query nvarchar(max), @SQL nvarchar(max) output', @Query, @SQL output
 end

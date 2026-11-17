@@ -9,7 +9,7 @@ Binds the shared sender queue to its activation procedure.
 */
 if not exists
 (
-	select 1 from sys.service_queues
+	select	1 from sys.service_queues
 	where object_id = object_id('z.AsyncChannelSenderQueue') and is_activation_enabled = 1
 		and object_id(activation_procedure) = object_id('z.usp_AsyncChannelSenderActivator')
 		and max_readers = 1 and execute_as_principal_id = -2

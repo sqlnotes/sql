@@ -18,21 +18,19 @@ returns datetime
 as
 begin
 	return	(
-				select
-					case @Period
-						when 'Second' then dateadd(second, datediff_big(second, StartDate, @Date) / nullif(@Interval, 0) * @Interval, StartDate)
-						when 'Minute' then dateadd(minute, datediff_big(minute, StartDate, @Date) / nullif(@Interval, 0) * @Interval, StartDate)
-						when 'Hourly' then dateadd(hour, datediff_big(hour, StartDate, @Date) / nullif(@Interval, 0) * @Interval, StartDate)
-						when 'Daily' then dateadd(day, datediff_big(day, StartDate, @Date) / nullif(@Interval, 0) * @Interval, StartDate)
-						--when 'Weekly' then dateadd(week, datediff_big(week, StartDate, @Date) / @Interval * @Interval, StartDate)
-						when 'Weekly' then dateadd(day, convert(int, floor(datediff_big(day, w.WeekStartDate, @Date) / (7.0 * nullif(@Interval, 0))) * @Interval * 7), w.WeekStartDate)
-						when 'Monthly' then dateadd(month, datediff_big(month, StartDate, @Date) / nullif(@Interval, 0) * @Interval, StartDate)
-						when 'Yearly' then dateadd(year, datediff_big(year, StartDate, @Date) / nullif(@Interval, 0) * @Interval, StartDate)
-					end
+				select	case @Period
+							when 'Second' then dateadd(second, datediff_big(second, StartDate, @Date) / nullif(@Interval, 0) * @Interval, StartDate)
+							when 'Minute' then dateadd(minute, datediff_big(minute, StartDate, @Date) / nullif(@Interval, 0) * @Interval, StartDate)
+							when 'Hourly' then dateadd(hour, datediff_big(hour, StartDate, @Date) / nullif(@Interval, 0) * @Interval, StartDate)
+							when 'Daily' then dateadd(day, datediff_big(day, StartDate, @Date) / nullif(@Interval, 0) * @Interval, StartDate)
+							when 'Weekly' then dateadd(day, convert(int, floor(datediff_big(day, w.WeekStartDate, @Date) / (7.0 * nullif(@Interval, 0))) * @Interval * 7), w.WeekStartDate)
+							when 'Monthly' then dateadd(month, datediff_big(month, StartDate, @Date) / nullif(@Interval, 0) * @Interval, StartDate)
+							when 'Yearly' then dateadd(year, datediff_big(year, StartDate, @Date) / nullif(@Interval, 0) * @Interval, StartDate)
+						end
 				from (select convert(datetime2, isnull(@StartDate, '0006-01-01'), 121) StartDate) d
 					cross apply
 					(
-						select dateadd(day, -((datediff(day, '1900-01-01', a.AnchorDate) % 7 + 7) % 7), a.AnchorDate) WeekStartDate
+						select	dateadd(day, -((datediff(day, '1900-01-01', a.AnchorDate) % 7 + 7) % 7), a.AnchorDate) WeekStartDate
 						from (select convert(datetime2, convert(date, isnull(@StartDate, '1900-01-01'))) AnchorDate) a
 					) w
 			)

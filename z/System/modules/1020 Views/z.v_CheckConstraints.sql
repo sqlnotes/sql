@@ -9,8 +9,7 @@ Exposes check-constraint definitions, parent objects and disabled, system-named 
 */
 create or alter view z.v_CheckConstraints
 as
-	select 
-			cc.object_id as ObjectID,
+	select	cc.object_id as ObjectID,
 			object_schema_name(cc.object_id) SchemaName,
 			cc.name as CheckConstraintName,
 			cc.parent_object_id ParentObjectID,

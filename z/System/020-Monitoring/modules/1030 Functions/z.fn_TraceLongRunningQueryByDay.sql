@@ -28,7 +28,7 @@ return(
 			count(case when DurationInMS >= 180000 and DurationInMS < 240000 then 1 end) [180-240],
 			count(case when DurationInMS >= 240000 then 1 end) [240+]
 	from (
-			select /*z.fn_ZSequenceIDToDatetime(TraceSequence)*/ StartTime Date, Duration / 1000.0 DurationInMS
+			select	/*z.fn_ZSequenceIDToDatetime(TraceSequence)*/ StartTime Date, Duration / 1000.0 DurationInMS
 			from z.TraceLongRunningQuery
 			where ApplicationName not like 'SQLAgent%'
 				and ApplicationName not like 'SSIS%'

@@ -22,7 +22,7 @@ begin
 	declare @SQL nvarchar(max), @ObjectID int, @Progress bit = 0;
 	declare @Skipped table (object_id int primary key);
 	declare cPlanGuides cursor local static for
-		select 'exec sp_control_plan_guide N''DROP'', N' + quotename(name, '''') + ';' from sys.plan_guides where object_schema_name(scope_object_id) = 'z';
+		select	'exec sp_control_plan_guide N''DROP'', N' + quotename(name, '''') + ';' from sys.plan_guides where object_schema_name(scope_object_id) = 'z';
 	open cPlanGuides;
 	fetch next from cPlanGuides into @SQL;
 	while @@fetch_status = 0
@@ -34,16 +34,16 @@ begin
 	deallocate cPlanGuides;
 	while 1=1
 	begin
-		select @ObjectID = null, @SQL = null;
+		select	@ObjectID = null, @SQL = null;
 		;with x0 as
 		(
-			select o.object_id, o.parent_object_id, 1 Level, o.type_desc
+			select	o.object_id, o.parent_object_id, 1 Level, o.type_desc
 			from sys.objects o
 			where schema_id = schema_id('z')
 				and parent_object_id = 0
 				and o.object_id <> @@procid
 			union all
-			select o.object_id, o.parent_object_id, x0.Level + 1, o.type_desc
+			select	o.object_id, o.parent_object_id, x0.Level + 1, o.type_desc
 			from sys.objects o
 				inner join x0 on o.parent_object_id = x0.object_id
 			where o.schema_id = schema_id('z')
@@ -52,7 +52,7 @@ begin
 		),
 		x1 as
 		(
-			select top 1 *
+			select	top 1 *
 			from x0
 			where not exists (select 1 from @Skipped s where s.object_id = x0.object_id)
 			order by x0.Level desc,
@@ -69,56 +69,56 @@ begin
 				end,
 				x0.object_id desc
 		)
-		select @ObjectID = x1.object_id,
-			@SQL = (
-						select case o.type_desc
-									when 'AGGREGATE_FUNCTION' then 'drop aggregate ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'CHECK_CONSTRAINT' then 'alter table ' + quotename(s.name) + '.' + quotename(p.name) + ' drop constraint ' + quotename(o.name)
-									when 'CLR_SCALAR_FUNCTION' then 'drop function ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'CLR_STORED_PROCEDURE' then 'drop procedure ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'CLR_TABLE_VALUED_FUNCTION' then 'drop function ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'CLR_TRIGGER' then 'drop trigger ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'DEFAULT_CONSTRAINT' then 'alter table ' + quotename(s.name) + '.' + quotename(p.name) + ' drop constraint ' + quotename(o.name)
-									when 'EDGE_CONSTRAINT' then 'alter table ' + quotename(s.name) + '.' + quotename(p.name) + ' drop constraint ' + quotename(o.name)
-									when 'EXTENDED_STORED_PROCEDURE' then 'drop procedure ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'FOREIGN_KEY_CONSTRAINT' then 'alter table ' + quotename(s.name) + '.' + quotename(p.name) + ' drop constraint ' + quotename(o.name)
-									when 'PRIMARY_KEY_CONSTRAINT' then 'alter table ' + quotename(s.name) + '.' + quotename(p.name) + ' drop constraint ' + quotename(o.name)
-									when 'REPLICATION_FILTER_PROCEDURE' then 'drop procedure ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'RULE' then 'drop rule ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'SEQUENCE_OBJECT' then 'drop sequence ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'SERVICE_QUEUE' then isnull((select string_agg('drop service ' + quotename(sv.name) + ';', '') from sys.services sv where sv.service_queue_id = o.object_id), '') + 'drop queue ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'SQL_INLINE_TABLE_VALUED_FUNCTION' then 'drop function ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'SQL_SCALAR_FUNCTION' then 'drop function ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'SQL_STORED_PROCEDURE' then 'drop procedure ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'SQL_TABLE_VALUED_FUNCTION' then 'drop function ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'SQL_TRIGGER' then 'drop trigger ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'SYNONYM' then 'drop synonym ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'UNIQUE_CONSTRAINT' then 'alter table ' + quotename(s.name) + '.' + quotename(p.name) + ' drop constraint ' + quotename(o.name)
-									when 'USER_TABLE' then 'drop table ' + quotename(s.name) + '.' + quotename(o.name)
-									when 'VIEW' then 'drop view ' + quotename(s.name) + '.' + quotename(o.name)
-								end + ';'
-						from sys.objects o
-							inner join sys.schemas s on s.schema_id = o.schema_id
-							left join sys.objects p on p.object_id = o.parent_object_id
-						where o.object_id = x1.object_id
-					)
+		select	@ObjectID = x1.object_id,
+				@SQL = (
+							select	case o.type_desc
+										 when 'AGGREGATE_FUNCTION' then 'drop aggregate ' + quotename(s.name) + '.' + quotename(o.name)
+										 when 'CHECK_CONSTRAINT' then 'alter table ' + quotename(s.name) + '.' + quotename(p.name) + ' drop constraint ' + quotename(o.name)
+										 when 'CLR_SCALAR_FUNCTION' then 'drop function ' + quotename(s.name) + '.' + quotename(o.name)
+										 when 'CLR_STORED_PROCEDURE' then 'drop procedure ' + quotename(s.name) + '.' + quotename(o.name)
+										 when 'CLR_TABLE_VALUED_FUNCTION' then 'drop function ' + quotename(s.name) + '.' + quotename(o.name)
+										 when 'CLR_TRIGGER' then 'drop trigger ' + quotename(s.name) + '.' + quotename(o.name)
+										 when 'DEFAULT_CONSTRAINT' then 'alter table ' + quotename(s.name) + '.' + quotename(p.name) + ' drop constraint ' + quotename(o.name)
+										 when 'EDGE_CONSTRAINT' then 'alter table ' + quotename(s.name) + '.' + quotename(p.name) + ' drop constraint ' + quotename(o.name)
+										 when 'EXTENDED_STORED_PROCEDURE' then 'drop procedure ' + quotename(s.name) + '.' + quotename(o.name)
+										 when 'FOREIGN_KEY_CONSTRAINT' then 'alter table ' + quotename(s.name) + '.' + quotename(p.name) + ' drop constraint ' + quotename(o.name)
+										 when 'PRIMARY_KEY_CONSTRAINT' then 'alter table ' + quotename(s.name) + '.' + quotename(p.name) + ' drop constraint ' + quotename(o.name)
+										 when 'REPLICATION_FILTER_PROCEDURE' then 'drop procedure ' + quotename(s.name) + '.' + quotename(o.name)
+										 when 'RULE' then 'drop rule ' + quotename(s.name) + '.' + quotename(o.name)
+										 when 'SEQUENCE_OBJECT' then 'drop sequence ' + quotename(s.name) + '.' + quotename(o.name)
+										 when 'SERVICE_QUEUE' then isnull((select string_agg('drop service ' + quotename(sv.name) + ';', '') from sys.services sv where sv.service_queue_id = o.object_id), '') + 'drop queue ' + quotename(s.name) + '.' + quotename(o.name)
+										 when 'SQL_INLINE_TABLE_VALUED_FUNCTION' then 'drop function ' + quotename(s.name) + '.' + quotename(o.name)
+										 when 'SQL_SCALAR_FUNCTION' then 'drop function ' + quotename(s.name) + '.' + quotename(o.name)
+										 when 'SQL_STORED_PROCEDURE' then 'drop procedure ' + quotename(s.name) + '.' + quotename(o.name)
+										 when 'SQL_TABLE_VALUED_FUNCTION' then 'drop function ' + quotename(s.name) + '.' + quotename(o.name)
+										 when 'SQL_TRIGGER' then 'drop trigger ' + quotename(s.name) + '.' + quotename(o.name)
+										 when 'SYNONYM' then 'drop synonym ' + quotename(s.name) + '.' + quotename(o.name)
+										 when 'UNIQUE_CONSTRAINT' then 'alter table ' + quotename(s.name) + '.' + quotename(p.name) + ' drop constraint ' + quotename(o.name)
+										 when 'USER_TABLE' then 'drop table ' + quotename(s.name) + '.' + quotename(o.name)
+										 when 'VIEW' then 'drop view ' + quotename(s.name) + '.' + quotename(o.name)
+									 end + ';'
+							from sys.objects o
+								inner join sys.schemas s on s.schema_id = o.schema_id
+								left join sys.objects p on p.object_id = o.parent_object_id
+							where o.object_id = x1.object_id
+						)
 		from x1;
 		if @SQL is null
 		begin
 			if exists (select 1 from @Skipped) and @Progress = 1
 			begin
 				delete from @Skipped;
-				select @Progress = 0;
+				select	@Progress = 0;
 				continue;
 			end
-			select @SQL = string_agg('drop type ' + quotename(s.name) + '.' + quotename(t.name) + ';', '')
+			select	@SQL = string_agg('drop type ' + quotename(s.name) + '.' + quotename(t.name) + ';', '')
 			from sys.types t
 				inner join sys.schemas s on s.schema_id = t.schema_id
 			where t.schema_id = schema_id('z')
 				and t.is_user_defined = 1;
 			if @SQL is not null
 				exec(@SQL);
-			select @SQL = string_agg('drop xml schema collection ' + quotename(s.name) + '.' + quotename(x.name) + ';', '')
+			select	@SQL = string_agg('drop xml schema collection ' + quotename(s.name) + '.' + quotename(x.name) + ';', '')
 			from sys.xml_schema_collections x
 				inner join sys.schemas s on s.schema_id = x.schema_id
 			where x.schema_id = schema_id('z');
@@ -140,7 +140,7 @@ begin
 		end
 		begin try
 			exec(@SQL);
-			select @Progress = 1;
+			select	@Progress = 1;
 		end try
 		begin catch
 			insert into @Skipped (object_id) values (@ObjectID);

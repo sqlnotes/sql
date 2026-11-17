@@ -9,7 +9,6 @@ Shared insert interface sending each serialized fragment separately.
 */
 create or alter view z.AsyncChannelMessage_Interface
 as
-	select top 0
-		AsyncChannelID = cast(null as int),
-		DataSequence = cast(null as bigint),
-		Data = cast(null as nvarchar(max))
+	select	top 0 AsyncChannelID = cast(null as int),
+				  DataSequence = cast(null as bigint),
+				  Data = cast(null as nvarchar(max))

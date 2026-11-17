@@ -20,10 +20,10 @@ begin
 		set xact_abort off;
 		throw 50000, N'Trace stop requires no existing transaction.', 1;
 	end;
-	declare @SelectedTraceID int, @CreatorSessionID int, @CreatorLoginTime datetime,
-		@ReturnCode int, @Message nvarchar(2048), @CurrentLoginTime datetime = (select login_time from sys.dm_exec_sessions where session_id = @@spid);
+	declare	@SelectedTraceID int, @CreatorSessionID int, @CreatorLoginTime datetime,
+			@ReturnCode int, @Message nvarchar(2048), @CurrentLoginTime datetime = (select login_time from sys.dm_exec_sessions where session_id = @@spid);
 	declare cTraces cursor local static read_only for
-		select TraceID, CreatorSessionID, CreatorLoginTime from z.Trace
+		select	TraceID, CreatorSessionID, CreatorLoginTime from z.Trace
 		where (@TraceName is not null or @TraceID is not null or (CreatorSessionID = @@spid and CreatorLoginTime = @CurrentLoginTime))
 			and (@TraceName is null or Name = @TraceName) and (@TraceID is null or TraceID = @TraceID);
 	open cTraces;
@@ -42,7 +42,7 @@ begin
 						exec @ReturnCode = sys.sp_trace_setstatus @SelectedTraceID, 0;
 						if @ReturnCode <> 0 and exists(select 1 from sys.traces where id = @SelectedTraceID and is_rowset = 1 and stop_time is null and status = 1)
 						begin
-							select @Message = concat(N'Native trace ', @SelectedTraceID, N': stop failed; return code ', @ReturnCode, N'.');
+							select	@Message = concat(N'Native trace ', @SelectedTraceID, N': stop failed; return code ', @ReturnCode, N'.');
 							throw 50000, @Message, 1;
 						end;
 					end try

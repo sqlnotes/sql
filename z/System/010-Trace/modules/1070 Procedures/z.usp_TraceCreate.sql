@@ -22,24 +22,24 @@ begin
 		set xact_abort off;
 		throw 50000, N'Trace creation requires no existing transaction.', 1;
 	end;
-	declare @SchemaName sysname, @TableName sysname, @QualifiedTable nvarchar(517), @ReturnCode int,
-		@CreatorLoginTime datetime = (select login_time from sys.dm_exec_sessions where session_id = @@spid),
-		@TraceFile nvarchar(256) = null, @MaxFileSize bigint = 5, @Message nvarchar(2048), @Allocated bit = 0;
-	select @TraceID = null;
+	declare	@SchemaName sysname, @TableName sysname, @QualifiedTable nvarchar(517), @ReturnCode int,
+			@CreatorLoginTime datetime = (select login_time from sys.dm_exec_sessions where session_id = @@spid),
+			@TraceFile nvarchar(256) = null, @MaxFileSize bigint = 5, @Message nvarchar(2048), @Allocated bit = 0;
+	select	@TraceID = null;
 	if @TraceName is null return;
 	if trim(@TraceName) = N'' throw 50000, N'@TraceName must not be empty.', 1;
 	if @ReceivingTable is not null
 	begin
-		select @SchemaName = parsename(@ReceivingTable, 2), @TableName = parsename(@ReceivingTable, 1);
+		select	@SchemaName = parsename(@ReceivingTable, 2), @TableName = parsename(@ReceivingTable, 1);
 		if @SchemaName is null or @TableName is null or parsename(@ReceivingTable, 3) is not null
 			or parsename(@ReceivingTable, 4) is not null or schema_id(@SchemaName) is null
 			throw 50000, N'@ReceivingTable must identify a table in an existing schema in the current database.', 1;
-		select @QualifiedTable = quotename(@SchemaName) + N'.' + quotename(@TableName);
+		select	@QualifiedTable = quotename(@SchemaName) + N'.' + quotename(@TableName);
 		if len(@QualifiedTable) > 128 throw 50000, N'The quoted receiving table name exceeds the registry limit.', 1;
-		select @ReceivingTable = @QualifiedTable;
+		select	@ReceivingTable = @QualifiedTable;
 	end;
 	exec z.usp_TraceCleanup;
-	select @TraceID = TraceID from z.v_TraceOwned where Name = @TraceName;
+	select	@TraceID = TraceID from z.v_TraceOwned where Name = @TraceName;
 	if @TraceID is not null
 	begin
 		begin try
@@ -47,7 +47,7 @@ begin
 			if not exists(select 1 from z.Trace with (updlock, holdlock) where TraceID = @TraceID and Name = @TraceName
 				and CreatorSessionID = @@spid and CreatorLoginTime = @CreatorLoginTime)
 			begin
-				select @Message = concat(N'Native trace ', @TraceID, N' registration changed before updating its metadata.');
+				select	@Message = concat(N'Native trace ', @TraceID, N' registration changed before updating its metadata.');
 				throw 50000, @Message, 1;
 			end;
 			if not exists(select 1 from z.v_TraceOwned where TraceID = @TraceID and Status = 'Stopped')
@@ -58,30 +58,30 @@ begin
 		end try
 		begin catch
 			if @@trancount > 0 rollback;
-			select @TraceID = null;
+			select	@TraceID = null;
 			throw;
 		end catch;
 		return;
 	end;
 	if @ReceivingTable is null
 	begin
-		select @QualifiedTable = N'[z].' + quotename(N'Trace_' + @TraceName);
+		select	@QualifiedTable = N'[z].' + quotename(N'Trace_' + @TraceName);
 		if @QualifiedTable is null or len(@QualifiedTable) > 128
 			throw 50000, N'The default receiving table name exceeds the registry limit; provide a shorter @ReceivingTable.', 1;
-		select @ReceivingTable = @QualifiedTable;
+		select	@ReceivingTable = @QualifiedTable;
 	end;
 	begin try
 		exec @ReturnCode = sys.sp_trace_create @traceid = @TraceID output, @options = 1, @tracefile = @TraceFile,
 			@maxfilesize = @MaxFileSize, @stoptime = null;
 		if @ReturnCode <> 0
 		begin
-			select @Message = concat(N'Native trace creation failed; return code ', @ReturnCode, N'.');
+			select	@Message = concat(N'Native trace creation failed; return code ', @ReturnCode, N'.');
 			throw 50000, @Message, 1;
 		end;
-		select @Allocated = 1;
+		select	@Allocated = 1;
 		if not exists(select 1 from sys.traces where id = @TraceID and is_rowset = 1 and stop_time is null)
 		begin
-			select @Message = concat(N'Native trace ', @TraceID, N' disappeared during creation.');
+			select	@Message = concat(N'Native trace ', @TraceID, N' disappeared during creation.');
 			throw 50000, @Message, 1;
 		end;
 		insert z.Trace (TraceID, Name, Description, ReceivingTable, CreatorSessionID, CreatorLoginTime)
@@ -99,7 +99,7 @@ begin
 		begin catch
 			print N'Failed to close an unregistered native trace; manual review is required.';
 		end catch;
-		select @TraceID = null;
+		select	@TraceID = null;
 		throw;
 	end catch;
 end;

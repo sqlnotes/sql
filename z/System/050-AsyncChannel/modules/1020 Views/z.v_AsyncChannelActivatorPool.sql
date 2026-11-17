@@ -16,14 +16,14 @@ as
 	from z.AsyncChannelActivatorPool p
 		outer apply
 		(
-			select SlotsInUse = sum(s.SlotCount), SessionsWaiting = sum(iif(s.MainHeld = 1 and s.SlotCount = 0, 1, 0))
+			select	SlotsInUse = sum(s.SlotCount), SessionsWaiting = sum(iif(s.MainHeld = 1 and s.SlotCount = 0, 1, 0))
 			from
 			(
 				-- The shared semaphore grants IX on ADPool/<ID> and X on <slot>-ADPool/<ID>.
 				-- Waiting is inferred from a held IX marker without a granted slot, not a native WAIT row.
-				select l.request_session_id,
-					SlotCount = count(distinct case when l.request_mode = 'X' and l.request_status = 'GRANT' then l.resource_description end),
-					MainHeld = max(iif(l.request_mode = 'IX' and l.request_status = 'GRANT', 1, 0))
+				select	l.request_session_id,
+						SlotCount = count(distinct case when l.request_mode = 'X' and l.request_status = 'GRANT' then l.resource_description end),
+						MainHeld = max(iif(l.request_mode = 'IX' and l.request_status = 'GRANT', 1, 0))
 				from sys.dm_tran_locks l
 				where l.resource_type = 'APPLICATION' and l.resource_database_id = db_id() and l.request_owner_type = 'SESSION'
 					and l.resource_description like N'%ADPool/' + cast(p.ActivatorPoolID as nvarchar(11)) + N'[^0-9]%'

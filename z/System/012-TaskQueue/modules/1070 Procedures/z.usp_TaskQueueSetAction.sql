@@ -2,13 +2,13 @@
 Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
-Source: https://github.com/sqlnotes/sql/blob/main/z/System/012-TaskQueue/modules/1070%20Procedures/z.usp_SetTaskQueueAction.sql
+Source: https://github.com/sqlnotes/sql/blob/main/z/System/012-TaskQueue/modules/1070%20Procedures/z.usp_TaskQueueSetAction.sql
 Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/012-TaskQueue/docs/readme.md#audit-log
 
 Sets the audit action and correlation ID. NULL clears the corresponding value;
 calling without arguments clears both.
 */
-create or alter procedure z.usp_SetTaskQueueAction
+create or alter procedure z.usp_TaskQueueSetAction
 (
 	@Action nvarchar(64) = null,
 	@ActionID uniqueidentifier = null

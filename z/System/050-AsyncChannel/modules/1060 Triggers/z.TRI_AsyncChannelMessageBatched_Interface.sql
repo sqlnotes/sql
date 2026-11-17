@@ -17,7 +17,7 @@ begin
 
 	declare @AsyncChannelID int, @LastAsyncChannelID int, @Payload nvarchar(max), @Handle uniqueidentifier
 	declare cMessages cursor local static for
-		select r.AsyncChannelID, string_agg(r.Data, N',') within group (order by r.DataSequence)
+		select	r.AsyncChannelID, string_agg(r.Data, N',') within group (order by r.DataSequence)
 		from (
 				select	ChunkID = (row_number() over (partition by i.AsyncChannelID order by i.DataSequence) - 1) / isnull(c.MaxRowsPerMessage, 2147483647),
 						i.AsyncChannelID, i.DataSequence, i.Data
@@ -33,7 +33,7 @@ begin
 	begin
 		if @LastAsyncChannelID is null or @LastAsyncChannelID <> @AsyncChannelID
 		begin
-			select @LastAsyncChannelID = @AsyncChannelID, @Handle = null
+			select	@LastAsyncChannelID = @AsyncChannelID, @Handle = null
 			exec z.usp_AsyncChannelGetConversationHandle @AsyncChannelID = @AsyncChannelID, @ConversationHandle = @Handle output
 		end
 		if @Handle is not null

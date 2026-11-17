@@ -17,7 +17,7 @@ begin
 	set nocount on
 	declare @SQL nvarchar(max)
 	declare cTables cursor local for
-		select quotename(object_schema_name(object_id))+'.'+ quotename(name) 
+		select	quotename(object_schema_name(object_id))+'.'+ quotename(name)
 		from sys.procedures
 		where name like 'usp!_DataInitialization%' escape '!'
 			and name not in ('usp_DataInitializationHelper', 'usp_DataInitializationMaster')

@@ -1,9 +1,9 @@
 -- Installation closes the previous shared collector before replacing its schema.
 -- Native effects cannot be rolled back; preserve registrations on failure for retry.
 if @@trancount > 0 throw 50000, N'Trace installation requires no existing transaction.', 1;
-declare @LegacyTrace bit = iif(col_length(N'z.Trace', N'CollectorUUID') is not null
+declare	@LegacyTrace bit = iif(col_length(N'z.Trace', N'CollectorUUID') is not null
 	or columnproperty(object_id(N'z.Trace'), N'TraceID', 'IsIdentity') = 1, 1, 0),
-	@SQL nvarchar(max), @LockResult int, @Rows bigint;
+		@SQL nvarchar(max), @LockResult int, @Rows bigint;
 if @LegacyTrace = 1 or object_id(N'z.TraceCollectorTrace', N'U') is not null or object_id(N'z.TraceCollector', N'U') is not null
 begin
 	begin try
@@ -13,13 +13,13 @@ begin
 		if object_id(N'z.TraceCollector', N'U') is not null
 			exec sys.sp_executesql N'select @Rows = count_big(*) from z.TraceCollector with (tablockx, holdlock);', N'@Rows bigint output', @Rows output;
 		if @LegacyTrace = 1
-			select @Rows = count_big(*) from z.Trace with (tablockx, holdlock);
+			select	@Rows = count_big(*) from z.Trace with (tablockx, holdlock);
 		if object_id(N'z.TraceCollectorTrace', N'U') is not null
 		begin
-			select @SQL = N'
+			select	@SQL = N'
 declare @TraceID int, @Started datetime, @Stopped datetime, @ReturnCode int;
 declare cTraces cursor local static read_only for
-	select TraceID, ' + iif(col_length(N'z.TraceCollectorTrace', N'NativeStartTime') is null, N'convert(datetime, null)', N'NativeStartTime') + N', NativeStopTime
+	select	TraceID,' + iif(col_length(N'z.TraceCollectorTrace', N'NativeStartTime') is null, N'convert(datetime, null)', N'NativeStartTime') + N', NativeStopTime
 	from z.TraceCollectorTrace with (tablockx, holdlock);
 open cTraces;
 fetch next from cTraces into @TraceID, @Started, @Stopped;

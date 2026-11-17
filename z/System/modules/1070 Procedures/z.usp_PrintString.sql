@@ -16,7 +16,7 @@ begin
 	set nocount on;
 	declare @Line nvarchar(max);
 	declare cLines cursor local static for
-		select isnull(l1.Value, N'')
+		select	isnull(l1.Value, N'')
 		from z.fn_SplitLines(@Str) l
 			outer apply z.fn_SplitStringFixedLength(l.Value, 4000) l1
 		order by l.Ordinal, l1.Ordinal

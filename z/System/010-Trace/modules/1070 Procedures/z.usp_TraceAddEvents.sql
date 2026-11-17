@@ -30,10 +30,10 @@ begin
 			throw 50000, N'Either @TraceName or @TraceID must be provided.', 1;
 		end
 		declare @ResolvedTraceID int;
-		select @ResolvedTraceID = TraceID
+		select	@ResolvedTraceID = TraceID
 		from z.v_TraceOwned
 		where (@TraceName is null or Name = @TraceName) and (@TraceID is null or TraceID = @TraceID);
-		select @TraceID = @ResolvedTraceID;
+		select	@TraceID = @ResolvedTraceID;
 		if not exists(select 1 from z.Trace with (updlock, holdlock) where TraceID = @TraceID and CreatorSessionID = @@spid
 			and CreatorLoginTime = (select login_time from sys.dm_exec_sessions where session_id = @@spid))
 			throw 50000, N'The selected trace registration changed before configuration.', 1;
@@ -48,14 +48,14 @@ begin
 		begin
 				if trim(@EventList) = N'' or exists
 				(
-					select 1 from string_split(@EventList, N',') s
+					select	1 from string_split(@EventList, N',') s
 					where trim(s.value) = N'' or not exists(select 1 from z.v_TraceEvent v where v.EventName = trim(s.value))
 				)
 				begin
 					throw 50000, N'@EventList must contain comma-separated catalog names without empty or unknown values.', 1;
 				end
 				insert into @Events(EventID)
-					select distinct v.TraceEventID from z.v_TraceEvent v
+					select	distinct v.TraceEventID from z.v_TraceEvent v
 						inner join string_split(@EventList, N',') s on v.EventName = trim(s.value);
 		end
 		declare @Columns table(ColumnID int primary key);
@@ -67,14 +67,14 @@ begin
 			begin
 				if trim(@EventColumnList) = N'' or exists
 				(
-					select 1 from string_split(@EventColumnList, N',') s
+					select	1 from string_split(@EventColumnList, N',') s
 					where trim(s.value) = N'' or not exists(select 1 from z.v_TraceColumn v where v.ColumnName = trim(s.value))
 				)
 				begin
 					throw 50000, N'@EventColumnList must contain comma-separated catalog names without empty or unknown values.', 1;
 				end
 				insert into @Columns(ColumnID)
-					select distinct v.ColumnID from z.v_TraceColumn v
+					select	distinct v.ColumnID from z.v_TraceColumn v
 						inner join string_split(@EventColumnList, N',') s on v.ColumnName = trim(s.value);
 			end
 		end
@@ -83,10 +83,10 @@ begin
 			insert into @Columns(ColumnID) select distinct ColumnID from z.TraceEventColumn where TraceID = @TraceID;
 		if not exists(select 1 from @Columns where ColumnID = 12) insert into @Columns(ColumnID) values(12);
 		insert into z.TraceEvent(TraceID, EventID)
-			select @TraceID, e.EventID from @Events e
+			select	@TraceID, e.EventID from @Events e
 			where not exists(select 1 from z.TraceEvent t where t.TraceID = @TraceID and t.EventID = e.EventID);
 		insert into z.TraceEventColumn(TraceID, EventID, ColumnID)
-			select @TraceID, e.EventID, c.ColumnID
+			select	@TraceID, e.EventID, c.ColumnID
 			from @Events e cross join @Columns c
 				inner join sys.trace_event_bindings b on b.trace_event_id = e.EventID and b.trace_column_id = c.ColumnID
 			where not exists(select 1 from z.TraceEventColumn t where t.TraceID = @TraceID and t.EventID = e.EventID and t.ColumnID = c.ColumnID);

@@ -15,27 +15,27 @@ create or alter procedure z.usp_SkipTrigger
 as
 begin
 	set nocount on
-	declare @TriggerIDs sql_variant
-	if @ParentObjectNames = 'all' or @TriggerNames = 'all'
+	declare @TriggerIDs nvarchar(4000)
+	if @ParentObjectNames = N'all' or @TriggerNames = N'all'
 	begin
-		select @TriggerIDs = 'all'
+		select	@TriggerIDs = N'all'
 	end
 	else
 	begin
-		select @TriggerIDs = cast(cast(string_agg(x0.object_id, ',') as varchar(8000)) as sql_variant)
+		select	@TriggerIDs = string_agg(cast(x0.object_id as nvarchar(11)), N',')
 		from (
-				select t.object_id
+				select	t.object_id
 				from sys.triggers t
 				where t.is_disabled = 0
 					and exists(
-								select *
+								select	*
 								from string_split(@ParentObjectNames, ',') s
 								where object_id(rtrim(ltrim(s.value))) = t.parent_id
 							)
 				union
-				select t.object_id
+				select	t.object_id
 				from (
-						select parsename(rtrim(ltrim(value)), 1) TriggerName, schema_name(schema_id(parsename(rtrim(ltrim(value)), 2))) SchemaName 
+						select	parsename(rtrim(ltrim(value)), 1) TriggerName, schema_name(schema_id(parsename(rtrim(ltrim(value)), 2))) SchemaName
 						from string_split(@TriggerNames, ',')
 					) x0
 					inner join sys.triggers t on t.name = x0.TriggerName and isnull(object_schema_name(t.object_id), '') = isnull(x0.SchemaName, '')

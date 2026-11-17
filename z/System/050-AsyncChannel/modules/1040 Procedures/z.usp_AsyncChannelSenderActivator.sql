@@ -15,7 +15,7 @@ begin
 
 	while (1 = 1)
 	begin
-		select @Handle = null, @ChannelID = null, @SessionID = null;
+		select	@Handle = null, @ChannelID = null, @SessionID = null;
 		waitfor (
 					receive top(1) @Handle = conversation_handle, @MessageType = message_type_name, @BodyText = cast(message_body as nvarchar(max))
 					from z.AsyncChannelSenderQueue
@@ -23,7 +23,7 @@ begin
 		if @Handle is null
 			break;
 
-		select @ChannelID = AsyncChannelID, @SessionID = SessionID
+		select	@ChannelID = AsyncChannelID, @SessionID = SessionID
 		from z.AsyncChannelSession
 		where ConversationHandle = @Handle;
 

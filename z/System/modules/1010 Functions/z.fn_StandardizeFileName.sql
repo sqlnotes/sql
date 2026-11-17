@@ -12,12 +12,8 @@ returns nvarchar(4000)
 as
 begin
 	if @FileName is null return null;
-	declare @Character int = 1;
-	select @FileName = translate(@FileName, N'<>:"/\|?* ', N'__________');
-	while @Character <= 31
-	begin
-		select @FileName = replace(@FileName collate Latin1_General_100_BIN2, nchar(@Character), N'_'), @Character += 1;
-	end
+	select	@FileName = translate(@FileName collate Latin1_General_100_BIN2,
+			N'<>:"/\|?* ' + cast(0x0100020003000400050006000700080009000A000B000C000D000E000F0010001100120013001400150016001700180019001A001B001C001D001E001F00 as nvarchar(31)), replicate(N'_', 41));
 	if right(@FileName, 1) = N'.' select @FileName = left(@FileName, len(@FileName) - 1) + N'_';
 	return @FileName;
 end

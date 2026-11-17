@@ -15,18 +15,18 @@ create or alter procedure z.usp_CreateDatabaseSnapshot
 as
 begin
 	set nocount, xact_abort on;
-	select @SourceDatabaseName = db_name(db_id(isnull(@SourceDatabaseName, db_name())))
+	select	@SourceDatabaseName = db_name(db_id(isnull(@SourceDatabaseName, db_name())))
 	if @SourceDatabaseName is null
 	begin
 		throw 50000, 'Could not find source database.', 1;
 	end
-	select @DatabaseSnapshotName = isnull(@DatabaseSnapshotName, @SourceDatabaseName + '_Snapshot')
+	select	@DatabaseSnapshotName = isnull(@DatabaseSnapshotName, @SourceDatabaseName + '_Snapshot')
 	if db_id(@DatabaseSnapshotName) is not null
 	begin
 		declare @Error nvarchar(2048) = replace(formatmessage(N'Database %s already exists.', @DatabaseSnapshotName), N'%', N'%%');
 		throw 50000, @Error, 1;
 	end
-	
+
 	declare @SQL nvarchar(max), @Proc sysname = quotename(@SourceDatabaseName)+'..sp_executesql'
 	declare @t table(name sysname, physical_name nvarchar(260), i int identity(1,1))
 	insert into @t
@@ -36,16 +36,16 @@ begin
 		throw 50000, 'Unknown error.', 1;
 	end
 
-	select @SQL = N'create database ' + quotename(@DatabaseSnapshotName) + N' on '
-		+ stuff(
-					(
-						select N', (name = ' + quotename(name) + N', filename = N''' + replace(physical_name + N'.' + replace(@DatabaseSnapshotName, N' ', N''), N'''', N'''''') + N''')'
-						from @t
-						order by i
-						for xml path(''), type
-					).value('.', 'nvarchar(max)')
-				, 1, 2, '')
-		+ N' as snapshot of ' + quotename(@SourceDatabaseName) + N';'
+	select	@SQL = N'create database ' + quotename(@DatabaseSnapshotName) + N' on '
+			+ stuff(
+					 (
+						 select	N', (name = ' + quotename(name) + N', filename = N''' + replace(physical_name + N'.' + replace(@DatabaseSnapshotName, N' ', N''), N'''', N'''''') + N''')'
+						 from @t
+						 order by i
+						 for xml path(''), type
+					 ).value('.', 'nvarchar(max)')
+				 , 1, 2, '')
+			+ N' as snapshot of ' + quotename(@SourceDatabaseName) + N';'
 	exec(@SQL)
 end
 

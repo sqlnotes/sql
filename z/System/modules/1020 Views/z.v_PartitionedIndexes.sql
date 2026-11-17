@@ -10,7 +10,7 @@ details.
 */
 create or alter view z.v_PartitionedIndexes
 as
-select	p.object_id ObjectID,object_schema_name(p.object_id) SchemaName, object_name(p.object_id) ObjectName, 
+select	p.object_id ObjectID,object_schema_name(p.object_id) SchemaName, object_name(p.object_id) ObjectName,
 		p.index_id IndexID, i.name IndexName, p.partition_number PartitionNumber, p.rows Rows, col_name(ic.object_id, ic.column_id) PartitionKeyName,
 		ps.data_space_id DataSpaceID,ps.name PartitionSchemeName, fg.name FileGroupName,
 		f1.function_id PartitionFunctionID,f1.name PartitionFunctionName, f1.boundary_value_on_right BoundaryValueOnRight,

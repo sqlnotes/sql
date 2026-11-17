@@ -12,7 +12,7 @@ as
 begin
     declare @ObjectName nvarchar(max)
     declare cModules cursor local static for
-        select quotename(object_schema_name(object_id))+ '.'+quotename(object_name(object_id))
+        select	quotename(object_schema_name(object_id))+ '.'+quotename(object_name(object_id))
         from sys.sql_modules
         where definition is not null
 		order by 1
@@ -25,7 +25,7 @@ begin
                     exec sp_refreshsqlmodule @ObjectName
             end try
             begin catch
-                select @ObjectName = 'Refreshing object ' + @ObjectName + '
+                select	@ObjectName = 'Refreshing object ' + @ObjectName + '
 ' + error_message();
                 throw 50000, @ObjectName, 12;
             end catch
@@ -33,7 +33,7 @@ begin
         end
     close cModules
     deallocate cModules
-    select @RefreshTimes -= 1
+    select	@RefreshTimes -= 1
     if @RefreshTimes > 0
         exec z.usp_RefeshAllSQLModules @RefreshTimes
 end

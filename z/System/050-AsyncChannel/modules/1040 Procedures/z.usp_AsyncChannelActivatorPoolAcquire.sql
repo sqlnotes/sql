@@ -15,9 +15,9 @@ create or alter procedure z.usp_AsyncChannelActivatorPoolAcquire
 as
 begin
 	set nocount on
-	declare @CandidatePoolID int, @MaxConcurrency int, @TimeoutSeconds int, @IsActive bit, @PoolName nvarchar(128),
+	declare	@CandidatePoolID int, @MaxConcurrency int, @TimeoutSeconds int, @IsActive bit, @PoolName nvarchar(128),
 			@Result int, @SemaphoreName nvarchar(200), @Info nvarchar(max), @TimeoutMS int
-	select @ActivatorPoolID = null
+	select	@ActivatorPoolID = null
 	select	@CandidatePoolID = p.ActivatorPoolID, @PoolName = p.Name, @MaxConcurrency = p.MaxConcurrency,
 			@TimeoutSeconds = p.TimeoutSeconds, @IsActive = p.IsActive
 	from z.AsyncChannel c
@@ -33,11 +33,11 @@ begin
 									  @LockOwner = 'Session', @LockTimeout = @TimeoutMS
 	if @Result > 0
 	begin
-		select @ActivatorPoolID = @CandidatePoolID
+		select	@ActivatorPoolID = @CandidatePoolID
 		return 0
 	end
-	select @Info = N'activator pool ' + @PoolName + N': semaphore acquisition failed (result ' + cast(@Result as nvarchar(11))
-		+ N', timeout ' + cast(@TimeoutMS as nvarchar(11)) + N'ms)'
+	select	@Info = N'activator pool ' + @PoolName + N': semaphore acquisition failed (result ' + cast(@Result as nvarchar(11))
+			+ N', timeout ' + cast(@TimeoutMS as nvarchar(11)) + N'ms)'
 	exec z.usp_AsyncChannelLog @AsyncChannelID = @AsyncChannelID, @Level = 'Warning', @Info = @Info, @SessionID = @@spid
 	return -1
 end

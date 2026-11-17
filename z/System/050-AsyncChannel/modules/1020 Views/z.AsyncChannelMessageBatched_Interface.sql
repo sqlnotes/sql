@@ -9,7 +9,6 @@ Shared insert interface batching serialized fragments by channel.
 */
 create or alter view z.AsyncChannelMessageBatched_Interface
 as
-	select top 0
-		AsyncChannelID = cast(null as int),
-		DataSequence = cast(null as bigint),
-		Data = cast(null as nvarchar(max))
+	select	top 0 AsyncChannelID = cast(null as int),
+				  DataSequence = cast(null as bigint),
+				  Data = cast(null as nvarchar(max))

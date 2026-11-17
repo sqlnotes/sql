@@ -14,8 +14,8 @@ begin
 	set nocount, xact_abort on;
 	;with s as
 	(
-		select v.PartitionFunctionName, 'Monthly' PartitionRangeType, 1 PartitionRangeTypeInterval,
-			3 ForwardedPartitionCount, N'Default' NextPartitionFileGroup, 6 PartitionsToKeep, cast(0 as bit) ArchivedSwappedPartitions
+		select	v.PartitionFunctionName, 'Monthly' PartitionRangeType, 1 PartitionRangeTypeInterval,
+				3 ForwardedPartitionCount, N'Default' NextPartitionFileGroup, 6 PartitionsToKeep, cast(0 as bit) ArchivedSwappedPartitions
 		from (values(N'PF_SchemaZPartitionGeneric'), (N'PF_SchemaZPartitionGenericDateTime')) v(PartitionFunctionName)
 		where exists(select * from sys.partition_functions f where f.name = v.PartitionFunctionName)
 	)

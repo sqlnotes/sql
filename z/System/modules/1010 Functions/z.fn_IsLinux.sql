@@ -8,8 +8,8 @@ Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/docs/reference
 Checks the server version string for Linux hosting.
 */
 create or alter function z.fn_IsLinux()
-returns bit 
-as 
-begin 
+returns bit
+as
+begin
 	return case when lower(@@version) like '%linux%' then 1 else 0 end
 end

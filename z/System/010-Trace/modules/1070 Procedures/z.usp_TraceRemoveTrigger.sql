@@ -29,10 +29,10 @@ begin
 			throw 50000, N'Either @TraceName or @TraceID must be provided.', 1;
 		end
 		declare @ResolvedTraceID int;
-		select @ResolvedTraceID = TraceID
+		select	@ResolvedTraceID = TraceID
 		from z.v_TraceOwned
 		where (@TraceName is null or Name = @TraceName) and (@TraceID is null or TraceID = @TraceID);
-		select @TraceID = @ResolvedTraceID;
+		select	@TraceID = @ResolvedTraceID;
 		if not exists(select 1 from z.Trace with (updlock, holdlock) where TraceID = @TraceID and CreatorSessionID = @@spid
 			and CreatorLoginTime = (select login_time from sys.dm_exec_sessions where session_id = @@spid))
 			throw 50000, N'The selected trace registration changed before configuration.', 1;

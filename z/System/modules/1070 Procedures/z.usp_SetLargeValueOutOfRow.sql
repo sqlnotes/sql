@@ -14,7 +14,7 @@ begin
 	set nocount on
 	declare @FullObjectName nvarchar(300)
 	declare cTables cursor static local for
-		select quotename(schema_name(schema_id)) + '.' + quotename(name)
+		select	quotename(schema_name(schema_id)) + '.' + quotename(name)
 		from sys.tables t
 		where exists(select * from sys.columns c where t.object_id = c.object_id and c.max_length = -1)
 			and large_value_types_out_of_row = 0

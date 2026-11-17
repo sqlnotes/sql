@@ -18,16 +18,16 @@ as
 begin
 	set nocount, xact_abort on
 	set transaction isolation level read uncommitted
-	
-	declare @TransactionID bigint, @Date datetime = cast(getdate() as datetime2(0)), @TextData nvarchar(max),
+
+	declare	@TransactionID bigint, @Date datetime = cast(getdate() as datetime2(0)), @TextData nvarchar(max),
 			@SessionContext1 sql_variant, @SessionContext2 sql_variant
-			
-	select @TransactionID = TransactionID, @TextData = TextData
+
+	select	@TransactionID = TransactionID, @TextData = TextData
 	from z.TraceBlockedProcessReport
-	where TraceSequence = @TraceSequence 
+	where TraceSequence = @TraceSequence
 	if @@rowcount = 0 or @TextData is null
 		return;
-	
+
 	if	@TextData like '%MScdc%'
 		or @TextData like '%vid_device_name%'
 		or @TextData like '%VIRTUAL_DEVICE%'
@@ -41,13 +41,13 @@ begin
 		return
 	if @SessionContext2 is not null and cast(@SessionContext2 as datetime) = @Date
 		return
-	
+
 	exec sp_set_session_context N'z.usp_TakeSnapshotActiveSessionsForBlockedProcessReport-1', @TransactionID
 	exec sp_set_session_context N'z.usp_TakeSnapshotActiveSessionsForBlockedProcessReport-2', @Date
-	
+
 
 	insert into z.TraceBlockedProcessReportActiveSessions(TraceSequence, SessionID, StartDate, BlockerSessionID, DurationInSecond, Status, Command, WaitType, WaitTime, WaitResource, LastWaitType, CPU, Reads, Writes, LogicalReads, TotalElapsedTime, DatabaseName, SQLText, /*QueryPlan,*/ GrantedMemory, NestedLevel, [RowCount], OpenTranCount, TransactionIsolationLevel, ExecutingManagedCode, MaxVersionTraversed, AverageVersionChainTraversed, TranDurationInSecond, LoginName, HostName, HostAddress, ApplicationName, BlockerLoginName, BlockerHostName, BlockerAddress, BlockerApplicationName, BlockerQuery, BlockerLastExecutedCommand)
-		select  @TraceSequence, SessionID, StartDate, BlockerSessionID, DurationInSecond, Status, Command, WaitType, WaitTime, WaitResource, LastWaitType, CPU, Reads, Writes, LogicalReads, TotalElapsedTime, DatabaseName, SQLText, /*QueryPlan,*/ GrantedMemory, NestedLevel, [RowCount], OpenTranCount, TransactionIsolationLevel, ExecutingManagedCode, MaxVersionTraversed, AverageVersionChainTraversed, TranDurationInSecond, LoginName, HostName, HostAddress, ApplicationName, BlockerLoginName, BlockerHostName, BlockerAddress, BlockerApplicationName, BlockerQuery, BlockerLastExecutedCommand
+		select	@TraceSequence, SessionID, StartDate, BlockerSessionID, DurationInSecond, Status, Command, WaitType, WaitTime, WaitResource, LastWaitType, CPU, Reads, Writes, LogicalReads, TotalElapsedTime, DatabaseName, SQLText, /*QueryPlan,*/ GrantedMemory, NestedLevel, [RowCount], OpenTranCount, TransactionIsolationLevel, ExecutingManagedCode, MaxVersionTraversed, AverageVersionChainTraversed, TranDurationInSecond, LoginName, HostName, HostAddress, ApplicationName, BlockerLoginName, BlockerHostName, BlockerAddress, BlockerApplicationName, BlockerQuery, BlockerLastExecutedCommand
 	from z.v_ActiveSessions
 end
 

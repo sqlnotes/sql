@@ -17,7 +17,7 @@ begin
 	declare @SemaphoreName nvarchar(200), @Result int
 	if @ActivatorPoolID is null
 		return
-	select @SemaphoreName = N'ADPool/' + cast(@ActivatorPoolID as nvarchar(11))
-	exec @Result = z.usp_ReleaseSemaphore @SemaphoreName = @SemaphoreName, @LockOwner = 'Session'
+	select	@SemaphoreName = N'ADPool/' + cast(@ActivatorPoolID as nvarchar(11))
+	exec @Result = z.usp_ReleaseSemaphore @SemaphoreName = @SemaphoreName
 	return @Result
 end

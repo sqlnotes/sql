@@ -44,7 +44,9 @@ Reuse requires the current database's literal prefix and matching native timing 
 @Command8 nvarchar(max) = null,
 @Command9 nvarchar(max) = null,
 @Command10 nvarchar(max) = null,
-@CreateSchedule bit = 1
+@CreateSchedule bit = 1,
+@JobName nvarchar(128) = null output,
+@JobID uniqueidentifier = null output
 ```
 
 These are the source-declared types and defaults. On update, NULL description/category retains the existing value; use an empty description to clear it. Other execution-context overrides, proxy/output settings and existing server assignments are not reconciled. Rebuilding after a command-count change or missing step recreates all managed steps with creation defaults, including execution-context, proxy and output settings. Intact step structures retain those overrides even when commands change.
@@ -59,7 +61,30 @@ The guard's existing failure routing is distinct from user-step failure routing:
 
 ## Results, permissions, and limits
 
-No defined result set. Requires relevant msdb Agent authority; job runs with configured owner context. DeleteAfterExecution uses native Agent delete levels: 0 = never, 1 = on success, 2 = on failure, 3 = on completion. NULL and values outside 0–3 raise error 51000 before metadata writes. Previously 1 meant completion; callers wanting that behavior must now pass 3. A rejected database guard quits reporting success, so deletion modes 1 and 3 can delete a guarded/skipped job. Database guard failure uses on_fail_action=1 (quit reporting success), which can obscure unavailable-database runs.
+No defined result set. Optional `@JobName` and `@JobID` output parameters return
+the actual database-prefixed job name and its `msdb.dbo.sysjobs.job_id` after
+successful creation or reconciliation. Both default to NULL. The full name uses
+the existing 128-character naming limit and accepted truncation behavior.
+Outputs are cleared on entry and populated together only after the procedure's
+COMMIT succeeds. When called inside a transaction, the caller still owns the
+outer commit; a later caller rollback can undo the job changes.
+
+Errors continue to propagate through THROW. SQL Server can skip copying output
+parameters back when an exception propagates, so initialize T-SQL receiving variables
+to NULL before each call, and clear them in the caller's CATCH if they are reused.
+The procedure cannot clear a caller's pre-existing values when copy-out is skipped.
+Existing best-effort category creation remains unchanged: its caught failure
+does not fail an otherwise successful job operation.
+
+```sql
+declare @JobName nvarchar(128), @JobID uniqueidentifier;
+exec z.usp_CreateServiceJob @Name = N'Example', @Command = N'select 1;',
+	@CreateSchedule = 0, @SetJobOwnerToSA = 0,
+	@JobName = @JobName output, @JobID = @JobID output;
+select @JobName JobName, @JobID JobID;
+```
+
+Requires relevant msdb Agent authority; job runs with configured owner context. DeleteAfterExecution uses native Agent delete levels: 0 = never, 1 = on success, 2 = on failure, 3 = on completion. NULL and values outside 0–3 raise error 51000 before metadata writes. Previously 1 meant completion; callers wanting that behavior must now pass 3. A rejected database guard quits reporting success, so deletion modes 1 and 3 can delete a guarded/skipped job. Database guard failure uses on_fail_action=1 (quit reporting success), which can obscure unavailable-database runs.
 
 ## Dependencies
 

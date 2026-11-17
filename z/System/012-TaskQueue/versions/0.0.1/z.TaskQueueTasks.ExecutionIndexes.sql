@@ -14,17 +14,17 @@ set numeric_roundabort off;
 declare @ObjectID int = object_id(N'z.TaskQueueTasks', N'U');
 if @ObjectID is not null
 begin
-	declare @ExpectedDefinition nvarchar(max) = N'convert(tinyint, case
+	declare	@ExpectedDefinition nvarchar(max) = N'convert(tinyint, case
 		when Status = ''Blocked'' or Status = ''NeedsReview'' then 1
 		when Status = ''Succeeded'' then case when CompletionCondition = ''Failed'' then 1 else 2 end
 		when Status = ''Failed'' and convert(bigint, AttemptsStarted) >= convert(bigint, MaxRetries) + 1 then case when CompletionCondition = ''Succeeded'' then 1 else 2 end
 		else 0 end)', @ActualDefinition nvarchar(max), @Sql nvarchar(max);
 	if not exists (select 1 from sys.columns where object_id = @ObjectID and name = N'CompletionState')
 	begin
-		select @Sql = N'alter table z.TaskQueueTasks add CompletionState as ' + @ExpectedDefinition + N';';
+		select	@Sql = N'alter table z.TaskQueueTasks add CompletionState as ' + @ExpectedDefinition + N';';
 		exec sys.sp_executesql @Sql;
 	end;
-	select @ActualDefinition = definition from sys.computed_columns
+	select	@ActualDefinition = definition from sys.computed_columns
 	where object_id = @ObjectID and name = N'CompletionState' and system_type_id = type_id(N'tinyint') and max_length = 1;
 	if @ActualDefinition is null or isnull(columnproperty(@ObjectID, N'CompletionState', 'IsDeterministic'), 0) <> 1
 		or isnull(columnproperty(@ObjectID, N'CompletionState', 'IsPrecise'), 0) <> 1
@@ -58,7 +58,7 @@ begin
 			(N'IX_z_TaskQueueTasks_BatchID_TaskID', N'BatchID', 1, 0), (N'IX_z_TaskQueueTasks_BatchID_TaskID', N'TaskID', 2, 0);
 	declare @CompatibleIndexes table (IndexName sysname, IndexID int);
 	insert @CompatibleIndexes (IndexName, IndexID)
-		select e.IndexName, i.index_id
+		select	e.IndexName, i.index_id
 		from @ExpectedIndexes e
 			cross join sys.indexes i
 			cross apply (values (lower(replace(translate(replace(i.filter_definition collate Latin1_General_100_BIN2,
@@ -71,17 +71,17 @@ begin
 			and not exists (select 1 from sys.index_columns c where c.object_id = @ObjectID and c.index_id = i.index_id and c.key_ordinal > 0 and c.is_descending_key = 1)
 			and not exists
 			(
-				select c.ColumnName, c.KeyOrdinal, c.IsIncludedColumn from @ExpectedColumns c where c.IndexName = e.IndexName
+				select	c.ColumnName, c.KeyOrdinal, c.IsIncludedColumn from @ExpectedColumns c where c.IndexName = e.IndexName
 				except
-				select d.name, c.key_ordinal, c.is_included_column
+				select	d.name, c.key_ordinal, c.is_included_column
 				from sys.index_columns c
-					join sys.columns d on d.object_id = c.object_id and d.column_id = c.column_id
+					inner join sys.columns d on d.object_id = c.object_id and d.column_id = c.column_id
 				where c.object_id = @ObjectID and c.index_id = i.index_id and (c.key_ordinal > 0 or c.is_included_column = 1)
 			);
 	if exists
 	(
-		select 1 from sys.indexes i
-			join @ExpectedIndexes e on e.IndexName = i.name
+		select	1 from sys.indexes i
+			inner join @ExpectedIndexes e on e.IndexName = i.name
 		where i.object_id = @ObjectID and not exists (select 1 from @CompatibleIndexes c where c.IndexName = e.IndexName and c.IndexID = i.index_id)
 	)
 		throw 50000, 'An existing TaskQueue execution index name has an incompatible definition; review it before deployment.', 1;

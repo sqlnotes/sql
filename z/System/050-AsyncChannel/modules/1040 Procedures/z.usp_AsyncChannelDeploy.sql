@@ -17,7 +17,7 @@ begin
 	set nocount, xact_abort on;
 	declare @GeneratedScript nvarchar(max)
 	declare cScripts cursor local static for
-		select GeneratedScript
+		select	GeneratedScript
 		from z.v_AsyncChannelScripts
 		where AsyncChannelID = @AsyncChannelID
 			and (NeedDeployment = 1 or (@ForceDeployment = 1 and ObjectType not in ('Interface','Queue','Service','Processing')))

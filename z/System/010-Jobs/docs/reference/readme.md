@@ -13,6 +13,7 @@ Exact SQL identifiers link to behavior and source. Native system dependencies ar
 | `z.fn_GetServiceJobID` | [Reference](supporting-objects.md#zfn_getservicejobid) | [SQL](../../modules/1010%20Functions/z.fn_GetServiceJobID.sql) |
 | `z.fn_GetServiceJobName` | [Reference](supporting-objects.md#zfn_getservicejobname) | [SQL](../../modules/1010%20Functions/z.fn_GetServiceJobName.sql) |
 | `z.fn_IsSQLAgentRunning` | [Reference](supporting-objects.md#zfn_issqlagentrunning) | [SQL](../../modules/1010%20Functions/z.fn_IsSQLAgentRunning.sql) |
+| `z.fn_IsSQLJobRunning` | [Reference](supporting-objects.md#zfn_issqljobrunning) | [SQL](../../modules/1010%20Functions/z.fn_IsSQLJobRunning.sql) |
 | `z.fn_ParseScheduleName` | [Reference](z.fn_ParseScheduleName.md) | [SQL](../../modules/1020%20Functions/z.fn_ParseScheduleName.sql) |
 | `z.fn_ResourceSQLScheduleOperation` | [Reference](supporting-objects.md#zfn_resourcesqlscheduleoperation) | [SQL](../../modules/1010%20Functions/z.fn_ResourceSQLScheduleOperation.sql) |
 | `z.fn_SQLAgentScheduleTimeToTime` | [Reference](supporting-objects.md#zfn_sqlagentscheduletimetotime) | [SQL](../../modules/1010%20Functions/z.fn_SQLAgentScheduleTimeToTime.sql) |
@@ -22,6 +23,7 @@ Exact SQL identifiers link to behavior and source. Native system dependencies ar
 | `z.usp_CreateServiceJob` | [Reference](z.usp_CreateServiceJob.md) | [SQL](../../modules/1070%20Procedures/z.usp_CreateServiceJob.sql) |
 | `z.usp_DisableServiceJob` | [Reference](z.usp_DisableServiceJob.md) | [SQL](../../modules/1070%20Procedures/z.usp_DisableServiceJob.sql) |
 | `z.usp_EnableServiceJob` | [Reference](z.usp_EnableServiceJob.md) | [SQL](../../modules/1070%20Procedures/z.usp_EnableServiceJob.sql) |
+| `z.usp_GetJobStatus` | [Reference](z.usp_GetJobStatus.md) | [SQL](../../modules/1070%20Procedures/z.usp_GetJobStatus.sql) |
 | `z.usp_RemoveOrphanedSchedule` | [Reference](z.usp_RemoveOrphanedSchedule.md) | [SQL](../../modules/1070%20Procedures/z.usp_RemoveOrphanedSchedule.sql) |
 | `z.usp_RemoveServiceJob` | [Reference](z.usp_RemoveServiceJob.md) | [SQL](../../modules/1070%20Procedures/z.usp_RemoveServiceJob.sql) |
 | `z.usp_StartServiceJob` | [Reference](z.usp_StartServiceJob.md) | [SQL](../../modules/1070%20Procedures/z.usp_StartServiceJob.sql) |

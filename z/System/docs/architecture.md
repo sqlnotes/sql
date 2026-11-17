@@ -28,7 +28,7 @@ Several catch blocks roll back any open transaction, including the caller's work
 
 ## Post objects and version marker
 
-[DeprecatedObject.sql](../post/DeprecatedObject.sql) removes retired objects on each eligible repeat, grouped by object type. Schema objects are removed through `z.usp_DropObject`; unsupported partition objects use guarded statements. [GeneralPostScript.sql](../post/GeneralPostScript.sql) executes initialization, naming enforcement and general-maintenance job setup. [Remove-blocker pre-post module](../890-SystemBeforePost/1010%20Procedures/z.usp_RemoveBlocker.sql) defines a cross-feature helper in 890-SystemBeforePost after Jobs exists. Its [reference](reference/remove-blocker.md) describes generated temporary procedures/jobs and session termination.
+[DeprecatedObject.sql](../post/DeprecatedObject.sql) removes System-owned retired objects on each eligible repeat, grouped by object type. Feature subsystems own their retired-object cleanup in their own `post` folders: [Jobs](../010-Jobs/post/DeprecatedObject.sql), [TaskQueue](../012-TaskQueue/post/DeprecatedObject.sql), [Backup](../020-Backup/post/DeprecatedObject.sql) and [Monitoring](../020-Monitoring/post/DeprecatedObject.sql). Each cleanup runs after its owning subsystem's replacement modules. Schema objects are removed through `z.usp_DropObject`; unsupported partition objects use guarded statements. [GeneralPostScript.sql](../post/GeneralPostScript.sql) executes initialization, naming enforcement and general-maintenance job setup. [Remove-blocker pre-post module](../890-SystemBeforePost/1010%20Procedures/z.usp_RemoveBlocker.sql) defines a cross-feature helper in 890-SystemBeforePost after Jobs exists. Its [reference](reference/remove-blocker.md) describes generated temporary procedures/jobs and session termination.
 
 Retired names and their current replacements:
 
@@ -47,7 +47,7 @@ Retired names and their current replacements:
 | `z.fn_CopyTableSchema` | `z.usp_CopyTableSchema` |
 | `z.fn_BuildQueryCopyTableSchema` | `z.usp_CopyTableSchema` with `@ShowPlan = 1` for script preview |
 | `z.fn_GetZSequenceID` | `z.fn_GenerateZSequenceID(null, @SeqGeneralID)` |
-| `z.fn_LettersOnly` | `z.fn_AsciiLettersOnly` |
+| `z.fn_LettersOnly` | `z.fn_ASCIILettersOnly` |
 | `z.fn_NumbersOnly` | `z.fn_DigitsOnly` |
 | `z.fn_PreviousCommittedRowVersion` | `z.fn_GetLastCommittedRowVersion` |
 | `z.fn_ReadLinesFromString` | `z.fn_SplitLines` |
@@ -56,7 +56,7 @@ Retired names and their current replacements:
 | `PS_zPartitionGeneric` | `PS_SchemaZPartitionGeneric` |
 | `PF_zPartitionGeneric` | `PF_SchemaZPartitionGeneric` |
 
-Update external callers before deploying; schema-bound dependencies can prevent removal. Old partition storage is retained with a message while indexes or partition schemes still reference it. Cleanup does not move table data or rewrite retention-policy rows. Add future retired names to the matching type section using an existence guard, and review dependencies before removal.
+Update external callers before deploying; schema-bound dependencies can prevent removal. Old partition storage is retained with a message while indexes or partition schemes still reference it. Cleanup does not move table data or rewrite retention-policy rows. Add future retired names to the owning subsystem's `post` cleanup, grouped by object type, and review dependencies before removal. Keep only System-owned retirement in System's post script.
 
 The [0.0.1 marker](../versions/0.0.1/dummy.sql) contains no database-object definition; it establishes System's initial version through installer completion.
 

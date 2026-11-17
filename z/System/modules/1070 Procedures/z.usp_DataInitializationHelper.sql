@@ -20,15 +20,15 @@ as
 begin
 	set nocount on
 	declare @HasIdentityColumn bit = 0, @SQL nvarchar(max), @Data nvarchar(max), @ObjectID int = object_id(@FullObjectName)
-	
+
 	if @ObjectID is null
 		return
-	
-	select @FullObjectName = quotename(object_schema_name(@ObjectID)) + '.' + quotename(object_name(@ObjectID))
-	select @SQL = 'select * from ' + @FullObjectName
+
+	select	@FullObjectName = quotename(object_schema_name(@ObjectID)) + '.' + quotename(object_name(@ObjectID))
+	select	@SQL = 'select * from ' + @FullObjectName
 	exec z.usp_GetQueryResultToSQL @SQL, @Data output
 	--exec z.usp_PrintString @Data
-	select * into #SourceSchema
+	select	* into #SourceSchema
 	from z.v_Objects
 	where ObjectID = @ObjectID
 
@@ -59,14 +59,14 @@ begin
 	end
 
 	if exists(select * from #SourceSchema where IsIdentity = 1)
-		select @HasIdentityColumn = 1
-	
+		select	@HasIdentityColumn = 1
 
-	select @SQL = cast('-- Initialize ' as nvarchar(max)) + @FullObjectName + '
--- exec z.usp_DataInitializationHelper @FullObjectName = ' + quotename(@FullObjectName, '''') + ' , @ForceIdentityColumnInsert = ' + iif(@ForceIdentityColumnInsert = 1, '1', '0') + ', @ForceMatchedDataUpdate = ' + iif(@ForceMatchedDataUpdate = 1, '1', '0') + ', @PrimaryKeys = ' + iif(@PrimaryKeys is null, 'null', '''' + replace(@PrimaryKeys, '''', '''''') + '''') + ', @ExcludedColumns = ' + iif(@ExcludedColumns is null, 'null', '''' + replace(@ExcludedColumns, '''', '''''') + '''') 
-		+ case when @HasIdentityColumn = 1  then '
+
+	select	@SQL = cast('-- Initialize ' as nvarchar(max)) + @FullObjectName + '
+-- exec z.usp_DataInitializationHelper @FullObjectName = ' + quotename(@FullObjectName, '''') + ' , @ForceIdentityColumnInsert = ' + iif(@ForceIdentityColumnInsert = 1, '1', '0') + ', @ForceMatchedDataUpdate = ' + iif(@ForceMatchedDataUpdate = 1, '1', '0') + ', @PrimaryKeys = ' + iif(@PrimaryKeys is null, 'null', '''' + replace(@PrimaryKeys, '''', '''''') + '''') + ', @ExcludedColumns = ' + iif(@ExcludedColumns is null, 'null', '''' + replace(@ExcludedColumns, '''', '''''') + '''')
+			+ case when @HasIdentityColumn = 1  then '
 set identity_insert ' + @FullObjectName + ' on;' else '' end
-		+ '
+			+ '
 ;with s as 
 (
 	' + @Data + '
@@ -77,13 +77,13 @@ when not matched then
 	insert ('+stuff((select ','+ quotename(ColumnName) from #SourceSchema order by ColumnID for xml path(''), type).value('.', 'nvarchar(max)'), 1, 1,'')+')
 	values('+stuff((select ',s.'+ quotename(ColumnName) from #SourceSchema order by ColumnID for xml path(''), type).value('.', 'nvarchar(max)'), 1, 1,'')+')
 '
-		+case when @ForceMatchedDataUpdate = 1 and exists(select * from #SourceSchema where PrimaryKeyOrder = 0) then 
-				'when matched and ('+stuff((select ' or s.'+ quotename(ColumnName)+' is null and t.'+ quotename(ColumnName)+' is not null or s.'+ quotename(ColumnName)+' is not null and t.'+ quotename(ColumnName)+' is null or s.'+ quotename(ColumnName)+' <> t.'+ quotename(ColumnName) from #SourceSchema where PrimaryKeyOrder = 0 order by ColumnID for xml path(''), type).value('.','nvarchar(max)'), 1, 4,'')+') then 
+			+case when @ForceMatchedDataUpdate = 1 and exists(select * from #SourceSchema where PrimaryKeyOrder = 0) then
+				 'when matched and ('+stuff((select ' or s.'+ quotename(ColumnName)+' is null and t.'+ quotename(ColumnName)+' is not null or s.'+ quotename(ColumnName)+' is not null and t.'+ quotename(ColumnName)+' is null or s.'+ quotename(ColumnName)+' <> t.'+ quotename(ColumnName) from #SourceSchema where PrimaryKeyOrder = 0 order by ColumnID for xml path(''), type).value('.','nvarchar(max)'), 1, 4,'')+') then
 update set '+stuff((select ', t.'+ quotename(ColumnName)+' = s.'+ quotename(ColumnName) from #SourceSchema where PrimaryKeyOrder = 0 order by ColumnID for xml path(''), type).value('.', 'nvarchar(max)'), 1, 2,'')
-	else ''
-	end+'
+			else ''
+			end+'
 ;'
-	+ case when @HasIdentityColumn = 1  then '
+			+ case when @HasIdentityColumn = 1  then '
 set identity_insert ' + @FullObjectName + ' off;' else '' end
 	exec z.usp_PrintString @SQL
 end

@@ -10,7 +10,7 @@ Converts readable schedule parameters into native SQL Agent timing fields and na
 create or alter function z.fn_ToSQLAgentSchedule
 (
 	@Frequency varchar(20) = 'Daily', --Monthly, Weekly, Daily, Agent Start, idle, Specific
-	@Interval int = 1, 
+	@Interval int = 1,
 	@ByDay varchar(8000) = null,--'[Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday] or First ... or Second ... or third ... or Fourth ... or Last ..., 1, 2, 3, 4'
 	@IntradayFrequency varchar(20) = 'Second', -- hourly, minute, second, Specific
 	@IntradayInterval int = 10,
@@ -20,15 +20,15 @@ create or alter function z.fn_ToSQLAgentSchedule
 )
 returns table
 as
-return 
+return
 (
 	with p as
 	(
-		select isnull(@StartDate, convert(date, getdate())) StartDate
+		select	isnull(@StartDate, convert(date, getdate())) StartDate
 	),
 	x0 as
 	(
-		select z.ScheduleID, z.Frequency, z.Interval, bd.value collate Latin1_General_100_CI_AS ByDay, IntradayFrequency, IntradayInterval, bt.value ByTime, z.StartDate, EndDate
+		select	z.ScheduleID, z.Frequency, z.Interval, bd.value collate Latin1_General_100_CI_AS ByDay, IntradayFrequency, IntradayInterval, bt.value ByTime, z.StartDate, EndDate
 		from p
 			cross apply z.fn_CleanseScheduleParameter(@Frequency, @Interval, @ByDay, @IntradayFrequency, @IntradayInterval, @ByTime, p.StartDate, @EndDate) z
 			outer apply string_split(z.ByDay, ',') bd
@@ -37,8 +37,8 @@ return
 	),
 	x1 as
 	(
-		select x0.ScheduleID, x0.Frequency, x0.Interval, x0.ByDay, x0.IntradayFrequency, x0.IntradayInterval, x0.ByTime, x0.StartDate, x0.EndDate,
-				case 
+		select	x0.ScheduleID, x0.Frequency, x0.Interval, x0.ByDay, x0.IntradayFrequency, x0.IntradayInterval, x0.ByTime, x0.StartDate, x0.EndDate,
+				case
 					when x0.Frequency = 'Specific' then 1
 					when x0.Frequency = 'Daily' then 4
 					when x0.Frequency = 'Weekly' then 8
@@ -48,9 +48,9 @@ return
 					when x0.Frequency = 'Idle' then 128
 				end freq_type,
 				isnull(
-						case 
+						case
 							when x0.Frequency = 'Daily' then Interval
-							when x0.Frequency = 'Weekly' then 
+							when x0.Frequency = 'Weekly' then
 								case x0.ByDay
 									when 'Sunday' then 1
 									when 'Monday' then 2
@@ -62,7 +62,7 @@ return
 								end
 							when x0.Frequency = 'Monthly' and try_cast(x0.ByDay as int) is not null then cast(x0.ByDay as int)
 							when x0.Frequency = 'Monthly' and try_cast(x0.ByDay as int) is null then
-								case 
+								case
 									when x0.ByDay like '%Sun%' then 1
 									when x0.ByDay like '%Mon%' then 2
 									when x0.ByDay like '%Tue%' then 3
@@ -75,7 +75,7 @@ return
 									when x0.ByDay like '%Day%' then 8
 								end
 							else 0
-						end, 
+						end,
 					0) freq_interval,
 				isnull(
 						case x0.IntradayFrequency
@@ -83,22 +83,22 @@ return
 							When 'Second' then 2
 							When 'Minute' then 4
 							When 'Hourly' then 8
-						end, 
+						end,
 					0) freq_subday_type,
 				isnull(x0.IntradayInterval, 0) freq_subday_interval,
 				isnull(
 						case when x0.Frequency = 'Monthly' and try_cast(x0.ByDay as int) is null then
-							case 
+							case
 									when x0.ByDay like '%First%' then 1
 									when x0.ByDay like '%Second%' then 2
 									when x0.ByDay like '%Third%' then 4
 									when x0.ByDay like '%Fourth%' then 8
 									when x0.ByDay like '%Last%' then 16
 							end
-						end, 
+						end,
 					0)freq_relative_interval,
 				isnull(case when x0.Frequency in ('Weekly', 'Monthly') then x0.Interval end, 0) freq_recurrence_factor,
-				
+
 				isnull(cast(convert(char(8), iif(x0.Frequency = 'Specific', try_convert(date, x0.ByDay, 121), x0.StartDate), 112) as int), 19900101) active_start_date,
 				isnull(cast(convert(char(8), x0.EndDate, 112) as int), 99991231) active_end_date,
 
@@ -106,10 +106,10 @@ return
 				isnull(cast(format(iif(x0.IntradayFrequency = 'Specific', null, t.EndTime), 'hhmmss') as int), 235959) active_end_time
 		from x0
 			outer apply(
-						select	case when i > 0 then try_cast(left(v, i -1) as time(0)) else try_cast(v as time(0)) end StartTime, 
+						select	case when i > 0 then try_cast(left(v, i -1) as time(0)) else try_cast(v as time(0)) end StartTime,
 								case when i > 0 then try_cast(right(v, l-i) as time(0)) end EndTime
 						from (
-								select x0.ByTime v, charindex('-', x0.ByTime) i, len(x0.ByTime) l
+								select	x0.ByTime v, charindex('-', x0.ByTime) i, len(x0.ByTime) l
 							) b
 					) t
 	),
@@ -124,12 +124,12 @@ return
 	),
 	x3 as
 	(
-		select z.fn_GetScheduleNamePrefix() + convert(nvarchar(1000), x2.freq_type) + N'-' + convert(nvarchar(1000), x2.freq_interval) + N'-' + convert(nvarchar(1000), x2.freq_subday_type) + N'-' + convert(nvarchar(1000), x2.freq_subday_interval) + N'-' + convert(nvarchar(1000), x2.freq_relative_interval) + N'-' + convert(nvarchar(1000), x2.freq_recurrence_factor) + N'-' + convert(nvarchar(1000), x2.active_start_date) + N'-' + convert(nvarchar(1000), x2.active_end_date) + N'-' + convert(nvarchar(1000), x2.active_start_time) + N'-' + convert(nvarchar(1000), x2.active_end_time) FullName,
-			x2.freq_type, x2.freq_interval, x2.freq_subday_type, x2.freq_subday_interval, x2.freq_relative_interval, x2.freq_recurrence_factor, x2.active_start_date, x2.active_end_date, x2.active_start_time, x2.active_end_time
+		select	z.fn_GetScheduleNamePrefix() + convert(nvarchar(1000), x2.freq_type) + N'-' + convert(nvarchar(1000), x2.freq_interval) + N'-' + convert(nvarchar(1000), x2.freq_subday_type) + N'-' + convert(nvarchar(1000), x2.freq_subday_interval) + N'-' + convert(nvarchar(1000), x2.freq_relative_interval) + N'-' + convert(nvarchar(1000), x2.freq_recurrence_factor) + N'-' + convert(nvarchar(1000), x2.active_start_date) + N'-' + convert(nvarchar(1000), x2.active_end_date) + N'-' + convert(nvarchar(1000), x2.active_start_time) + N'-' + convert(nvarchar(1000), x2.active_end_time) FullName,
+				x2.freq_type, x2.freq_interval, x2.freq_subday_type, x2.freq_subday_interval, x2.freq_relative_interval, x2.freq_recurrence_factor, x2.active_start_date, x2.active_end_date, x2.active_start_time, x2.active_end_time
 		from x2
 	)
-	select convert(nvarchar(128), x3.FullName) Name,
-		x3.freq_type, x3.freq_interval, x3.freq_subday_type, x3.freq_subday_interval, x3.freq_relative_interval, x3.freq_recurrence_factor, x3.active_start_date, x3.active_end_date, x3.active_start_time, x3.active_end_time
+	select	convert(nvarchar(128), x3.FullName) Name,
+			x3.freq_type, x3.freq_interval, x3.freq_subday_type, x3.freq_subday_interval, x3.freq_relative_interval, x3.freq_recurrence_factor, x3.active_start_date, x3.active_end_date, x3.active_start_time, x3.active_end_time
 	from x3
 	where not exists(select * from x3 where datalength(FullName) > 256)
 )

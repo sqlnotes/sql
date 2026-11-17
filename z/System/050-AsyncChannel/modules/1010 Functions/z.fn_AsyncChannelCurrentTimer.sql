@@ -21,7 +21,7 @@ as
 begin
 	return
 	(
-		select iif(e.dialog_timer > '1900-01-01', iif(datediff(second, sysutcdatetime(), e.dialog_timer) < 0, 0, datediff(second, sysutcdatetime(), e.dialog_timer)), null)
+		select	iif(e.dialog_timer > '1900-01-01', iif(datediff(second, sysutcdatetime(), e.dialog_timer) < 0, 0, datediff(second, sysutcdatetime(), e.dialog_timer)), null)
 		from sys.conversation_endpoints e
 		where e.conversation_handle = @ConversationHandle and e.state in ('SO', 'SI', 'CO')
 	)

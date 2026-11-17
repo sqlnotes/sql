@@ -17,14 +17,14 @@ begin
 
 	declare @AsyncChannelID int, @LastAsyncChannelID int, @Data nvarchar(max), @Handle uniqueidentifier
 	declare cMessages cursor local fast_forward for
-		select AsyncChannelID, Data from inserted order by AsyncChannelID, DataSequence
+		select	AsyncChannelID, Data from inserted order by AsyncChannelID, DataSequence
 	open cMessages
 	fetch next from cMessages into @AsyncChannelID, @Data
 	while @@fetch_status = 0
 	begin
 		if @LastAsyncChannelID is null or @AsyncChannelID is null or @LastAsyncChannelID <> @AsyncChannelID
 		begin
-			select @LastAsyncChannelID = @AsyncChannelID, @Handle = null
+			select	@LastAsyncChannelID = @AsyncChannelID, @Handle = null
 			exec z.usp_AsyncChannelGetConversationHandle @AsyncChannelID = @AsyncChannelID, @ConversationHandle = @Handle output
 		end
 		if @Handle is not null

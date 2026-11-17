@@ -25,6 +25,7 @@ begin
 		constraint PK_z_TaskQueueBatch primary key clustered (BatchID) with (data_compression = row),
 		constraint UQ_z_TaskQueueBatch_BatchName unique (BatchName) with (data_compression = row),
 		index IX_z_TaskQueueBatch_Status nonclustered (Status) with (data_compression = row),
+		index IX_z_TaskQueueBatch_BatchType nonclustered (BatchType) with (data_compression = row),
 		constraint CK_z_TaskQueueBatch_BatchName check (len(trim(BatchName)) > 0),
 		constraint CK_z_TaskQueueBatch_MaxConcurrentWorkers check (MaxConcurrentWorkers >= 0),
 		constraint CK_z_TaskQueueBatch_Status check (Status in ('Draft', 'Ready', 'Running', 'Completed', 'Stopped'))

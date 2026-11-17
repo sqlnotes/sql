@@ -190,12 +190,11 @@ Name is spelled Refesh. Refreshes all visible current-database modules with defi
 ```sql
 create or alter procedure z.usp_ReleaseSemaphore
 (
-	@SemaphoreName nvarchar(200),
-	@LockOwner varchar(32) = 'Transaction'
+	@SemaphoreName nvarchar(200)
 )
 ```
 
-Retrieves the slot from session context and releases one acquisition reference. A missing or nonpositive stored slot raises error 50000; native failures return a negative status. Clears context after the final release. No internal transaction/result set.
+Releases any held Session and Transaction semaphore slots and markers in the current database/session. NULL, empty, missing and already-released names return 0 without an error; stale context is cleared. If both scopes hold the semaphore, both are released. Transaction scope is probed only while a transaction is active; release never commits or rolls back it. Catchable cleanup failures return a negative status without throwing and do not prevent attempting the other scope. No internal transaction/result set. Callers supply only `@SemaphoreName`; remove former `@LockOwner` arguments.
 
 ## z.usp_RemoveSchemaZ
 

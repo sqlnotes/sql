@@ -74,6 +74,40 @@ Time int -> time(0): zero-pad to six digits then interpret HHMMSS; invalid value
 @Time as int
 ```
 
+## z.fn_IsSQLJobRunning
+
+[Source](../../modules/1010%20Functions/z.fn_IsSQLJobRunning.sql)
+
+```sql
+@JobID uniqueidentifier
+```
+
+Returns `bit`: 1 when a visible local session has a program_name matching
+`SQLAgent - TSQL JobStep (Job 0x<32 hexadecimal digits> : Step ...)` for this
+job ID; otherwise 0. NULL also returns 0. The ID is converted through binary(16)
+to match Agent's native GUID byte order, rather than the printable GUID text.
+Any matching step session counts, including a waiting, blocked or sleeping one.
+
+This is a local T-SQL step-session observation. A 0 means no matching visible
+session. Job metadata is not consulted. It does not report previous outcome,
+non-T-SQL steps, remote execution, or periods when the job has no T-SQL step
+session, such as a gap between steps. Application names are client-supplied;
+this is not an execution-ownership or security check.
+
+No permission elevation is performed. Seeing other sessions requires
+`VIEW SERVER STATE` on SQL Server 2019 or `VIEW SERVER PERFORMANCE STATE` on
+SQL Server 2022 and later. See Microsoft's
+[sys.dm_exec_sessions reference](https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-exec-sessions-transact-sql).
+
+Use it directly in T-SQL without capturing a stored-procedure result set:
+
+```sql
+select z.fn_IsSQLJobRunning(@JobID) IsRunning;
+
+select j.job_id JobID, j.name JobName, z.fn_IsSQLJobRunning(j.job_id) IsRunning
+from msdb.dbo.sysjobs j;
+```
+
 ## z.v_ServiceJobs
 
 [Source](../../modules/1020%20Views/z.v_ServiceJobs.sql)

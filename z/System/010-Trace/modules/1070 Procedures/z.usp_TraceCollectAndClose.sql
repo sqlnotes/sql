@@ -29,12 +29,12 @@ begin
 	if @MaxDurationInSec is null or @MaxDurationInSec < 0 or @TransactionDurationInSec is null or @TransactionDurationInSec < 1
 		or @MaxEventsPerTransaction < 1
 		throw 50000, N'Capture duration must be nonnegative; transaction duration and an optional event limit must be positive.', 1;
-	declare @SQL nvarchar(max), @Declarations nvarchar(max), @Reset nvarchar(max), @Decode nvarchar(max),
-		@Routes nvarchar(max) = N'', @ColumnNames nvarchar(max), @Values nvarchar(max),
-		@ReceivingTable nvarchar(517), @Callback nvarchar(517), @EventName nvarchar(128), @Definition nvarchar(128), @CleanupLoginTime datetime,
-		@LockResult int, @Resource nvarchar(255),
-		@CreatorLoginTime datetime = (select login_time from sys.dm_exec_sessions where session_id = @@spid);
-	select t.TraceID, t.Name, t.ReceivingTable, t.CreatorLoginTime into #Traces
+	declare	@SQL nvarchar(max), @Declarations nvarchar(max), @Reset nvarchar(max), @Decode nvarchar(max),
+			@Routes nvarchar(max) = N'', @ColumnNames nvarchar(max), @Values nvarchar(max),
+			@ReceivingTable nvarchar(517), @Callback nvarchar(517), @EventName nvarchar(128), @Definition nvarchar(128), @CleanupLoginTime datetime,
+			@LockResult int, @Resource nvarchar(255),
+			@CreatorLoginTime datetime = (select login_time from sys.dm_exec_sessions where session_id = @@spid);
+	select	t.TraceID, t.Name, t.ReceivingTable, t.CreatorLoginTime into #Traces
 	from z.Trace t inner join sys.traces n on n.id = t.TraceID and n.stop_time is null and n.is_rowset = 1
 	where t.CreatorSessionID = @@spid and t.CreatorLoginTime = @CreatorLoginTime and n.status = 1
 		and (@TraceName is null or t.Name = @TraceName) and (@TraceID is null or t.TraceID = @TraceID);
@@ -44,16 +44,16 @@ begin
 		return;
 	end;
 	-- This immutable selection also scopes normal and error cleanup.
-	select * into #CleanupTraces from #Traces;
-	select c.TraceID, c.EventID, c.ColumnID into #SelectedColumns
+	select	* into #CleanupTraces from #Traces;
+	select	c.TraceID, c.EventID, c.ColumnID into #SelectedColumns
 	from z.TraceEventColumn c inner join #Traces t on t.TraceID = c.TraceID;
-	select g.* into #Callbacks from z.TraceTrigger g inner join #Traces t on t.TraceID = g.TraceID;
-	select ColumnID, ColumnName, DataType, Definition into #Columns from z.v_TraceColumn
+	select	g.* into #Callbacks from z.TraceTrigger g inner join #Traces t on t.TraceID = g.TraceID;
+	select	ColumnID, ColumnName, DataType, Definition into #Columns from z.v_TraceColumn
 	where ColumnID = 27 or ColumnID in (select ColumnID from #SelectedColumns);
 	begin try
 		if exists
 		(
-			select 1 from #Callbacks g
+			select	1 from #Callbacks g
 			where object_id(g.ProcedureName, N'P') is null or parsename(g.ProcedureName, 2) is null or parsename(g.ProcedureName, 3) is not null or parsename(g.ProcedureName, 4) is not null
 				or exists(select 1 from (values(N'@TraceSequence'),(N'@TraceID'),(N'@EventName')) p(Name)
 					where not exists(select 1 from sys.parameters s where s.object_id = object_id(g.ProcedureName, N'P') and s.name = p.Name))
@@ -67,7 +67,7 @@ begin
 		begin
 			if parsename(@ReceivingTable, 2) is null or parsename(@ReceivingTable, 3) is not null or parsename(@ReceivingTable, 4) is not null
 				throw 50000, N'Trace receiving tables must use two-part names in the current database.', 1;
-			select @Resource = N'Schema z.TraceReceiver:' + convert(nvarchar(20), checksum(@ReceivingTable collate database_default));
+			select	@Resource = N'Schema z.TraceReceiver:' + convert(nvarchar(20), checksum(@ReceivingTable collate database_default));
 			begin tran;
 			exec @LockResult = z.usp_AcquireSemaphore @SemaphoreName = @Resource, @TotalCount = 1, @LockOwner = N'Transaction', @LockTimeout = 30000;
 			if @LockResult <= 0 throw 50000, N'Could not prepare the trace receiving table.', 1;
@@ -75,7 +75,7 @@ begin
 				throw 50000, N'A trace receiving destination must be a table.', 1;
 			if object_id(@ReceivingTable, N'U') is not null and
 			(
-				select count(*) from sys.columns where object_id = object_id(@ReceivingTable)
+				select	count(*) from sys.columns where object_id = object_id(@ReceivingTable)
 					and is_computed = 0 and is_identity = 0 and is_nullable = 0
 					and ((name = N'TraceSequence' and system_type_id = 127)
 						or (name = N'EventID' and system_type_id = 56)
@@ -84,9 +84,9 @@ begin
 				throw 50000, N'Trace receiving tables require noncomputed, nonidentity, nonnullable TraceSequence bigint, EventID int and EventName nvarchar(128) or wider.', 1;
 			if object_id(@ReceivingTable, N'U') is null
 			begin
-				select @SQL = N'create table ' + quotename(parsename(@ReceivingTable, 2)) + N'.' + quotename(parsename(@ReceivingTable, 1)) + N' (TraceSequence bigint not null constraint ' + quotename(left(N'DF_' + parsename(@ReceivingTable, 2) + N'_' + parsename(@ReceivingTable, 1) + N'_TraceSequence', 128))
-					+ N' default(datediff_big(second, ''1900-01-01'', getutcdate()) * 268435456 | next value for z.SeqGeneralID), EventID int not null, EventName nvarchar(128) not null, constraint '
-					+ quotename(left(N'PK_' + parsename(@ReceivingTable, 2) + N'_' + parsename(@ReceivingTable, 1), 128)) + N' primary key clustered(TraceSequence) with (data_compression = page) on PS_SchemaZPartitionGeneric(TraceSequence)) on PS_SchemaZPartitionGeneric(TraceSequence);';
+				select	@SQL = N'create table ' + quotename(parsename(@ReceivingTable, 2)) + N'.' + quotename(parsename(@ReceivingTable, 1)) + N' (TraceSequence bigint not null constraint ' + quotename(left(N'DF_' + parsename(@ReceivingTable, 2) + N'_' + parsename(@ReceivingTable, 1) + N'_TraceSequence', 128))
+						+ N' default(datediff_big(second, ''1900-01-01'', getutcdate()) * 268435456 | next value for z.SeqGeneralID), EventID int not null, EventName nvarchar(128) not null, constraint '
+						+ quotename(left(N'PK_' + parsename(@ReceivingTable, 2) + N'_' + parsename(@ReceivingTable, 1), 128)) + N' primary key clustered(TraceSequence) with (data_compression = page) on PS_SchemaZPartitionGeneric(TraceSequence)) on PS_SchemaZPartitionGeneric(TraceSequence);';
 				exec sys.sp_executesql @SQL;
 			end;
 			declare cColumns cursor local fast_forward for select c.ColumnName, c.Definition from #Columns c
@@ -99,7 +99,7 @@ begin
 			begin
 				if not exists(select 1 from sys.columns where object_id = object_id(@ReceivingTable) and name = @EventName)
 				begin
-					select @SQL = N'alter table ' + quotename(parsename(@ReceivingTable, 2)) + N'.' + quotename(parsename(@ReceivingTable, 1)) + N' add ' + quotename(@EventName) + N' ' + @Definition + N' null;';
+					select	@SQL = N'alter table ' + quotename(parsename(@ReceivingTable, 2)) + N'.' + quotename(parsename(@ReceivingTable, 1)) + N' add ' + quotename(@EventName) + N' ' + @Definition + N' null;';
 					exec sys.sp_executesql @SQL;
 				end;
 				fetch next from cColumns into @EventName, @Definition;
@@ -111,48 +111,48 @@ begin
 		end;
 		close cDestinations;
 		deallocate cDestinations;
-		select @Declarations = (select N', @C' + convert(nvarchar(10), ColumnID) + N' ' + Definition from #Columns order by ColumnID for xml path(''), type).value('.', 'nvarchar(max)'),
-			@Reset = (select N', @C' + convert(nvarchar(10), ColumnID) + N' = null' from #Columns order by ColumnID for xml path(''), type).value('.', 'nvarchar(max)');
-		select @Decode =
-		(
-			select N'
+		select	@Declarations = (select N', @C' + convert(nvarchar(10), ColumnID) + N' ' + Definition from #Columns order by ColumnID for xml path(''), type).value('.', 'nvarchar(max)'),
+				@Reset = (select N', @C' + convert(nvarchar(10), ColumnID) + N' = null' from #Columns order by ColumnID for xml path(''), type).value('.', 'nvarchar(max)');
+		select	@Decode =
+				(
+				select	N'
 				' + case when row_number() over(order by ColumnID) = 1 then N'if' else N'else if' end + N' @ColumnID = ' + convert(nvarchar(10), ColumnID) + N'
-					select @C' + convert(nvarchar(10), ColumnID) + N' = ' +
-				case DataType
-					when 'bigint' then N'convert(bigint, convert(binary(8), reverse(substring(@Data, 1, 8))))'
-					when 'int' then N'convert(int, convert(binary(4), reverse(substring(@Data, 1, 4))))'
-					when 'datetime' then N'datetimefromparts(Y, M, D, HH, MM, SS, MS)
+					select	@C' + convert(nvarchar(10), ColumnID) + N' = ' +
+						case DataType
+						 when 'bigint' then N'convert(bigint, convert(binary(8), reverse(substring(@Data, 1, 8))))'
+						 when 'int' then N'convert(int, convert(binary(4), reverse(substring(@Data, 1, 4))))'
+						 when 'datetime' then N'datetimefromparts(Y, M, D, HH, MM, SS, MS)
 					from (select convert(int, convert(binary(2), reverse(substring(@Data, 1, 2)))) Y, convert(int, convert(binary(2), reverse(substring(@Data, 3, 2)))) M,
 						convert(int, convert(binary(2), reverse(substring(@Data, 7, 2)))) D, convert(int, convert(binary(2), reverse(substring(@Data, 9, 2)))) HH,
 						convert(int, convert(binary(2), reverse(substring(@Data, 11, 2)))) MM, convert(int, convert(binary(2), reverse(substring(@Data, 13, 2)))) SS,
 						convert(int, convert(binary(2), reverse(substring(@Data, 15, 2)))) MS) d'
-					else N'convert(' + Definition + N', @Data)'
-				end + N';'
-			from #Columns order by ColumnID for xml path(''), type
-		).value('.', 'nvarchar(max)');
+						 else N'convert(' + Definition + N', @Data)'
+						end + N';'
+				from #Columns order by ColumnID for xml path(''), type
+				).value('.', 'nvarchar(max)');
 		declare cRoutes cursor local static read_only for select TraceID, ReceivingTable from #Traces order by TraceID;
 		open cRoutes;
 		fetch next from cRoutes into @TraceID, @ReceivingTable;
 		while @@fetch_status = 0
 		begin
-			select @ColumnNames = (select N', ' + quotename(c.ColumnName) from #Columns c
-				where exists(select 1 from #SelectedColumns b where b.TraceID = @TraceID and b.ColumnID = c.ColumnID)
-				order by c.ColumnID for xml path(''), type).value('.', 'nvarchar(max)'),
-				@Values = (select N', case when @EventID in ('
-					+ (select string_agg(convert(nvarchar(max), EventID), N',') within group(order by EventID)
-						from #SelectedColumns b where b.TraceID = @TraceID and b.ColumnID = c.ColumnID)
-					+ N') then @C' + convert(nvarchar(10), c.ColumnID) + N' end' from #Columns c
+			select	@ColumnNames = (select N', ' + quotename(c.ColumnName) from #Columns c
 					where exists(select 1 from #SelectedColumns b where b.TraceID = @TraceID and b.ColumnID = c.ColumnID)
-					order by c.ColumnID for xml path(''), type).value('.', 'nvarchar(max)');
-			select @Routes += N'
+					order by c.ColumnID for xml path(''), type).value('.', 'nvarchar(max)'),
+					@Values = (select	N', case when @EventID in ('
+										+ (select string_agg(convert(nvarchar(max), EventID), N',') within group(order by EventID)
+										from #SelectedColumns b where b.TraceID = @TraceID and b.ColumnID = c.ColumnID)
+										+ N') then @C' + convert(nvarchar(10), c.ColumnID) + N' end' from #Columns c
+						where exists(select 1 from #SelectedColumns b where b.TraceID = @TraceID and b.ColumnID = c.ColumnID)
+						order by c.ColumnID for xml path(''), type).value('.', 'nvarchar(max)');
+			select	@Routes += N'
 				if @CurrentTraceID = ' + convert(nvarchar(10), @TraceID) + N'
 				begin
-					select @Operation = N''insert'';
-					insert ' + quotename(parsename(@ReceivingTable, 2)) + N'.' + quotename(parsename(@ReceivingTable, 1))
-					+ N' (TraceSequence, EventID, EventName' + @ColumnNames + N')
+					select	@Operation = N''insert'';
+					insert' + quotename(parsename(@ReceivingTable, 2)) + N'.' + quotename(parsename(@ReceivingTable, 1))
+					 + N' (TraceSequence, EventID, EventName' + @ColumnNames + N')
 						values (@TraceSequence, @EventID, @EventName' + @Values + N');';
 			declare cCallbacks cursor local static read_only for
-				select EventName, quotename(parsename(ProcedureName, 2)) + N'.' + quotename(parsename(ProcedureName, 1))
+				select	EventName, quotename(parsename(ProcedureName, 2)) + N'.' + quotename(parsename(ProcedureName, 1))
 				from #Callbacks where TraceID = @TraceID
 					and (EventName = N'all' or not exists(select 1 from #Callbacks where TraceID = @TraceID and EventName = N'all'))
 				order by EventName;
@@ -160,23 +160,23 @@ begin
 			fetch next from cCallbacks into @EventName, @Callback;
 			while @@fetch_status = 0
 			begin
-				select @Routes += N'
+				select	@Routes += N'
 					' + case when @EventName = N'all' then N'' else N'if @EventName = N' + quotename(@EventName, '''') + N' ' end + N'
 					begin
-						select @Operation = N''callback ' + replace(@Callback, '''', '''''') + N''';
+						select	@Operation = N''callback' + replace(@Callback, '''', '''''') + N''';
 						exec ' + @Callback + N' @TraceSequence = @TraceSequence, @TraceID = @CurrentTraceID, @EventName = @EventName;
 					end;';
 				fetch next from cCallbacks into @EventName, @Callback;
 			end;
 			close cCallbacks;
 			deallocate cCallbacks;
-			select @Routes += N'
+			select	@Routes += N'
 				end;';
 			fetch next from cRoutes into @TraceID, @ReceivingTable;
 		end;
 		close cRoutes;
 		deallocate cRoutes;
-		select @SQL = N'declare @EventID int, @EventName nvarchar(128), @ColumnID int, @Data varbinary(max), @TraceSequence bigint,
+		select	@SQL = N'declare @EventID int, @EventName nvarchar(128), @ColumnID int, @Data varbinary(max), @TraceSequence bigint,
 	@BatchCount int = 0, @BatchStarted datetime2(7), @ReadEvents int, @FetchStatus int, @FrameLength int,
 	@CurrentTraceID int, @CurrentName nvarchar(128), @Operation nvarchar(600),
 	@StartedUTC datetime2(7) = sysutcdatetime(), @Diagnostic nvarchar(2048)' + @Declarations + N';
@@ -185,7 +185,7 @@ create unique clustered index IX_Buffer on #Buffer(Ordinal);
 begin try
 	while datediff_big(second, @StartedUTC, sysutcdatetime()) < @MaxDurationInSec
 	begin
-		select @ReadEvents = 0;
+		select	@ReadEvents = 0;
 		-- A selected trace stopped elsewhere leaves polling normally.
 		delete s from #Traces s where not exists
 			(select 1 from z.Trace t inner join sys.traces n on n.id = t.TraceID
@@ -202,9 +202,9 @@ begin try
 			if @@trancount > 0 and datediff_big(millisecond, @BatchStarted, sysutcdatetime()) >= convert(bigint, @TransactionDurationInSec) * 1000
 			begin
 				commit;
-				select @BatchCount = 0, @BatchStarted = null;
+				select	@BatchCount = 0, @BatchStarted = null;
 			end;
-			select @Operation = N''read'';
+			select	@Operation = N''read'';
 			truncate table #Buffer;
 			begin try
 				if exists(select 1 from sys.traces where id = @CurrentTraceID and stop_time is null and is_rowset = 1 and status = 1)
@@ -217,41 +217,41 @@ begin try
 				if exists(select 1 from sys.traces where id = @CurrentTraceID and stop_time is null and is_rowset = 1 and status = 1) throw;
 				truncate table #Buffer;
 			end catch;
-			select @Operation = N''decode'', @EventID = null, @EventName = null;
+			select	@Operation = N''decode'', @EventID = null, @EventName = null;
 			declare cTraceBuffer cursor local static read_only for select ColumnID, FrameLength, Data from #Buffer order by Ordinal;
 			open cTraceBuffer;
 			fetch next from cTraceBuffer into @ColumnID, @FrameLength, @Data;
-			select @FetchStatus = @@fetch_status;
+			select	@FetchStatus = @@fetch_status;
 			while @FetchStatus = 0
 			begin
-				select @Operation = N''decode'';
+				select	@Operation = N''decode'';
 				if @ColumnID = 65526
 				begin
-					select @EventID = convert(int, convert(binary(2), reverse(substring(@Data, 1, 2)))), @EventName = null' + @Reset + N';
-					select @EventName = case @EventID' + (select N' when ' + convert(nvarchar(10), TraceEventID) + N' then N' + quotename(EventName, '''') from z.v_TraceEvent order by TraceEventID for xml path(''), type).value('.', 'nvarchar(max)') + N' end;
+					select	@EventID = convert(int, convert(binary(2), reverse(substring(@Data, 1, 2)))), @EventName = null' + @Reset + N';
+					select	@EventName = case @EventID' + (select N' when ' + convert(nvarchar(10), TraceEventID) + N' then N' + quotename(EventName, '''') from z.v_TraceEvent order by TraceEventID for xml path(''), type).value('.', 'nvarchar(max)') + N' end;
 				end
 				else if @EventName is not null
 				begin' + @Decode + N'
 				end;
 				fetch next from cTraceBuffer into @ColumnID, @FrameLength, @Data;
 				-- Callbacks can use cursors: save this cursor status before invoking them.
-				select @FetchStatus = @@fetch_status;
+				select	@FetchStatus = @@fetch_status;
 				if @EventName is not null and (@FetchStatus <> 0 or @ColumnID = 65526)
 				begin
 					if @@trancount = 0
 					begin
 						begin tran;
-						select @BatchStarted = sysutcdatetime(), @BatchCount = 0;
+						select	@BatchStarted = sysutcdatetime(), @BatchCount = 0;
 					end;
-					select @C27 = @EventID, @ReadEvents += 1,
+					select	@C27 = @EventID, @ReadEvents += 1,
 						@TraceSequence = datediff_big(second, ''1900-01-01'', getutcdate()) * 268435456 | next value for z.SeqGeneralID;
 ' + @Routes + N'
-					select @BatchCount += 1;
+					select	@BatchCount += 1;
 					if (@MaxEventsPerTransaction is not null and @BatchCount >= @MaxEventsPerTransaction)
 						or datediff_big(millisecond, @BatchStarted, sysutcdatetime()) >= convert(bigint, @TransactionDurationInSec) * 1000
 					begin
 						commit;
-						select @BatchCount = 0, @BatchStarted = null;
+						select	@BatchCount = 0, @BatchStarted = null;
 					end;
 				end;
 			end;
@@ -265,7 +265,7 @@ begin try
 		if @@trancount > 0 and datediff_big(millisecond, @BatchStarted, sysutcdatetime()) >= convert(bigint, @TransactionDurationInSec) * 1000
 		begin
 			commit;
-			select @BatchCount = 0, @BatchStarted = null;
+			select	@BatchCount = 0, @BatchStarted = null;
 		end;
 		if @ReadEvents = 0 waitfor delay ''00:00:00.004'';
 	end;
@@ -274,7 +274,7 @@ begin try
 end try
 begin catch
 	if @@trancount > 0 rollback;
-	select @Diagnostic = N''Trace '' + convert(nvarchar(10), @CurrentTraceID) + N'' ('' + isnull(@CurrentName, N'''') + N'') failed during '' + isnull(@Operation, N''collection'') + N''.'';
+	select	@Diagnostic = N''Trace '' + convert(nvarchar(10), @CurrentTraceID) + N'' ('' + isnull(@CurrentName, N'''') + N'') failed during '' + isnull(@Operation, N''collection'') + N''.'';
 	print @Diagnostic;
 	throw;
 end catch;';
@@ -284,7 +284,7 @@ end catch;';
 	begin catch
 		if @@trancount > 0 rollback;
 		declare cErrorCleanup cursor local static read_only for
-			select s.TraceID, s.CreatorLoginTime from #CleanupTraces s inner join z.Trace t on t.TraceID = s.TraceID
+			select	s.TraceID, s.CreatorLoginTime from #CleanupTraces s inner join z.Trace t on t.TraceID = s.TraceID
 				and t.CreatorSessionID = @@spid and t.CreatorLoginTime = s.CreatorLoginTime;
 		open cErrorCleanup;
 		fetch next from cErrorCleanup into @TraceID, @CleanupLoginTime;
@@ -304,7 +304,7 @@ end catch;';
 		throw;
 	end catch;
 	declare cCloseCleanup cursor local static read_only for
-		select s.TraceID, s.CreatorLoginTime from #CleanupTraces s inner join z.Trace t on t.TraceID = s.TraceID
+		select	s.TraceID, s.CreatorLoginTime from #CleanupTraces s inner join z.Trace t on t.TraceID = s.TraceID
 			and t.CreatorSessionID = @@spid and t.CreatorLoginTime = s.CreatorLoginTime;
 	open cCloseCleanup;
 	fetch next from cCloseCleanup into @TraceID, @CleanupLoginTime;

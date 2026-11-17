@@ -19,21 +19,21 @@ begin
 	declare @Unknown varchar(max), @ErrMsg nvarchar(2048), @SourceAsyncChannelID int
 	declare @Channels table (AsyncChannelID int not null primary key)
 	insert into @Channels (AsyncChannelID)
-		select distinct cast(trim(value) as int) from string_split(@AsyncChannelIDs, ',') where trim(value) <> ''
-	select @Unknown = string_agg(cast(c.AsyncChannelID as varchar(10)), ', ')
+		select	distinct cast(trim(value) as int) from string_split(@AsyncChannelIDs, ',') where trim(value) <> ''
+	select	@Unknown = string_agg(cast(c.AsyncChannelID as varchar(10)), ', ')
 	from @Channels c
 	where not exists (select 1 from z.AsyncChannel a where a.AsyncChannelID = c.AsyncChannelID)
 	if @Unknown is not null
 	begin
 		-- forwarding runs in a Service Broker session where nobody sees an error: log it and keep forwarding to the known channels
-		select @ErrMsg = N'AsyncChannel forward: unknown AsyncChannelID ' + @Unknown + N'; skipped.', @SourceAsyncChannelID = cast(session_context(N'AsyncChannel-AsyncChannelID') as int)
+		select	@ErrMsg = N'AsyncChannel forward: unknown AsyncChannelID ' + @Unknown + N'; skipped.', @SourceAsyncChannelID = cast(session_context(N'AsyncChannel-AsyncChannelID') as int)
 		exec z.usp_AsyncChannelLog @AsyncChannelID = @SourceAsyncChannelID, @Level = 'Error', @Info = @ErrMsg, @SessionID = @@spid
 		delete c from @Channels c where not exists (select 1 from z.AsyncChannel a where a.AsyncChannelID = c.AsyncChannelID)
 	end
 	if @Batched = 0
 	begin
 		insert into z.AsyncChannelMessage_Interface (AsyncChannelID, DataSequence, Data)
-			select c.AsyncChannelID, m.SequenceNumber, m.Payload
+			select	c.AsyncChannelID, m.SequenceNumber, m.Payload
 			from @Messages m
 				cross join @Channels c
 			where m.IsPayload = 1
@@ -41,7 +41,7 @@ begin
 	else
 	begin
 		insert into z.AsyncChannelMessageBatched_Interface (AsyncChannelID, DataSequence, Data)
-			select c.AsyncChannelID, m.SequenceNumber, m.Payload
+			select	c.AsyncChannelID, m.SequenceNumber, m.Payload
 			from @Messages m
 				cross join @Channels c
 			where m.IsPayload = 1

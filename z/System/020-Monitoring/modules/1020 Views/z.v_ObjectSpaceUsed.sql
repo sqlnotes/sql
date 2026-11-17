@@ -9,17 +9,15 @@ Aggregates row counts and allocated space by database object.
 */
 create or alter view z.v_ObjectSpaceUsed
 as
-select
-	a1.object_id ObjectID,
-	object_schema_name(a1.object_id) SchemaName, object_name(a1.object_id) TableName,
-	a1.rows [RowCount],
-	(a1.reserved + isnull(a4.reserved,0))* 8 as ReservedKB,
-	a1.data * 8 as DataKB,
-	(case when (a1.used + isnull(a4.used,0)) > a1.data then (a1.used + isnull(a4.used,0)) - a1.data else 0 end) * 8 as IndexSize,
-	(case when (a1.reserved + isnull(a4.reserved,0)) > a1.used then (a1.reserved + isnull(a4.reserved,0)) - a1.used else 0 end) * 8 as Unused
+select	a1.object_id ObjectID,
+		object_schema_name(a1.object_id) SchemaName, object_name(a1.object_id) TableName,
+		a1.rows [RowCount],
+		(a1.reserved + isnull(a4.reserved,0))* 8 as ReservedKB,
+		a1.data * 8 as DataKB,
+		(case when (a1.used + isnull(a4.used,0)) > a1.data then (a1.used + isnull(a4.used,0)) - a1.data else 0 end) * 8 as IndexSize,
+		(case when (a1.reserved + isnull(a4.reserved,0)) > a1.used then (a1.reserved + isnull(a4.reserved,0)) - a1.used else 0 end) * 8 as Unused
 from (
-		select
-				ps.object_id,
+		select	ps.object_id,
 				sum (case when (ps.index_id < 2) then row_count else 0 end) as rows,
 				sum (ps.reserved_page_count) as reserved,
 				sum (
@@ -34,8 +32,7 @@ from (
 		group by ps.object_id
 	) as a1
 	left join(
-				select
-						it.parent_id,
+				select	it.parent_id,
 						sum(ps.reserved_page_count) as reserved,
 						sum(ps.used_page_count) as used
 				from sys.dm_db_partition_stats ps

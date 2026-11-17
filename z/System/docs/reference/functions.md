@@ -173,12 +173,12 @@ returns bit
 
 Returns bit from linux string in @@version, subject to collation.
 
-## z.fn_AsciiLettersOnly
+## z.fn_ASCIILettersOnly
 
-[Source](../../modules/1010%20Functions/z.fn_AsciiLettersOnly.sql)
+[Source](../../modules/1010%20Functions/z.fn_ASCIILettersOnly.sql)
 
 ```sql
-create or alter function z.fn_AsciiLettersOnly(@str varchar(max))
+create or alter function z.fn_ASCIILettersOnly(@str varchar(max))
 returns nvarchar(max)
 ```
 

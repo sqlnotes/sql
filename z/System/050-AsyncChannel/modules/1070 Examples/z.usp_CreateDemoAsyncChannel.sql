@@ -42,7 +42,7 @@ begin
 			throw 50000, 'The Demo pool name or requested pool ID is already registered.', 1;
 		if exists
 		(
-			select 1 from sys.objects
+			select	1 from sys.objects
 			where schema_id = schema_id(N'z') and name in
 			(
 				N'AsyncChannel_Demo', N'AsyncChannel_Demo_Interface', N'TRI_AsyncChannel_Demo_Interface',
@@ -65,7 +65,7 @@ begin
 		);
 		exec(N'create view z.AsyncChannel_Demo_Interface
 as
-	select top (0) RecordID = cast(null as int), Description = cast(null as nvarchar(200)), Date = cast(null as datetime2(3));');
+	select	top (0) RecordID = cast(null as int), Description = cast(null as nvarchar(200)), Date = cast(null as datetime2(3));');
 
 		-- 2. A dedicated pool limits this example to one processing call at a time.
 		insert into z.AsyncChannelActivatorPool (ActivatorPoolID, Name, Description, MaxConcurrency, TimeoutSeconds, IsActive)
@@ -87,14 +87,14 @@ begin
 	set nocount, xact_abort on;
 	;with x as
 	(
-		select d.RecordID, d.Description, d.Date,
-			Ordinal = row_number() over (partition by d.RecordID order by m.SequenceNumber desc, d.Date desc, d.Description collate Latin1_General_100_BIN2 desc)
+		select	d.RecordID, d.Description, d.Date,
+				Ordinal = row_number() over (partition by d.RecordID order by m.SequenceNumber desc, d.Date desc, d.Description collate Latin1_General_100_BIN2 desc)
 		from @Messages m
 			cross apply z.fn_AsyncChannelDeserializer_Demo(m.Payload) d
 		where m.IsPayload = 1
 	), s as
 	(
-		select RecordID, Description, Date from x where Ordinal = 1
+		select	RecordID, Description, Date from x where Ordinal = 1
 	)
 	merge z.AsyncChannel_Demo as t using s on t.RecordID = s.RecordID
 	when matched then update set t.Description = s.Description, t.Date = s.Date

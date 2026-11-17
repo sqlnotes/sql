@@ -9,7 +9,7 @@ Selects the default set of live performance counters for collection.
 */
 create or alter view z.v_PerformanceCountersDefault
 as
-	select ObjectName, CounterName, InstanceName, CounterValue, CounterType, CounterTypeName, CounterTypeDescription
+	select	ObjectName, CounterName, InstanceName, CounterValue, CounterType, CounterTypeName, CounterTypeDescription
 	from z.v_PerformanceCounters
 where ObjectName not in ('SQL Server 2022 XTP Transactions')
 	and ObjectName not like 'SQL Server 2022 XTP%'

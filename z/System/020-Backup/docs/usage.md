@@ -133,4 +133,7 @@ exec z.usp_BackupDatabasesParallel @Databases = N'UserDatabases',
 
 Waits for temporary Agent workers, attempts every selected database once and
 throws after completion if any task failed. Inspect retained TaskQueue results.
+Its temporary TaskQueue executors accept the standard `@Parameters nvarchar(max)`
+argument; each wrapper supplies its fixed backup inputs. Cleanup checks
+`z.v_TaskQueueRunningTasks` before dropping those temporary executors.
 See [parallel backup reference](reference/z.usp_BackupDatabasesParallel.md).

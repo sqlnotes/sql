@@ -25,7 +25,7 @@ begin
 		-- an inactive channel discards the message silently; an unknown channel is logged, never raised
 		if exists (select 1 from z.AsyncChannel where AsyncChannelID = @AsyncChannelID)
 			return
-		select @ErrMsg = N'AsyncChannel send: unknown AsyncChannelID ' + isnull(cast(@AsyncChannelID as nvarchar(10)), N'null') + N'; message discarded.'
+		select	@ErrMsg = N'AsyncChannel send: unknown AsyncChannelID ' + isnull(cast(@AsyncChannelID as nvarchar(10)), N'null') + N'; message discarded.'
 		exec z.usp_AsyncChannelLog @AsyncChannelID = @AsyncChannelID, @Level = 'Error', @Info = @ErrMsg, @Payload = @Data, @SessionID = @@spid
 		return
 	end
@@ -40,11 +40,11 @@ begin
 			if error_number() = 8426 and @Attempt = 0
 			begin
 				delete from z.AsyncChannelSession where AsyncChannelID = @AsyncChannelID and SessionID = @@spid;
-				select @ConversationHandle = null
+				select	@ConversationHandle = null
 				exec z.usp_AsyncChannelGetConversationHandle @AsyncChannelID = @AsyncChannelID, @ConversationHandle = @ConversationHandle output;
 				if @ConversationHandle is null
 					return
-				select @Attempt = @Attempt + 1
+				select	@Attempt = @Attempt + 1
 			end
 			else
 				throw;

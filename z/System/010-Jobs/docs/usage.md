@@ -17,6 +17,31 @@ from z.fn_ToSQLAgentSchedule('Daily', 1, null, 'Minute', 15, '08:00-17:00', defa
 
 Schedules reside in msdb and are logically database-scoped by name. Jobs in the same database can reuse a schedule; different databases receive separate names. Creating/removing jobs and schedules changes msdb. Returned normalization rows describe the translation, not proof that SQL Agent accepted or executed it.
 
+## Job status
+
+Use `z.usp_GetJobStatus` to return the native SQL Agent job summary, including
+current execution status, step, retry count and previous outcome:
+
+```sql
+exec z.usp_GetJobStatus; -- All jobs visible to the caller.
+exec z.usp_GetJobStatus @JobName = N'z_(sql)_Example';
+```
+
+Supply `@JobID` instead to select by native job ID. Both selectors default to
+NULL; a name is the complete Agent job name, without automatic prefixing. See
+the [status reference](reference/z.usp_GetJobStatus.md) for result and permission details.
+
+For a scalar check of a local T-SQL step session, use
+`z.fn_IsSQLJobRunning(@JobID)`. It returns bit 1 when a visible matching Agent
+session exists and 0 otherwise, including for NULL. It does not cover jobs
+without a local T-SQL step session. See its
+[reference and visibility requirements](reference/supporting-objects.md#zfn_issqljobrunning).
+
+```sql
+select j.job_id JobID, j.name JobName, z.fn_IsSQLJobRunning(j.job_id) IsRunning
+from msdb.dbo.sysjobs j;
+```
+
 ## Job names
 
 The complete job name is `z_(DatabaseName)_Name`, returned as `nvarchar(128)`. Overlength names are silently truncated. Creation, lookup, start/stop, enable/disable and removal use the same truncated identity. Two input names with the same truncated result refer to the same job. The original input can contain up to 255 UTF-16 units; the database prefix consumes part of the stored name's 128-unit capacity.

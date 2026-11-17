@@ -36,7 +36,7 @@ Names use `##backup_<databaseName>_<uuid>`, with the database-name segment
 limited to nvarchar(86) so the full name fits nvarchar(128). Names retain spaces,
 punctuation and Unicode; task commands use bracket-delimited identifiers via
 QUOTENAME, including escaped closing brackets. Each task has an
-empty parameters array. Database identity and backup options are embedded as
+empty `params` object (`{}`). Database identity and backup options are embedded as
 escaped literals in the wrapper, which invokes the installed sequential backup
 procedure. NULL values remain NULL and long option strings are preserved.
 The wrapper checks the captured database ID, name, creation date and online state

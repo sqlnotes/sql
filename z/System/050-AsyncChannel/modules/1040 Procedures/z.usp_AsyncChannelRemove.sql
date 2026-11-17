@@ -15,7 +15,7 @@ as
 begin
 	set nocount, xact_abort on;
 
-	declare @Name nvarchar(128), @Queue sysname, @Service sysname,
+	declare	@Name nvarchar(128), @Queue sysname, @Service sysname,
 			@Serializer sysname, @Deserializer sysname, @Trigger sysname,
 			@Enqueue sysname, @Activator sysname
 	select	@Name = Name, @Queue = QueueName, @Service = ServiceName,
@@ -32,14 +32,14 @@ begin
 
 	-- end every live conversation tied to this channel (both endpoints), then clear sessions
 	declare @end nvarchar(max) = N''
-	select @end = @end + N'end conversation ''' + cast(h as nvarchar(60)) + N''' with cleanup;'
+	select	@end = @end + N'end conversation ''' + cast(h as nvarchar(60)) + N''' with cleanup;'
 	from (
-			select s.ConversationHandle h
+			select	s.ConversationHandle h
 			from z.AsyncChannelSession s
-				join sys.conversation_endpoints e on e.conversation_handle = s.ConversationHandle
+				inner join sys.conversation_endpoints e on e.conversation_handle = s.ConversationHandle
 			where s.AsyncChannelID = @AsyncChannelID
 			union
-			select e.conversation_handle
+			select	e.conversation_handle
 			from sys.conversation_endpoints e
 			where e.service_id = (select service_id from sys.services where name collate database_default = @Service)
 		) x

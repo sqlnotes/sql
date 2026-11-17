@@ -9,7 +9,7 @@ Describes the six counter types exposed by SQL Server's performance-counter DMV.
 */
 create or alter view z.v_PerformanceCounterTypes
 as
-	select t.CounterType, cast(t.CounterTypeName as nvarchar(64)) CounterTypeName, cast(t.Description as nvarchar(512)) Description
+	select	t.CounterType, cast(t.CounterTypeName as nvarchar(64)) CounterTypeName, cast(t.Description as nvarchar(512)) Description
 	from (values
 		(65792, N'PERF_COUNTER_LARGE_RAWCOUNT', N'Last observed 64-bit raw value. Read directly in the units defined by the counter.'),
 		(272696320, N'PERF_COUNTER_COUNTER', N'Cumulative 32-bit event count. Calculate the per-second rate from the value change divided by elapsed seconds between two samples.'),

@@ -16,7 +16,7 @@ begin
 	set nocount, xact_abort on;
 	declare @SQL nvarchar(max);
 	declare cRoles cursor local static for
-		select 'alter authorization on server role :: ' + quotename(r.name) + ' to sa;'
+		select	'alter authorization on server role :: ' + quotename(r.name) + ' to sa;'
 		from sys.server_principals r
 		where r.type_desc = 'SERVER_ROLE'
 			and r.is_fixed_role = 0

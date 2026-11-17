@@ -16,7 +16,7 @@ begin
 	set nocount, xact_abort on;
 	declare @SQL nvarchar(max);
 	declare cUsers cursor local static for
-		select 'alter user ' + quotename(p.name) + ' with login = ' + quotename(s.name collate database_default) + ';'
+		select	'alter user ' + quotename(p.name) + ' with login = ' + quotename(s.name collate database_default) + ';'
 		from sys.database_principals p
 			inner join sys.server_principals s on s.name collate database_default = p.name and s.sid <> p.sid
 		where p.type_desc in ('SQL_USER')
