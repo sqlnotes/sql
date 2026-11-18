@@ -16,16 +16,22 @@ The existing `890-SystemBeforePost/1010 Procedures` helpers are installed after 
 
 ## Baselines and identities
 
-Baseline and version eligibility is decided independently for each owning subsystem after reading its database version (`0.0.0` when fresh or unversioned). When `versions` is absent or has no version subfolders, the installer deploys `baseline` and any non-version scripts in `versions/`, followed by `modules` and remaining stages. When the database version is `0.0.0` or equals the first version in `versions/`, the installer deploys `baseline` followed by all version folders from the first version through the latest version. When the database version is greater than the first version in `versions/` (up to the latest version), the installer skips the entire `baseline` subtree, including its `pre`/`post` stages, and deploys version folders starting from the installed database version onward. Only direct numeric version folders count; reserved stage folders and `.vs` do not. Eligible ordinary files still use hash checking; eligible `pre`/`post` scripts always run. Children without migrations can remain `0.0.0`.
+The installer reads each subsystem's installed version independently. A fresh or unversioned subsystem starts at 0.0.0. Only direct numeric children of `versions/` determine the supported range.
 
-When version folders exist, a nonzero installed version older than the first version in `versions/` is rejected with an upgrade-path error and requires reinstallation. Fresh installations can use a consolidated baseline directly. Versions above the latest available version in `versions/` remain rejected as downgrades.
+| Installed state | Baseline | Version folders visited |
+| --- | --- | --- |
+| No version folders | Included | None. Eligible non-version scripts in `versions/` still run. |
+| Fresh, 0.0.0, or equal to the first retained version | Included | First through latest |
+| Above the first version and at or below the latest | Skipped, including its pre/post scripts | Installed through latest |
+| Nonzero and below the first version, or above the latest | Deployment rejected | None |
+
+An installation below the retained version floor requires reinstallation. Hash checking applies to eligible ordinary scripts. Eligible pre/post scripts run on every deployment.
 
 ### Baseline, migrations and rebasing
 
 The baseline contains complete initial table definitions and can be deployed
 without version folders. During initial-version development, put the initial
-columns, constraints and indexes directly in those definitions. Baseline files
-create absent objects; they do not contain rolling schema updates.
+columns, constraints and indexes directly in those definitions. Keep incremental upgrades in version folders.
 
 After that initial definition is established, preserve it. Put each subsequent
 schema change in the appropriate version folder, including CREATE TABLE for a
@@ -36,15 +42,7 @@ The installer still visits the version folder. A later 0.0.2 column addition
 belongs in its migration rather than an edit to the baseline; fresh installations
 reach that version by applying the later migrations after baseline creation.
 
-A deliberate rebase replaces baseline definitions with the complete schema at
-a chosen supported floor and consolidates the older migration history. For
-example, a project at 10.10.10 could rebase to 8.0.0: fresh installations or
-installations already at 8.0.0 deploy the 8.0.0 baseline and apply versions
-8.0.0 through 10.10.10; installations above 8.0.0 skip baseline and apply
-versions starting from their installed version; nonzero installations below
-8.0.0 are rejected and require reinstallation. An existing unversioned 0.0.0
-database must also be distinguished when a rebase raises the floor. This is a
-policy for a future deliberate rebase, not a rebase of the current source tree.
+A deliberate rebase replaces the baseline with the complete schema at the new supported floor and consolidates older migrations. Plan explicitly for existing unversioned databases because the installer also uses 0.0.0 for a fresh installation.
 
 CodeBase uses paths such as `/System/010-Partition`. SQL derives SystemID as GUID from MD5 of `trim(lower(CodeBase))`. Case/outer-space aliases share identity according to SQL normalization/collation; paths are not normalized independently by PowerShell. Renaming a folder, including its prefix, changes identity. The renamed Trace, Jobs, Backup and Security paths therefore initialize new subsystem owners and hashes; guarded baselines become eligible under those owners. Existing metadata history remains under the former paths; the installer does not remap it or carry its version forward. Review baseline replay before updating an existing installation.
 

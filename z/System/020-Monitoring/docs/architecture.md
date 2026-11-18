@@ -14,10 +14,6 @@ See [System documentation](../../docs/readme.md) for deployment order.
 
 Snapshots capture requests at collection time, not a full session history. Query text, plans, login names, and client details can be sensitive. Database Mail configuration is an administrative operation that changes server settings and msdb; it is not a health-only check.
 
-## Integration constraints
-
-Empty request snapshots can be normal: the collector excludes its own session. Check DMV visibility before assuming there are no other requests. Missing ring-buffer events can mean system_health is absent, has no ring-buffer target, or has already overwritten events. Persisted duplicate keys can occur under concurrent collectors; the System Health insert uses a not-exists predicate without serialization. z.v_IndexSpaceUsed uses 8.192 / 1024 per page for columns labelled MB, rather than the usual 8 / 1024; use raw page counts when exact units matter.
-
 ## SQL Trace monitoring
 
 `z.usp_CollectTrace` creates/configures four independent native rowset traces for blocking, long-running queries, errors and file growth. Each has native filters, its own destination and callbacks, and no scheduled stop time. One connection polls and processes their buffers. Monitoring owns diagnostic tables, snapshot callbacks and daily/hourly summaries. Installation does not start capture.

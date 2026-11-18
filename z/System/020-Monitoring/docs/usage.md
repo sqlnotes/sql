@@ -4,8 +4,6 @@
 
 ## Examples
 
-Execute against a database containing System and this subsystem. Examples describe current interfaces; environment permissions and data determine results.
-
 ```sql
 select SessionID, BlockerSessionID, DurationInSecond, DatabaseName, SQLText
 from z.v_ActiveSessions;
@@ -20,7 +18,7 @@ exec z.usp_TakeSnapshotActiveSessions;
 exec z.usp_CollectSystemHealthEvents;
 ```
 
-Snapshots capture requests at collection time, not a full session history. Query text, plans, login names, and client details can be sensitive. Database Mail configuration is an administrative operation that changes server settings and msdb; it is not a health-only check.
+Snapshots capture requests visible at collection time. Restrict access to the stored SQL text, plans and session details.
 
 ## CPU and memory history
 

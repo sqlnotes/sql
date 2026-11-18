@@ -2,9 +2,7 @@
 
 [Subsystem](readme.md) | [Object reference](reference/readme.md)
 
-## Examples
-
-Execute against a database containing System and this subsystem. Examples describe current interfaces; environment permissions and data determine results.
+## Preview login and permission scripts
 
 ```sql
 select LoginName, LoginType, SQL
@@ -15,4 +13,4 @@ from z.fn_BuildQueryCopyUserPermission(N'ExampleUser', N'ExampleUserCopy')
 order by Ordinal;
 ```
 
-Functions return script text without executing it. Review generated text before use. Login output can contain password hashes and SIDs: handle it as security material. Permission generators contain known limitations; they are not complete security-migration tools.
+These queries return script text. Restrict access to generated SQL login definitions because they can include password hashes and SIDs. Review the [supported login attributes](reference/z.fn_BuildQueryCopyLogin.md) and [permission classes](reference/z.fn_BuildQueryCopyLoginPermission.md) before applying the scripts.

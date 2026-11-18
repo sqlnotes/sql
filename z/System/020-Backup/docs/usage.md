@@ -2,7 +2,7 @@
 
 [Subsystem](readme.md) | [Object reference](reference/readme.md)
 
-Run one invocation at a time from a database containing the Backup subsystem. Each call backs up the selected list again.
+Run sequential backups from the database containing Schema Z. Each call processes its selected list again.
 
 ```sql
 exec z.usp_BackupDatabase
@@ -11,6 +11,8 @@ exec z.usp_BackupDatabase
 	@BackupType = N'FULL',
 	@ServerName = N'ProductionLabel';
 ```
+
+To back up a single database named `Region,West` or `AllDatabases`, supply `@ExactDatabaseName` with that literal name. Use `@Databases` for groups or lists.
 
 ServerName controls the destination prefix only. Omit it or pass NULL to use @@servername. It does not connect to another server. Windows accepts slash-separated inputs through normalization; use a mounted filesystem path such as `/mnt/backup` on Linux.
 

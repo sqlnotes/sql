@@ -2,7 +2,7 @@
 
 [Subsystem](readme.md) | [Object reference](reference/readme.md)
 
-Run one backup invocation at a time. There is no shared status view, worker pool or resumable batch. Every call processes its selected databases again. Errors stop remaining work and propagate to the caller. Native history in msdb records successful backups; no extended-property status is maintained.
+The sequential procedure processes its selected databases again on every call. An error stops remaining work. Inspect msdb history for earlier successes. For a parallel call, use its retained TaskQueue batch and task rows to see individual outcomes. [Parallel backup](reference/z.usp_BackupDatabasesParallel.md)
 
 The procedure does not prevalidate paths. Check native directory/backup errors and SQL Server service-account access. Filesystem destinations use local or UNC paths on Windows and local or mounted paths on Linux. Windows non-URL forward slashes are normalized to backslashes. A NULL folder falls back to InstanceDefaultBackupPath. Unknown or ineligible database selectors can produce no work. Offline databases and snapshots can fail at native BACKUP execution.
 

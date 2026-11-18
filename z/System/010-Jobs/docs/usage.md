@@ -4,8 +4,6 @@
 
 ## Examples
 
-Execute against a database containing System and this subsystem. Examples describe current interfaces; environment permissions and data determine results.
-
 ```sql
 select JobName, ServiceName, IsActive, IsExecuting
 from z.v_ServiceJobs
@@ -85,9 +83,7 @@ Schedule keywords are case-insensitive and accent-sensitive regardless of databa
 
 Invalid relevant inputs, including any invalid or empty list member, reject the complete definition. The creation procedures raise error 51000 before changing existing jobs or schedules. To inspect the diagnostic without making changes, call z.fn_ValidateScheduleParameter with the same eight schedule arguments; NULL means validation succeeded. Parameters unused by the selected frequency retain their existing ignored behavior; Specific derives its execution dates from ByDay and ignores supplied StartDate and EndDate. Manual-only job creation is not inferred from an empty or invalid schedule.
 
-An omitted StartDate uses the SQL Server local date; EndDate remains unlimited (9999-12-31). Creation captures one operation date and passes it through validation, conversion and nested schedule creation. Explicit dates and recurring ByTime defaults are unchanged. Specific derives execution dates from ByDay, ignores StartDate/EndDate, and retains date-only values as midnight.
-
-Reuse requires the current database's literal prefix and matching native timing fields/end date. For every-day schedules (daily interval one), different start dates can share a schedule when both are on or before the captured operation date. Future starts require the same start date. Multi-day, weekly, monthly and other frequencies retain exact start-date matching. Prefer an exact date match, then the lowest schedule ID among eligible historical starts. Disabled schedules stay disabled. No existing schedule is renamed or modified.
+An omitted StartDate uses the SQL Server local date. Daily schedules with interval one may reuse an equivalent schedule that has already started. Use the returned schedule IDs for the actual assignments. [Schedule matching rules](reference/z.usp_CreateSchedule.md)
 
 ## Existing schedule changes
 

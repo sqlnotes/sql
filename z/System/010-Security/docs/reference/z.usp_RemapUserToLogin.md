@@ -17,7 +17,7 @@ Compare transformed database-user and server-login names for WINDOWS/INSTANCE au
 
 ## Results, permissions, and limits
 
-No defined result set. Requires ALTER USER authority and metadata visibility. User replacement null falls back to the user pattern; login replacement null makes REPLACE null and falls back to original login.
+No defined result set. Requires ALTER USER authority and metadata visibility. For either side, a NULL replacement defaults to that side's search text, leaving the original name intact. Supply an empty replacement string to remove the matched text.
 
 ## Dependencies
 

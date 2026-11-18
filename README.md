@@ -11,14 +11,12 @@ shared utilities, object references, and the eight feature subsystems:
 - [Monitoring](z/System/020-Monitoring/docs/readme.md): sessions, diagnostic trace presets and resource information.
 - [Trace](z/System/010-Trace/docs/readme.md): SQL Trace configuration and collection.
 - [Jobs](z/System/010-Jobs/docs/readme.md): SQL Agent jobs and schedule helpers.
-- [Backup](z/System/020-Backup/docs/readme.md): backups and database snapshots.
+- [Backup](z/System/020-Backup/docs/readme.md): sequential or parallel backups, restore planning, retention and snapshots.
 - [Security](z/System/010-Security/docs/readme.md): permission generators and user utilities.
 - [TaskQueue](z/System/012-TaskQueue/docs/readme.md): task batches, workers and recovery.
 - [AsyncChannel](z/System/050-AsyncChannel/docs/readme.md): asynchronous data delivery and processing.
 
-Read [deployment](z/docs/deploy.md) before running `z/Deploy.ps1`. Review each
-feature's prerequisites and limitations before using its examples. Installation
-does not automatically configure every operational feature.
+Use PowerShell 7 and SQL Server 2019 or later. Installation and repeat deployment create or reconcile the hourly maintenance job and clean up eligible orphan schedules in msdb. Use `-ShowPlan` to preview files before connecting. [Install and update](z/docs/deploy.md)
 
 For deployment mechanics and authoring scripts, see the
 [deployment developer guide](z/docs/readme.md).

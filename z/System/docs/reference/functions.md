@@ -127,11 +127,11 @@ create or alter function z.fn_GetPeriodStart
 returns datetime
 ```
 
-Returns datetime period start for Second, Minute, Hourly, Daily, Weekly, Monthly or Yearly. Default anchor is 2020-01-01; Weekly defaults to Monday 1900-01-01 independently of @@datefirst; an explicit StartDate anchors multiweek intervals to the Monday of its week.
+Returns the latest anchored boundary at or before `@Date` for Second, Minute, Hourly, Daily, Weekly, Monthly or Yearly. An interval of either sign uses its absolute width. Zero, NULL and unknown periods return NULL.
 
-The default anchor changed from 0006-01-01 for all nonweekly periods, so intervals can align differently; pass an explicit StartDate to retain a previous alignment. Nonweekly calculations retain integer division toward zero: for dates before the anchor, multi-unit intervals can return a boundary after the input date.
+The default anchor is 2020-01-01 for nonweekly periods. Supply `@StartDate` to retain another alignment, including an anchor time within a day. Month and year boundaries use the original anchor day, clipping to the last day of a shorter month when necessary. Weekly boundaries start at Monday midnight independently of DATEFIRST, using the Monday of the supplied anchor's week or 1900-01-01 by default.
 
-On SQL Server 2019/2022, Second offsets must fit an int (approximately 68 years from the anchor); older explicit anchors or distant dates can still overflow. `@Interval = 0` returns NULL; negative or out-of-range intervals can overflow datetime bounds.
+The result must fit SQL Server `datetime`. SQL Server 2019 and 2022 also require the final DATEADD offset to fit an int, which limits second offsets to about 68 years from the anchor.
 
 ## z.fn_IsAmazonRDS
 
@@ -153,7 +153,7 @@ create or alter function z.fn_IsAzureDatabase()
 returns bit
 ```
 
-Returns bit 0 in both branches, including SQL Azure. Cannot currently detect Azure.
+Returns 1 for Azure SQL Database (EngineEdition 5) and Azure SQL Managed Instance (8). Other engine editions return 0, including SQL Server on an Azure VM. [Engine edition values](https://learn.microsoft.com/en-us/sql/t-sql/functions/serverproperty-transact-sql)
 
 ## z.fn_IsHostedDatabase
 
@@ -164,7 +164,7 @@ create or alter function z.fn_IsHostedDatabase()
 returns bit
 ```
 
-Returns bit from Amazon RDS or Azure helpers. Azure helper always returns 0.
+Returns 1 when either the Amazon RDS or Azure database helper identifies the environment.
 
 ## z.fn_IsLinux
 

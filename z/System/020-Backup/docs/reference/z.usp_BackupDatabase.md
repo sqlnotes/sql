@@ -14,10 +14,13 @@ Back up the selected databases sequentially in ascending data-file size. Every i
 @OtherBackupOptions nvarchar(max) = null,
 @ServerName sysname = null,
 @BackupFileNameFormat nvarchar(4000) = N'{ServerName}${InstanceName}${DatabaseName}_{yyyyMMdd}_{HHmmssfffffff}',
-@FullBackupIfNeeded bit = 0
+@FullBackupIfNeeded bit = 0,
+@ExactDatabaseName nvarchar(max) = null
 ```
 
-Databases accepts AllDatabases, UserDatabases, SystemDatabases or comma-separated names. Exclude tempdb and error/recovery states; skip SIMPLE recovery for LOG. Read-only databases automatically include COPY_ONLY for disk and URL backups. SQL Server honors it for FULL and LOG; with DIFFERENTIAL it has no effect and the requested type remains DIFF. Read-write backups use COPY_ONLY only when explicitly supplied in OtherBackupOptions. Compression NULL uses the server default. OtherBackupOptions supplies trusted SQL options, including an existing credential option where appropriate.
+`@Databases` accepts AllDatabases, UserDatabases, SystemDatabases or a comma-separated list. Set `@ExactDatabaseName` to select one literal database name, even when it contains a comma or matches a group name. A non-NULL exact name takes precedence over `@Databases`. The name must match under the catalog collation and have the same byte length. An overlength input or an extra trailing space selects nothing. Both selectors exclude tempdb and error/recovery states and skip SIMPLE recovery for LOG.
+
+Read-only databases automatically include COPY_ONLY for disk and URL backups. SQL Server honors it for FULL and LOG; with DIFFERENTIAL it has no effect and the requested type remains DIFF. Read-write backups use COPY_ONLY only when explicitly supplied in OtherBackupOptions. Compression NULL uses the server default. OtherBackupOptions supplies trusted SQL options, including an existing credential option where appropriate.
 
 ServerName is a destination naming label, not a remote SQL connection. NULL uses @@servername; otherwise the supplied name replaces it in the server/instance prefix. A name without an instance uses MSSQLSERVER; a backslash separates a named instance. The procedure always backs up databases on the instance where it executes.
 

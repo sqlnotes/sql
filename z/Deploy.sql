@@ -43,11 +43,13 @@ create or alter procedure z.usp_AcquireSemaphore
 as
 begin
 	set nocount on;
-	declare	@ResourceInternal nvarchar(255), @SessionKey sysname, @OtherKey sysname,
+	declare	@ResourceInternal nvarchar(255), @SessionKey sysname,
 			@OtherOwner varchar(32), @ExistingSlot int, @OtherSlot int, @Slot int = 1,
 			@Result int, @Remaining int, @MainAcquired bit = 0, @SlotAcquired bit = 0,
 			@Started datetime2(3) = sysutcdatetime(), @Elapsed bigint,
-			@NameHash varchar(64), @Delay varchar(12);
+			@Delay varchar(12), @SaveLegacy bit, @SaveGeneration binary(8), @SaveValue sql_variant,
+			@Hash binary(32), @Generation binary(8), @Entry varbinary(44), @LookupOwner varchar(32),
+			@Prefix nvarchar(64), @Key sysname, @FreeKey sysname, @Index int, @ResolvedSlot int, @Legacy bit;
 	if nullif(trim(@SemaphoreName), N'') is null or @TotalCount is null or @TotalCount < 1
 		throw 50000, 'A semaphore requires a nonempty name and positive capacity.', 1;
 	if @LockOwner is null or @LockOwner not in ('Transaction', 'Session')
@@ -57,12 +59,51 @@ begin
 	select	@LockOwner = case when @LockOwner = 'Transaction' then 'Transaction' else 'Session' end;
 	if @LockOwner = 'Transaction' and @@trancount = 0
 		throw 50000, 'A transaction-owned semaphore requires an active transaction.', 1;
-	select	@NameHash = convert(varchar(64), hashbytes('SHA2_256', convert(varbinary(max), @SemaphoreName)), 2),
+	select	@Hash = hashbytes('SHA2_256', convert(varbinary(max), @SemaphoreName)), @LookupOwner = @LockOwner,
 			@OtherOwner = case @LockOwner when 'Session' then 'Transaction' else 'Session' end;
-	select	@SessionKey = N'Semaphore-' + convert(nvarchar(11), db_id()) + N'-' + @LockOwner + N'-' + @NameHash,
-			@OtherKey = N'Semaphore-' + convert(nvarchar(11), db_id()) + N'-' + @OtherOwner + N'-' + @NameHash;
-	select	@ExistingSlot = try_convert(int, session_context(@SessionKey)),
-			@OtherSlot = try_convert(int, session_context(@OtherKey));
+	while @LookupOwner is not null
+	begin
+		select	@Prefix = N'Semaphore-' + convert(nvarchar(11), db_id()) + N'-' + @LookupOwner + N'-',
+				@Generation = case when @LookupOwner = 'Transaction' and @@trancount > 0 then convert(binary(8), current_transaction_id()) else 0x0000000000000000 end,
+				@ResolvedSlot = null, @Legacy = 0, @Index = 1, @FreeKey = null;
+		select	@Key = @Prefix + convert(varchar(64), @Hash, 2);
+		if session_context(@Key) is not null
+		begin
+			-- An active permit acquired with the former per-name key can still be released.
+			select	@ResolvedSlot = try_convert(int, session_context(@Key)), @Legacy = 1;
+		end
+		else
+		begin
+			-- Pool entries are hash(32) + native slot(4) + transaction ID(8).
+			-- A one-byte vacancy preserves the end marker (the first never-written key).
+			while 1 = 1
+			begin
+				select	@Key = @Prefix + convert(nvarchar(11), @Index);
+				select	@Entry = convert(varbinary(44), session_context(@Key));
+				if @Entry is null
+				begin
+					select	@Key = isnull(@FreeKey, @Key);
+					break;
+				end;
+				if datalength(@Entry) = 44 and substring(@Entry, 1, 32) = @Hash
+				begin
+					select	@ResolvedSlot = case when substring(@Entry, 37, 8) = @Generation then convert(int, substring(@Entry, 33, 4)) end;
+					break;
+				end;
+				if @FreeKey is null and (datalength(@Entry) = 1 or substring(@Entry, 37, 8) <> @Generation) select @FreeKey = @Key;
+				select	@Index += 1;
+			end;
+		end;
+		if @LookupOwner = @LockOwner
+			select	@SessionKey = @Key, @ExistingSlot = @ResolvedSlot, @SaveLegacy = @Legacy, @SaveGeneration = @Generation;
+		else select @OtherSlot = @ResolvedSlot;
+		select	@LookupOwner = case when @LookupOwner = @LockOwner then @OtherOwner end;
+	end;
+
+	-- Concurrent MARS requests can independently select the same vacant entry
+	-- from different snapshots. A per-name key keeps their writes independent.
+	if @ExistingSlot is null and (connectionproperty('net_transport') = N'Session' or current_request_id() <> 0)
+		select	@SaveLegacy = 1, @SessionKey = N'Semaphore-' + convert(nvarchar(11), db_id()) + N'-' + @LockOwner + N'-' + convert(varchar(64), @Hash, 2);
 
 	if @ExistingSlot < 1 select @ExistingSlot = null;
 	if @OtherSlot < 1 select @OtherSlot = null;
@@ -82,7 +123,8 @@ begin
 		select	@ResourceInternal = cast(@ExistingSlot as nvarchar(10)) + N'-' + @SemaphoreName;
 		if applock_mode('public', @ResourceInternal, @LockOwner) = 'NoLock'
 		begin
-			exec sys.sp_set_session_context @key = @SessionKey, @value = null;
+			select	@SaveValue = case when @SaveLegacy = 0 then 0x00 end;
+			exec sys.sp_set_session_context @key = @SessionKey, @value = @SaveValue;
 			select	@ExistingSlot = null;
 		end
 		else
@@ -111,7 +153,9 @@ begin
 			if @Result >= 0
 			begin
 				select	@SlotAcquired = 1;
-				exec sys.sp_set_session_context @key = @SessionKey, @value = @Slot;
+				if @SaveLegacy = 1 select @SaveValue = @Slot;
+				else select @SaveValue = @Hash + convert(binary(4), @Slot) + @SaveGeneration;
+				exec sys.sp_set_session_context @key = @SessionKey, @value = @SaveValue;
 				return @Slot;
 			end
 			if @Result <> -1 break;
@@ -154,15 +198,42 @@ as
 begin
 	set nocount on;
 	if nullif(trim(@SemaphoreName), N'') is null return 0;
-	declare	@ContextKey sysname, @NameHash varchar(64), @ResourceInternal nvarchar(255),
-			@LockOwner varchar(32) = 'Session', @Slot int, @Result int, @ReturnCode int = 0;
-	select	@NameHash = convert(varchar(64), hashbytes('SHA2_256', convert(varbinary(max), @SemaphoreName)), 2);
+	declare	@ResourceInternal nvarchar(255), @ClearValue sql_variant,
+			@LockOwner varchar(32) = 'Session', @Slot int, @Result int, @ReturnCode int = 0,
+			@Hash binary(32), @Generation binary(8), @Entry varbinary(44),
+			@Prefix nvarchar(64), @Key sysname, @Index int, @Legacy bit, @Found bit;
+	select	@Hash = hashbytes('SHA2_256', convert(varbinary(max), @SemaphoreName));
 	while @LockOwner is not null
 	begin
 		begin try
-			select	@ContextKey = N'Semaphore-' + convert(nvarchar(11), db_id()) + N'-' + @LockOwner + N'-' + @NameHash,
-					@ResourceInternal = null;
-			select	@Slot = try_convert(int, session_context(@ContextKey));
+			select	@ResourceInternal = null;
+			select	@Prefix = N'Semaphore-' + convert(nvarchar(11), db_id()) + N'-' + @LockOwner + N'-',
+					@Generation = case when @LockOwner = 'Transaction' and @@trancount > 0 then convert(binary(8), current_transaction_id()) else 0x0000000000000000 end,
+					@Slot = null, @Legacy = 0, @Found = 0, @Index = 1;
+			select	@Key = @Prefix + convert(varchar(64), @Hash, 2);
+			if session_context(@Key) is not null
+			begin
+				-- An active permit acquired with the former per-name key can still be released.
+				select	@Slot = try_convert(int, session_context(@Key)), @Legacy = 1, @Found = 1;
+			end
+			else
+			begin
+				-- Pool entries are hash(32) + native slot(4) + transaction ID(8).
+				-- A one-byte vacancy preserves the end marker (the first never-written key).
+				while 1 = 1
+				begin
+					select	@Key = @Prefix + convert(nvarchar(11), @Index);
+					select	@Entry = convert(varbinary(44), session_context(@Key));
+					if @Entry is null break;
+					if datalength(@Entry) = 44 and substring(@Entry, 1, 32) = @Hash
+					begin
+						select	@Found = 1, @Slot = case when substring(@Entry, 37, 8) = @Generation then convert(int, substring(@Entry, 33, 4)) end;
+						break;
+					end;
+					select	@Index += 1;
+				end;
+			end;
+			select	@ClearValue = case when @Legacy = 0 then 0x00 end;
 			if @Slot > 0 select @ResourceInternal = cast(@Slot as nvarchar(10)) + N'-' + @SemaphoreName;
 			-- Transaction context survives commit/rollback; probe only an active transaction.
 			if @LockOwner = 'Session' or @@trancount > 0
@@ -185,15 +256,14 @@ begin
 						exec @Result = sys.sp_releaseapplock @Resource = @SemaphoreName, @LockOwner = @LockOwner;
 						if @Result < 0 and @ReturnCode = 0 select @ReturnCode = @Result;
 					end
-					if applock_mode('public', @SemaphoreName, @LockOwner) = 'NoLock'
-						exec sys.sp_set_session_context @key = @ContextKey, @value = null;
-					else if @ReturnCode = 0 select @ReturnCode = -999;
+					if applock_mode('public', @SemaphoreName, @LockOwner) <> 'NoLock'
+					begin
+						if @ReturnCode = 0 select @ReturnCode = -999;
+					end
+					else if @Found = 1 exec sys.sp_set_session_context @key = @Key, @value = @ClearValue;
 				end
 			end
-			else
-			begin
-				exec sys.sp_set_session_context @key = @ContextKey, @value = null;
-			end
+			else if @Found = 1 exec sys.sp_set_session_context @key = @Key, @value = @ClearValue;
 		end try
 		begin catch
 			-- Cleanup must not throw or prevent attempting the other owner scope.

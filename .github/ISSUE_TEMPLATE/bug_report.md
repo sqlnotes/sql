@@ -7,21 +7,14 @@ assignees: ''
 
 ---
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+**Environment**
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+Schema Z revision, SQL Server build and database compatibility level. Include the PowerShell version for installer issues.
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+**Steps to reproduce**
 
-**Screenshots if applicable**
-If applicable, add screenshots to help explain your problem.
+Include the affected module, minimal setup and command with sanitized inputs.
 
-**Additional context if applicable**
-Add any other context about the problem here.
+**Expected and actual results**
+
+Include the relevant SQL or PowerShell error number and message, if present.

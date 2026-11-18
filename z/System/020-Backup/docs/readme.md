@@ -13,7 +13,7 @@ Run full, differential, or transaction-log backups; restore full, differential a
 
 ## Operational scope
 
-Backups run sequentially to filesystem folders, Azure Blob HTTPS URLs or S3-compatible URLs (SQL Server 2022+). The nullable ServerName parameter changes the server/instance destination prefix; NULL uses @@servername. The procedure creates filesystem directories when needed, uses object prefixes for URLs, and never deletes old backups. Retention is a separate operation through the [filesystem cleanup procedure](reference/z.usp_CleanupDatabaseBackups.md) or provider lifecycle rules for URL objects.
+Use [sequential backup](reference/z.usp_BackupDatabase.md) to process one database at a time or [parallel backup](reference/z.usp_BackupDatabasesParallel.md) for bounded Agent workers. Destinations include filesystem folders, Azure Blob HTTPS URLs and S3-compatible URLs (SQL Server 2022+). The nullable ServerName parameter changes the server/instance destination prefix; NULL uses @@servername. The procedure creates filesystem directories when needed, uses object prefixes for URLs, and never deletes old backups. Retention is a separate operation through the [filesystem cleanup procedure](reference/z.usp_CleanupDatabaseBackups.md) or provider lifecycle rules for URL objects.
 
 Windows destinations can use absolute local or UNC paths. Linux destinations use absolute filesystem paths, including mounted network shares. The parameterless Full/Log wrappers contain a fixed UNC destination; inspect them before use.
 

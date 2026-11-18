@@ -28,4 +28,4 @@ The maintenance executor serializes by partition function with a session applica
 
 System root post invokes the job factory to create or reconcile hourly general maintenance, including partition retention. Newly created jobs are enabled; existing enabled state is preserved. Installation requires Agent/msdb job and schedule permissions.
 
-For RIGHT expiration, the retained upper partition is also held temporarily while empty neighbors merge. The empty destination's per-index compression is restored before switching retained rows back. Adjacent partitions with different filegroups for any index are rejected before DDL because preserving that placement would require data movement. Temporary merge holders use the _Partition_MergeHold suffix and must not already exist.
+RIGHT expiration switches the retained upper partition aside during the merge, then restores its compression before switching it back. [Storage requirements](reference/retention.md#recovery-expiration-and-compression)

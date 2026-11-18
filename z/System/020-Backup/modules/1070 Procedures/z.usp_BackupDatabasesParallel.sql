@@ -97,7 +97,7 @@ begin
 	set nocount, xact_abort on;
 	if not exists (select 1 from sys.databases where ' + @IdentityPredicate + N')
 		throw 50000, ''The selected database is no longer the same online database.'', 1;
-	exec ' + quotename(db_name()) + N'.z.usp_BackupDatabase @Databases = ' + @DatabaseLiteral + @BackupArguments + N'
+	exec ' + quotename(db_name()) + N'.z.usp_BackupDatabase @ExactDatabaseName = ' + @DatabaseLiteral + @BackupArguments + N'
 end;';
 			if object_id(N'tempdb..' + quotename(@Wrapper), N'P') is null
 				exec(@SQL);

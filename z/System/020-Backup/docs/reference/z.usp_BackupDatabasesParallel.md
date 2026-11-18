@@ -31,16 +31,15 @@ once, with Finished as its completion condition, so one backup error does not
 prevent other databases from being attempted. BatchType is Backup. Overlapping
 calls are independent and are allowed; external backup operations are not coordinated.
 
-One parameterless global temporary procedure is created per selected database.
+Each selected database gets a global temporary executor procedure with the TaskQueue signature, `@Parameters nvarchar(max)`.
 Names use `##backup_<databaseName>_<uuid>`, with the database-name segment
 limited to nvarchar(86) so the full name fits nvarchar(128). Names retain spaces,
 punctuation and Unicode; task commands use bracket-delimited identifiers via
-QUOTENAME, including escaped closing brackets. Each task has an
-empty `params` object (`{}`). Database identity and backup options are embedded as
+QUOTENAME, including escaped closing brackets. Each task passes `N'{}'` as its payload. The wrapper ignores that argument. Database identity and backup options are embedded as
 escaped literals in the wrapper, which invokes the installed sequential backup
 procedure. NULL values remain NULL and long option strings are preserved.
 The wrapper checks the captured database ID, name, creation date and online state
-before calling the backup procedure. Recovery-model eligibility is left to the
+before calling the backup procedure with the captured name in `@ExactDatabaseName`. A selected database name containing a comma or matching a group name still identifies a single backup target. Recovery-model eligibility is left to the
 backup procedure, which skips incompatible databases. Backup selection and execution follow
 the existing sequential procedure's behavior.
 
@@ -58,5 +57,4 @@ procedure rolls back an open transaction and rethrows; it does not explicitly
 drop wrappers, which follow global temporary procedure lifetime.
 Keep the creating connection alive; cancellation/disconnection may bypass cleanup.
 Temporary task commands must be rebuilt before replaying a retained batch.
-Settings and task bodies are visible to appropriately privileged readers; do not
-supply secrets as literal backup options. Backups run with the job owner's context.
+Appropriately privileged readers can inspect wrapper definitions and task rows. Keep credentials out of literal backup options. Backups run with the job owner's context.

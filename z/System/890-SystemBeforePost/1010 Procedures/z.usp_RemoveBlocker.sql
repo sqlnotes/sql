@@ -59,7 +59,7 @@ begin
 			end catch
 		end
 	end
-	drop procedure' + @Proc + ';
+	drop procedure ' + @Proc + ';
 end'
 	if z.fn_GetServiceJobID(@Proc) is null
 	begin

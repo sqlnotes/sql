@@ -26,12 +26,39 @@ begin
 			@Maximum sql_variant, @MaximumDate datetime2(7), @MaximumID bigint, @LowerLiteral nvarchar(300), @UpperLiteral nvarchar(300),
 			@FirstNewDate datetime, @SQL nvarchar(max), @OutSQL nvarchar(max) = N'', @InSQL nvarchar(max) = N'',
 			@Source nvarchar(517), @Target nvarchar(517), @Column sysname, @ObjectID int, @Predicate nvarchar(max),
-			@BoundaryID int, @Boundary sql_variant, @BoundaryDate datetime2(7), @Suffix nvarchar(30), @Checks nvarchar(max),
+			@BoundaryID int, @Boundary sql_variant, @BoundaryDate datetime2(7), @Suffix nvarchar(30), @BeforeSwitch nvarchar(max), @AfterSwitch nvarchar(max),
 			@MergeTarget nvarchar(517), @MergeOutSQL nvarchar(max), @MergeInSQL nvarchar(max), @RestoreSQL nvarchar(max),
 			@PreviousBoundary sql_variant, @NextBoundary sql_variant, @CompressionPartition int;
 	declare @Tables table(ObjectID int primary key, Source nvarchar(517), SchemaName sysname, TableName sysname, ColumnName sysname);
 	declare @Splits table(Ordinal int, SQL nvarchar(max), Date datetime);
 	declare @RetainedSuffixes table(Suffix nvarchar(30) primary key);
+
+	declare @SwitchChecks table(ObjectID int, Holder varchar(5), BeforeSwitch nvarchar(max), AfterSwitch nvarchar(max), primary key(ObjectID, Holder));
+	-- Error 8604 aborts the DDL transaction even with XACT_ABORT OFF. Replay the
+	-- whole atomic action only for a newly identified, unswitchable CHECK owner.
+	declare @BeginAction nvarchar(max) = N'if @@trancount > 0 or @@options & 2 = 2
+begin
+	set xact_abort off;
+	throw 50000, N''Partition maintenance requires no caller or implicit transaction.'', 1;
+end
+set xact_abort on;
+declare @SwitchTable int, @LiveName nvarchar(517), @Disable nvarchar(max), @Restore nvarchar(max);
+declare @Revalidate table(ObjectID int primary key);
+while 1 = 1
+begin
+	begin try
+		begin tran;
+',
+			@EndAction nvarchar(max) = N'		commit;
+		break;
+	end try
+	begin catch
+		if @@trancount > 0 rollback;
+		if error_number() <> 8604 or @SwitchTable is null or exists(select 1 from @Revalidate where ObjectID = @SwitchTable) throw;
+		insert @Revalidate values(@SwitchTable);
+		select @SwitchTable = null;
+	end catch;
+end;';
 
 	select	@FunctionID = function_id, @Fanout = fanout, @Right = boundary_value_on_right from sys.partition_functions where name = @PartitionFunctionName;
 	select	@BaseType = type_name(system_type_id), @DataType = type_name(system_type_id) +
@@ -76,6 +103,49 @@ begin
 		insert into @Ret(Name, SQL, Action) values('Error', N'throw 50001, ' + quotename(@Error, '''') + N', 1;', 'Error');
 		return;
 	end
+	-- Normally, matching trusted holder checks prove that the rows can switch
+	-- back. If the engine cannot compare a check, keep the original constraint
+	-- objects and restore their exact trust state under the same schema lock.
+	;with a as
+	(
+		select	t.ObjectID, t.Source, h.Kind,
+				case when max(convert(int, c.is_not_trusted)) = 1 then N'1 = 1'
+					else N'exists(select 1 from @Revalidate where ObjectID = @SwitchTable)' end Revalidate,
+				string_agg(convert(nvarchar(max), N'alter table ' + quotename(t.SchemaName) + N'.' + quotename(t.TableName + N'_Partition_' + h.Kind + N'Hold')
+					+ N' with check add constraint ' + quotename(N'CK_Partition' + h.Kind + N'_' + convert(nvarchar(20), c.object_id))
+					+ N' check ' + c.definition collate database_default + N';'), nchar(10)) within group(order by c.object_id) HolderChecks
+		from @Tables t
+			inner join sys.check_constraints c on c.parent_object_id = t.ObjectID and c.is_disabled = 0
+			cross join (values('Split'), ('Merge')) h(Kind)
+		group by t.ObjectID, t.Source, h.Kind
+	)
+	insert @SwitchChecks
+		select	a.ObjectID, a.Kind,
+				N'select @LiveName = N''' + replace(a.Source, N'''', N'''''') + N''';
+select @SwitchTable = object_id(@LiveName), @Restore = null;
+if ' + a.Revalidate + N'
+begin
+	-- Read the state under the table schema lock, including for a saved plan.
+	select @Disable = N''alter table '' + @LiveName + N'' nocheck constraint '' + names.Enabled,
+		@Restore = concat(N''alter table '' + @LiveName + N'' with check check constraint '' + names.Trusted + N'';'',
+			N''alter table '' + @LiveName + N'' with nocheck check constraint '' + names.Untrusted + N'';'')
+	from (
+		select string_agg(convert(nvarchar(max), quotename(name)), N'','') within group(order by object_id) Enabled,
+			string_agg(convert(nvarchar(max), case when is_not_trusted = 0 then quotename(name) end), N'','') within group(order by object_id) Trusted,
+			string_agg(convert(nvarchar(max), case when is_not_trusted = 1 then quotename(name) end), N'','') within group(order by object_id) Untrusted
+		from sys.check_constraints where parent_object_id = @SwitchTable and is_disabled = 0
+	) names;
+	if @Disable is not null exec(@Disable);
+end
+else
+begin
+' + a.HolderChecks + N'
+end;
+',
+				N'if @Restore is not null exec(@Restore);
+select @SwitchTable = null;
+'
+		from a;
 	select	@Today = isnull(@Today, getutcdate()), @ThisPeriod = z.fn_GetPeriodStart(isnull(@Today, getutcdate()), @PartitionRangeType, @PartitionRangeTypeInterval, default);
 	select	@NextPeriod = case @PartitionRangeType
 			when 'Minute' then dateadd(minute, @PartitionRangeTypeInterval, @ThisPeriod)
@@ -145,13 +215,13 @@ begin
 exec z.usp_CopyTableSchema @FullSourceTableName = ' + (N'N''' + replace(@Source, N'''', N'''''') + N'''') + N', @FullTargetTableName = ' + (N'N''' + replace(@Target, N'''', N'''''') + N'''') + N', @PartitionNumber = ' + convert(nvarchar(20), @Fanout) + N', @DropTargetTableIfExists = 0, @CopyIdentity = 1;
 alter table ' + @Source + N' switch partition ' + convert(nvarchar(20), @Fanout) + N' to ' + @Target + N';
 ';
-			-- Source checks must also be trusted on the holder before switching back.
-			select	@Checks = string_agg(convert(nvarchar(max), N'alter table ' + @Target + N' with check add constraint ' +
-					quotename(N'CK_PartitionHold_' + convert(nvarchar(20), @ObjectID) + N'_' + convert(nvarchar(20), object_id)) + N' check ' + definition collate database_default + N';'), nchar(13) + nchar(10)) within group(order by object_id)
-				from sys.check_constraints where parent_object_id = @ObjectID and is_disabled = 0;
-			select	@InSQL += isnull(@Checks + nchar(13) + nchar(10), N'') +
-					N'alter table ' + @Target + N' with check add constraint ' + quotename(N'CK_PartitionHoldRange_' + convert(nvarchar(20), @ObjectID)) + N' check (' + @Predicate + N');
-alter table ' + @Target + N' switch to ' + @Source + N' partition ' + convert(nvarchar(20), @Fanout) + N';
+			select	@BeforeSwitch = N'', @AfterSwitch = N'';
+			select	@BeforeSwitch = BeforeSwitch, @AfterSwitch = AfterSwitch from @SwitchChecks where ObjectID = @ObjectID and Holder = 'Split';
+			select	@InSQL += N'if exists(select 1 from ' + @Target + N')
+begin
+alter table ' + @Target + N' with check add constraint ' + quotename(N'CK_PartitionHoldRange_' + convert(nvarchar(20), @ObjectID)) + N' check (' + @Predicate + N');
+' + @BeforeSwitch + N'alter table ' + @Target + N' switch to ' + @Source + N' partition ' + convert(nvarchar(20), @Fanout) + N';
+' + @AfterSwitch + N'end;
 drop table ' + @Target + N';
 ';
 			fetch next from cSplitTables into @ObjectID, @Source, @Target, @Column;
@@ -160,20 +230,7 @@ drop table ' + @Target + N';
 		deallocate cSplitTables;
 		-- Each boundary script declares @ID; execute in separate scopes inside the same transaction.
 		select	@SQL = string_agg(convert(nvarchar(max), N'exec(N''' + replace(SQL, N'''', N'''''') + N''');'), nchar(13) + nchar(10)) within group(order by Ordinal) from @Splits;
-		insert into @Ret(Name, SQL, Action, PartitionNumber) values('Extend future boundaries', N'if @@trancount > 0 or @@options & 2 = 2
-begin
-	set xact_abort off;
-	throw 50000, N''Partition maintenance requires no caller or implicit transaction.'', 1;
-end
-set xact_abort on;
-begin try
-	begin tran;
-' + @OutSQL + @SQL + nchar(13) + nchar(10) + @InSQL + N'commit;
-end try
-begin catch
-	if @@trancount > 0 rollback;
-	throw;
-end catch;', 'ExtendBoundaries', @Fanout);
+		insert into @Ret(Name, SQL, Action, PartitionNumber) values('Extend future boundaries', @BeginAction + @OutSQL + @SQL + nchar(13) + nchar(10) + @InSQL + @EndAction, 'ExtendBoundaries', @Fanout);
 	end
 	select	@CompressionPartition = max(r.boundary_id) + 1 from sys.partition_range_values r
 		outer apply z.fn_SqlVariantToDateTime(case when @BaseType = 'bigint' then r.value else convert(sql_variant, null) end) d
@@ -260,15 +317,16 @@ alter table ' + @Source + N' switch partition ' + convert(nvarchar(20), @Boundar
 						+ N' with (data_compression = ' + p.data_compression_desc collate database_default + N');'), nchar(13) + nchar(10)) within group(order by i.index_id)
 					from sys.indexes i inner join sys.partitions p on p.object_id = i.object_id and p.index_id = i.index_id
 					where i.object_id = @ObjectID and p.partition_number = @CompressionPartition and i.type in (0, 1, 2, 5, 6);
-				select	@Checks = string_agg(convert(nvarchar(max), N'alter table ' + @MergeTarget + N' with check add constraint ' +
-						quotename(N'CK_PartitionMerge_' + convert(nvarchar(20), @ObjectID) + N'_' + convert(nvarchar(20), object_id)) + N' check ' + definition collate database_default + N';'), nchar(13) + nchar(10)) within group(order by object_id)
-					from sys.check_constraints where parent_object_id = @ObjectID and is_disabled = 0;
+				select	@BeforeSwitch = N'', @AfterSwitch = N'';
+				select	@BeforeSwitch = BeforeSwitch, @AfterSwitch = AfterSwitch from @SwitchChecks where ObjectID = @ObjectID and Holder = 'Merge';
 				select	@Predicate = case when @LowerLiteral is null then N'1 = 1' else quotename(@Column) + N' is not null and ' + quotename(@Column) + N' >= ' + @LowerLiteral end
 						+ case when @UpperLiteral is null then N'' else N' and ' + quotename(@Column) + N' < ' + @UpperLiteral end;
 				if @LowerLiteral is null select @Predicate = N'(' + @Predicate + N') or ' + quotename(@Column) + N' is null';
-				select	@MergeInSQL += isnull(@RestoreSQL + nchar(13) + nchar(10), N'') + isnull(@Checks + nchar(13) + nchar(10), N'') +
-						N'alter table ' + @MergeTarget + N' with check add constraint ' + quotename(N'CK_PartitionMergeRange_' + convert(nvarchar(20), @ObjectID)) + N' check (' + @Predicate + N');
-alter table ' + @MergeTarget + N' switch to ' + @Source + N' partition ' + convert(nvarchar(20), @BoundaryID) + N';
+				select	@MergeInSQL += isnull(@RestoreSQL + nchar(13) + nchar(10), N'') + N'if exists(select 1 from ' + @MergeTarget + N')
+begin
+alter table ' + @MergeTarget + N' with check add constraint ' + quotename(N'CK_PartitionMergeRange_' + convert(nvarchar(20), @ObjectID)) + N' check (' + @Predicate + N');
+' + @BeforeSwitch + N'alter table ' + @MergeTarget + N' switch to ' + @Source + N' partition ' + convert(nvarchar(20), @BoundaryID) + N';
+' + @AfterSwitch + N'end;
 drop table ' + @MergeTarget + N';
 ';
 			end
@@ -278,21 +336,9 @@ drop table ' + @MergeTarget + N';
 		deallocate cTargetTables;
 		select	@UpperLiteral = case when @BaseType = 'bigint' then convert(nvarchar(100), @Boundary)
 				else N'convert(' + @DataType + N',convert(datetime2(7),' + quotename(convert(nvarchar(40), convert(datetime2(7), @Boundary), 126), '''') + N',126))' end;
-		insert into @Ret(Name, SQL, Action, PartitionNumber) values('Partition Swapout boundary ' + convert(varchar(40), @BoundaryDate, 126), N'if @@trancount > 0 or @@options & 2 = 2
-begin
-	set xact_abort off;
-	throw 50000, N''Partition maintenance requires no caller or implicit transaction.'', 1;
-end
-set xact_abort on;
-begin try
-	begin tran;
-' + @OutSQL + @MergeOutSQL + N'alter partition function ' + quotename(@PartitionFunctionName) + N'() merge range (' + @UpperLiteral + N');
-' + @MergeInSQL + @InSQL + N'commit;
-end try
-begin catch
-	if @@trancount > 0 rollback;
-	throw;
-end catch;', 'ExpireBoundary', @BoundaryID);
+		insert into @Ret(Name, SQL, Action, PartitionNumber) values('Partition Swapout boundary ' + convert(varchar(40), @BoundaryDate, 126), @BeginAction
+			+ @OutSQL + @MergeOutSQL + N'alter partition function ' + quotename(@PartitionFunctionName) + N'() merge range (' + @UpperLiteral + N');'
+			+ nchar(13) + nchar(10) + @MergeInSQL + @InSQL + @EndAction, 'ExpireBoundary', @BoundaryID);
 		fetch next from cBatches into @BoundaryID, @Boundary, @BoundaryDate;
 	end
 	close cBatches;

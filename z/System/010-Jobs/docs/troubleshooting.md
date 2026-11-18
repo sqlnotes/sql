@@ -14,7 +14,4 @@ Start/stop detection relies on program_name patterns and is not an authoritative
 
 ## Permission and partial-operation failures
 
-System supplies z.fn_SplitString. SQL Server Agent, msdb job/schedule procedures and z.usp_AcquireSemaphore are required. The helpers do not start the Agent service.
-
-Read the relevant callable reference before retrying a failed write. Some procedures roll back any open transaction, including a caller's transaction; others leave earlier operations committed. Native server resources and filesystem actions do not share a single database rollback boundary. Catalog/DMV access is evaluated on the deployed server and depends on SQL Server version and caller context.
-
+Check the caller's msdb job/schedule rights and whether SQL Server Agent is running. Job creation can also create a category outside the transaction that protects job and schedule changes. If reconciliation fails inside a caller transaction, inspect the transaction state before retrying. [Creation details](reference/z.usp_CreateServiceJob.md)

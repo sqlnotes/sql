@@ -8,7 +8,7 @@
 
 ## Environment detection
 
-`z.fn_IsAzureDatabase` returns 0 in both branches. `z.fn_IsHostedDatabase` therefore recognizes only the current Amazon RDS heuristic. Do not use either as an authoritative feature check.
+`z.fn_IsHostedDatabase` combines [Azure engine-edition detection](reference/functions.md#zfn_isazuredatabase) with the Amazon RDS heuristic. A SQL Server VM uses its installed SQL Server edition regardless of cloud provider.
 
 ## Naming errors
 
@@ -16,7 +16,7 @@
 
 ## Semaphore wait
 
-`z.usp_AcquireSemaphore` validates `@SemaphoreName`, `@TotalCount > 0`, `@LockOwner` (`Transaction` or `Session`), and `@LockTimeout >= -1`. Waits are bounded by `@LockTimeout` (`-1` waits indefinitely; `0` does not wait). Session context keys are derived from `SHA2_256` of `db_id()`, owner, and semaphore name.
+Check that the name is nonempty, capacity is positive, and an active transaction exists for a Transaction-owned permit. A timeout of 0 tries once. The default -1 waits indefinitely. For session-context error 15665 on a long-lived MARS connection, move work that uses many distinct semaphore names to a connection with MARS disabled. [Semaphore ownership and cleanup](reference/coordination.md#semaphores)
 
 ## Generated SQL
 

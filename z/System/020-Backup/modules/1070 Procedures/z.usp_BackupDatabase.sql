@@ -16,7 +16,8 @@ create or alter procedure z.usp_BackupDatabase
 	@OtherBackupOptions nvarchar(max) = null,-- 'stats = 1',
 	@ServerName sysname = null, --Backup path label; NULL uses @@servername.
 	@BackupFileNameFormat nvarchar(4000) = N'{ServerName}${InstanceName}${DatabaseName}_{yyyyMMdd}_{HHmmssfffffff}',
-	@FullBackupIfNeeded bit = 0
+	@FullBackupIfNeeded bit = 0,
+	@ExactDatabaseName nvarchar(max) = null
 )
 as
 begin
@@ -78,11 +79,14 @@ begin
 			and d.name not in ('tempdb')
 			and m.type_desc in ('ROWS')
 			and (
-						@Databases = 'AllDatabases'
-					or	@Databases = 'UserDatabases' and d.name not in ('master', 'tempdb', 'model', 'msdb')
-					or	@Databases = 'SystemDatabases' and d.name in ('master', 'tempdb', 'model', 'msdb')
-					or  exists(select * from string_split(@Databases, ',') ss where ltrim(rtrim(ss.value)) = d.name)
+				d.name = @ExactDatabaseName and datalength(d.name) = datalength(@ExactDatabaseName)
+				or @ExactDatabaseName is null and (
+					@Databases = 'AllDatabases'
+					or @Databases = 'UserDatabases' and d.name not in ('master', 'tempdb', 'model', 'msdb')
+					or @Databases = 'SystemDatabases' and d.name in ('master', 'tempdb', 'model', 'msdb')
+					or exists (select 1 from string_split(@Databases, ',') s where trim(s.value) = d.name)
 				)
+			)
 			and (
 					@BackupType in ('FULL', 'DIFF')
 					or d.recovery_model_desc <> 'SIMPLE'
