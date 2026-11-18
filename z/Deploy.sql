@@ -20,7 +20,7 @@ go
 if db_id(N'$(DatabaseName)') is null
 begin
 	declare @Sql nvarchar(max) = N'create database ' + quotename(N'$(DatabaseName)') + N';';
-	exec sys.sp_executesql @Sql;
+	exec(@Sql);
 	print N'Database ' + quotename(N'$(DatabaseName)') + N' is created.';
 end
 go

@@ -2,13 +2,13 @@
 Author: John Huang
 Author blog: https://www.sqlnotes.info/
 Repository: https://github.com/sqlnotes/sql
-Source: https://github.com/sqlnotes/sql/blob/main/z/System/012-TaskQueue/modules/1070%20Procedures/z.usp_TaskQueueRunWorker.sql
+Source: https://github.com/sqlnotes/sql/blob/main/z/System/012-TaskQueue/modules/1070%20Procedures/z.usp_TaskQueueExecuteBatchWorker.sql
 Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/012-TaskQueue/docs/readme.md#worker-and-execution-ownership
 
 Acquires and calls executor procedures with unchanged parameters, serializing each batch's claims and protecting live executions.
-Works only on Running batches; records task outcomes without changing batch state.
+Works on one resolved Running batch; records task outcomes without changing batch state and returns when no task can be claimed now.
 */
-create or alter procedure z.usp_TaskQueueRunWorker
+create or alter procedure z.usp_TaskQueueExecuteBatchWorker
 (
 	@BatchID bigint = null,
 	@BatchName nvarchar(128) = null
@@ -21,147 +21,97 @@ begin
 	if session_context(N'z.TaskQueue.WorkerActive') is not null
 		throw 50000, 'This session already has an active or interrupted TaskQueue worker; disconnect it before reuse.', 1;
 	declare	@WorkerLoginTime datetime,
-			@WorkBatchID bigint, @ScanAfterBatchID bigint, @ExecutionLevel bigint,
-			@TaskBatchID bigint, @TaskID int, @ExecutorProcedure nvarchar(300), @Parameters nvarchar(max), @ClaimToken uniqueidentifier,
+			@TaskID int, @AttemptsStarted int, @ExecutorProcedure nvarchar(300), @Parameters nvarchar(max), @ClaimToken uniqueidentifier,
 			@TaskSemaphore nvarchar(200), @Slot int, @ReleaseResult int, @TaskLockHeld bit = 0,
 			@BatchSemaphore nvarchar(200), @MaxConcurrentWorkers int, @BatchLockHeld bit = 0,
-			@RecoveryBatchID bigint, @RecoveryTaskID int, @RecoverySemaphore nvarchar(200), @RecoveryLockHeld bit = 0,
 			@CommandServer sysname, @CommandDatabase sysname, @CommandSchema sysname, @CommandProcedure sysname,
 			@IsTemporary bit, @ExecutableCommand nvarchar(max), @Sql nvarchar(max),
 			@Position int, @PartStart int, @PartCount int, @InBrackets bit, @InQuotes bit, @Character nchar(1),
 			@ReturnCode int, @ErrorNumber int, @ErrorMessage nvarchar(4000), @Now datetime2(7),
-			@RetryIntervalSecond int, @Failed bit, @CleanupFailed bit = 0, @WaitForWork bit = 0,
+			@RetryIntervalSecond int, @Failed bit, @CleanupFailed bit = 0,
 			@AuditAction nvarchar(32), @ActionID uniqueidentifier;
+	
 	declare @ExecutorParts table(PartIndex int, IsSupplied bit);
-	if @BatchID is not null or @BatchName is not null
-		exec z.usp_TaskQueueResolveBatch @BatchID = @BatchID output, @BatchName = @BatchName output;
-	select	@WorkerLoginTime = login_time from sys.dm_exec_sessions where session_id = @@spid;
-	if @WorkerLoginTime is null throw 50000, 'Cannot identify the worker session.', 1;
+	
+	exec z.usp_TaskQueueResolveBatch @BatchID = @BatchID output, @BatchName = @BatchName output;
+	select	@BatchSemaphore = z.fn_TaskQueueGetBatchSemaphore(@BatchID);
+	
+	select	@WorkerLoginTime = login_time 
+	from sys.dm_exec_sessions 
+	where session_id = @@spid;
+	
 	exec sys.sp_set_session_context @key = N'z.TaskQueue.WorkerActive', @value = 1;
 	begin try
 		while 1 = 1
 		begin
-			select	@WorkBatchID = null, @TaskBatchID = null, @TaskID = null, @TaskSemaphore = null;
-			select	top (1) @WorkBatchID = b.BatchID
-			from z.TaskQueueBatch b
-			where b.Status = 'Running' and (@BatchID is null or b.BatchID = @BatchID)
-				and (@ScanAfterBatchID is null or b.BatchID > @ScanAfterBatchID)
-			order by b.BatchID;
-			if @WorkBatchID is null
-			begin
-				if @WaitForWork = 0 break;
-				-- Keep the invocation alive across retry delays, capacity and level waits.
-				-- No transaction or batch semaphore is held while waiting.
-				exec z.usp_TaskQueueSetAction;
-				select	@ScanAfterBatchID = null, @WaitForWork = 0;
-				waitfor delay '00:00:01';
-				continue;
-			end;
+			select	@TaskID = null, @TaskSemaphore = null;
 			begin tran;
-			exec z.usp_TaskQueueLockBatchForChange @BatchID = @WorkBatchID;
-			-- Stop may have won the gate after discovery. Do not recover or claim its tasks.
-			if not exists (select 1 from z.TaskQueueBatch where BatchID = @WorkBatchID and Status = 'Running')
+			exec z.usp_TaskQueueLockBatchForChange @BatchID = @BatchID;
+			-- Read the current limit with Running state before recovering or claiming tasks.
+			select	@MaxConcurrentWorkers = MaxConcurrentWorkers
+			from z.TaskQueueBatch
+			where BatchID = @BatchID and Status = 'Running';
+			if @@rowcount = 0
 			begin
 				commit;
-				select	@ScanAfterBatchID = @WorkBatchID;
-				continue;
+				break;
 			end;
 
-			-- Holding the task semaphore is authoritative. Session identifiers are diagnostic.
-			declare cRecovery cursor local fast_forward for
-				select	BatchID, TaskID from z.TaskQueueTasks
-				where Status = 'Running' and BatchID = @WorkBatchID
-				order by BatchID, TaskID;
-			open cRecovery;
-			fetch next from cRecovery into @RecoveryBatchID, @RecoveryTaskID;
-			while @@fetch_status = 0
-			begin
-				select	@RecoverySemaphore = N'z.TaskQueue.Task:' + convert(nvarchar(20), @RecoveryBatchID) + N':' + convert(nvarchar(11), @RecoveryTaskID);
-				-- The helper reuses same-session slots. Never adopt an interrupted own execution.
-				if applock_mode('public', N'1-' + @RecoverySemaphore, 'Session') = 'NoLock'
-				begin
-					exec @Slot = z.usp_AcquireSemaphore @SemaphoreName = @RecoverySemaphore, @TotalCount = 1, @LockOwner = 'Session', @LockTimeout = 0;
-					if @Slot > 0
-					begin
-						select	@RecoveryLockHeld = 1;
-						select	@ActionID = newid();
-						exec z.usp_TaskQueueSetAction @Action = N'Recover', @ActionID = @ActionID;
-						update z.TaskQueueTasks
-						set Status = 'NeedsReview', FinishedAtUTC = sysutcdatetime(), ClaimToken = null,
-							WorkerSessionID = null, WorkerLoginTime = null, LastErrorNumber = 50000,
-							LastErrorMessage = N'Execution ownership was lost. The command may have completed; reconcile its effects before retrying.'
-						where BatchID = @RecoveryBatchID and TaskID = @RecoveryTaskID and Status = 'Running';
-						exec @ReleaseResult = z.usp_ReleaseSemaphore @SemaphoreName = @RecoverySemaphore;
-						if @ReleaseResult < 0 throw 50000, 'Cannot release a recovered TaskQueue semaphore.', 1;
-						select	@RecoveryLockHeld = 0;
-					end;
-				end;
-				fetch next from cRecovery into @RecoveryBatchID, @RecoveryTaskID;
-			end;
-			close cRecovery;
-			deallocate cRecovery;
+			-- The batch gate prevents new task owners while unlocked Running rows are recovered.
+			select	@ActionID = newid(), @Now = sysutcdatetime();
+			exec z.usp_TaskQueueSetAction @Action = N'Recover', @ActionID = @ActionID;
+			update t
+			set Status = 'Failed', FinishedAtUTC = @Now,
+				AvailableAtUTC = dateadd(second, t.RetryIntervalSecond, @Now), ClaimToken = null,
+				WorkerSessionID = null, WorkerLoginTime = null, LastErrorNumber = 50000,
+				LastErrorMessage = N'Execution ownership was lost. The attempt failed and follows the configured retry policy; command effects may already have committed.'
+			from z.TaskQueueTasks t
+				inner join z.v_TaskQueueRunningTasks r on r.BatchID = t.BatchID and r.TaskID = t.TaskID
+			where t.BatchID = @BatchID 
+				and t.Status = 'Running' 
+				and r.IsTaskLockHeld = 0;
+			exec z.usp_TaskQueueSetAction;
 
-			-- Wait for live owners only while this batch is Running.
-			if exists (select 1 from z.TaskQueueTasks where BatchID = @WorkBatchID and Status = 'Running')
-				select	@WaitForWork = 1;
-			select	@ExecutionLevel = min(s.SortOrder)
-			from
-			(
-				select	min(SortOrder) SortOrder from z.TaskQueueTasks where BatchID = @WorkBatchID and CompletionState = 0
-				union all
-				select	min(SortOrder) from z.TaskQueueTasks where BatchID = @WorkBatchID and CompletionState = 1
-			) s;
-			-- Future availability keeps the worker alive; terminal level barriers do not.
-			if exists
-			(
-				select	1 from z.TaskQueueTasks
-				where BatchID = @WorkBatchID and SortOrder = @ExecutionLevel and CompletionState = 0
-					and Status in ('Pending', 'Failed')
-					and convert(bigint, AttemptsStarted) < convert(bigint, MaxRetries) + 1
-					and (Status = 'Pending' or AttemptsStarted > 0)
-			) select @WaitForWork = 1;
-			-- The gate keeps the earliest unresolved level stable through acquisition.
-			select	top (1) @TaskBatchID = BatchID, @TaskID = TaskID, @MaxConcurrentWorkers = MaxConcurrentWorkers
-			from z.v_TaskQueuePendingTasks
-			where BatchID = @WorkBatchID and SortOrder = @ExecutionLevel
-			order by BatchID, SortOrder, TaskID;
-			if @TaskID is not null
-				select	@ExecutorProcedure = ExecutorProcedure, @Parameters = Parameters, @RetryIntervalSecond = RetryIntervalSecond
-				from z.TaskQueueTasks where BatchID = @TaskBatchID and TaskID = @TaskID;
+			-- The worker applies scheduling rules while the gate keeps selection stable through acquisition.
+			select	top (1) @TaskID = t.TaskID, @ExecutorProcedure = t.ExecutorProcedure,
+					@Parameters = t.Parameters, @RetryIntervalSecond = t.RetryIntervalSecond,
+					@AttemptsStarted = t.AttemptsStarted
+			from z.v_TaskQueuePendingTasks t
+			where t.BatchID = @BatchID and t.AvailableAtUTC <= sysutcdatetime()
+				and not exists
+				(
+					select	1 from z.TaskQueueTasks p
+					where p.BatchID = t.BatchID and p.CompletionState in (0, 1) and p.SortOrder < t.SortOrder
+				)
+			order by t.SortOrder, t.TaskID;
 			if @TaskID is null
 			begin
 				commit;
-				exec z.usp_TaskQueueSetAction;
-				select	@ScanAfterBatchID = @WorkBatchID;
-				continue;
+				break;
 			end;
 			select	@ActionID = newid();
 			exec z.usp_TaskQueueSetAction @Action = N'Acquire', @ActionID = @ActionID;
-			if exists (select 1 from z.TaskQueueTasks where BatchID = @TaskBatchID and TaskID = @TaskID and AttemptsStarted = 2147483647)
+			if @AttemptsStarted = 2147483647
 			begin
-				update z.TaskQueueTasks set Status = 'NeedsReview', LastErrorNumber = 50000,
+				update z.TaskQueueTasks set Status = 'Failed', FinishedAtUTC = sysutcdatetime(), LastErrorNumber = 50000,
 					LastErrorMessage = N'The task attempt counter cannot be incremented.'
-				where BatchID = @TaskBatchID and TaskID = @TaskID;
+				where BatchID = @BatchID and TaskID = @TaskID;
 				commit;
 				exec z.usp_TaskQueueSetAction;
-				select	@ScanAfterBatchID = null, @WaitForWork = 0;
 				continue;
 			end;
-			select	@TaskSemaphore = N'z.TaskQueue.Task:' + convert(nvarchar(20), @TaskBatchID) + N':' + convert(nvarchar(11), @TaskID);
-			if applock_mode('public', N'1-' + @TaskSemaphore, 'Session') <> 'NoLock'
+			select	@TaskSemaphore = z.fn_TaskQueueGetTaskSemaphore(@BatchID, @TaskID);
+			if applock_mode('public', z.fn_TaskQueueGetTaskSemaphoreSlot(@BatchID, @TaskID), 'Session') <> 'NoLock'
 				throw 50000, 'The current session retains an interrupted task lock; disconnect before reuse.', 1;
 			exec @Slot = z.usp_AcquireSemaphore @SemaphoreName = @TaskSemaphore, @TotalCount = 1, @LockOwner = 'Session', @LockTimeout = 0;
 			if @Slot <= 0
 			begin
 				commit;
-				exec z.usp_TaskQueueSetAction;
-				select	@ScanAfterBatchID = @WorkBatchID;
-				continue;
+				break;
 			end;
 			select	@TaskLockHeld = 1;
 			if @MaxConcurrentWorkers > 0
 			begin
-				select	@BatchSemaphore = N'z.TaskQueue.Worker:' + convert(nvarchar(20), @TaskBatchID);
 				exec @Slot = z.usp_AcquireSemaphore @SemaphoreName = @BatchSemaphore, @TotalCount = @MaxConcurrentWorkers, @LockOwner = 'Session', @LockTimeout = 0;
 				if @Slot <= 0
 				begin
@@ -169,9 +119,7 @@ begin
 					if @ReleaseResult < 0 throw 50000, 'Cannot release the unclaimed task semaphore.', 1;
 					select	@TaskLockHeld = 0;
 					commit;
-					exec z.usp_TaskQueueSetAction;
-					select	@ScanAfterBatchID = @WorkBatchID;
-					continue;
+					break;
 				end;
 				select	@BatchLockHeld = 1;
 			end;
@@ -179,7 +127,7 @@ begin
 			update z.TaskQueueTasks set Status = 'Running', AttemptsStarted = AttemptsStarted + 1,
 				ClaimToken = @ClaimToken, WorkerSessionID = @@spid, WorkerLoginTime = @WorkerLoginTime,
 				StartedAtUTC = @Now, FinishedAtUTC = null
-			where BatchID = @TaskBatchID and TaskID = @TaskID and Status in ('Pending', 'Failed');
+			where BatchID = @BatchID and TaskID = @TaskID and Status in ('Pending', 'Failed');
 			if @@rowcount <> 1 throw 50000, 'The selected task could not be claimed.', 1;
 			commit;
 			exec z.usp_TaskQueueSetAction;
@@ -251,7 +199,7 @@ begin
 			set nocount, xact_abort on;
 
 			begin tran;
-			exec z.usp_TaskQueueLockBatchForChange @BatchID = @WorkBatchID;
+			exec z.usp_TaskQueueLockBatchForChange @BatchID = @BatchID;
 			select	@ActionID = newid(), @AuditAction = case when @Failed = 1 then N'Fail' else N'Complete' end;
 			exec z.usp_TaskQueueSetAction @Action = @AuditAction, @ActionID = @ActionID;
 			select	@Now = sysutcdatetime();
@@ -259,7 +207,7 @@ begin
 				FinishedAtUTC = @Now, LastErrorNumber = @ErrorNumber, LastErrorMessage = @ErrorMessage,
 				AvailableAtUTC = case when @Failed = 1 then dateadd(second, @RetryIntervalSecond, @Now) else AvailableAtUTC end,
 				ClaimToken = null, WorkerSessionID = null, WorkerLoginTime = null
-			where BatchID = @TaskBatchID and TaskID = @TaskID and Status = 'Running' and ClaimToken = @ClaimToken;
+			where BatchID = @BatchID and TaskID = @TaskID and Status = 'Running' and ClaimToken = @ClaimToken;
 			if @@rowcount <> 1 throw 50000, 'Task completion ownership no longer matches.', 1;
 			commit;
 			exec @ReleaseResult = z.usp_ReleaseSemaphore @SemaphoreName = @TaskSemaphore;
@@ -271,7 +219,6 @@ begin
 				if @ReleaseResult < 0 throw 50000, 'Cannot release the batch worker semaphore.', 1;
 				select	@BatchLockHeld = 0;
 			end;
-			select	@ScanAfterBatchID = null, @WaitForWork = 0;
 		end;
 		exec z.usp_TaskQueueSetAction;
 		exec sys.sp_set_session_context @key = N'z.TaskQueue.WorkerActive', @value = null;
@@ -279,16 +226,9 @@ begin
 	begin catch
 		if @@trancount > 0 rollback;
 		exec z.usp_TaskQueueSetAction;
-		if cursor_status('local', 'cRecovery') >= 0 close cRecovery;
-		if cursor_status('local', 'cRecovery') > -3 deallocate cRecovery;
 		if @TaskLockHeld = 1
 		begin
 			exec @ReleaseResult = z.usp_ReleaseSemaphore @SemaphoreName = @TaskSemaphore;
-			if @ReleaseResult < 0 select @CleanupFailed = 1;
-		end;
-		if @RecoveryLockHeld = 1
-		begin
-			exec @ReleaseResult = z.usp_ReleaseSemaphore @SemaphoreName = @RecoverySemaphore;
 			if @ReleaseResult < 0 select @CleanupFailed = 1;
 		end;
 		if @BatchLockHeld = 1

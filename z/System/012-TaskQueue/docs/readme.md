@@ -1,7 +1,7 @@
 # TaskQueue
 
 TaskQueue supplies batch/task storage, lifecycle procedures, a partitioned audit
-log and separate running/pending task views, with `z.usp_TaskQueueRunWorker` for execution.
+log and separate running/pending task views, with `z.usp_TaskQueueExecuteBatchWorker` for execution.
 SQL Agent job creation and scheduling belong to Jobs.
 
 ## Procedure names
@@ -17,14 +17,17 @@ together in object explorers. The following former names are deprecated:
 | `z.usp_ResolveTaskQueueBatch` | `z.usp_TaskQueueResolveBatch` |
 | `z.usp_RestartTaskQueueBatch` | `z.usp_TaskQueueRestartBatch` |
 | `z.usp_ResumeTaskQueueBatch` | `z.usp_TaskQueueResumeBatch` |
-| `z.usp_RunTaskQueueWorker` | `z.usp_TaskQueueRunWorker` |
+| `z.usp_RunTaskQueueWorker` | `z.usp_TaskQueueExecuteBatchWorker` |
+| `z.usp_TaskQueueRunWorker` | `z.usp_TaskQueueExecuteBatchWorker` |
+| `z.usp_TaskQueueExecuteWorker` | `z.usp_TaskQueueExecuteBatchWorker` |
 | `z.usp_SetTaskQueueAction` | `z.usp_TaskQueueSetAction` |
 | `z.usp_StartTaskQueueBatch` | `z.usp_TaskQueueStartBatch` |
 | `z.usp_StopTaskQueueBatch` | `z.usp_TaskQueueStopBatch` |
 | `z.usp_ValidateTaskQueueBatch` | Removed; running-task checks use `z.v_TaskQueueRunningTasks` |
 
 Update external jobs, scripts and executor names that invoke the former
-procedure names before deployment. Reapply object-specific EXECUTE permissions to the
+procedure names before deployment, including stored Agent job-step commands.
+Reapply object-specific EXECUTE permissions to the
 replacement procedures where those grants are used. New definitions and
 repository callers use only the current names. TaskQueue's [post cleanup](../post/DeprecatedObject.sql) drops the
 former procedures after the replacement modules are installed; no forwarding
@@ -45,19 +48,21 @@ executor-name storage constraints.
 | Description | nvarchar(max), nullable | Optional batch description |
 | MaxConcurrentWorkers | int | Nonnegative per-batch limit on simultaneously Running tasks; default 0 means unlimited |
 | Status | varchar(16) | Draft (default), Ready, Running, Completed or Stopped |
-| LastErrorMessage | nvarchar(4000), nullable | Latest batch error or explanation; interpreted by the caller |
+| LastErrorMessage | nvarchar(4000), nullable | Optional batch diagnostic; ExecuteBatch clears it at launch and does not collect task errors |
 | CreatedAtUTC | datetime2(7) | Creation time; defaults to sysutcdatetime() |
 | StartedAtUTC | datetime2(7), nullable | Current launch timestamp; strictly increases for successive launches within an execution cycle |
 | FinishedAtUTC | datetime2(7), nullable | Completion time |
 
-Completed means the workflow reached its end under the tasks' completion
-conditions; it does not classify the batch as succeeded or failed. Interpret
-LastErrorMessage and task outcomes for that distinction. Stopped means the batch
-was explicitly stopped or cannot advance because a task exhausted its retries
-without satisfying its completion condition. Exhausted retries that satisfy an
-accepted failure or either-outcome condition do not by themselves stop the batch.
+Completed means the execution finished after all workers exited, including when
+an exhausted failure prevents later tasks from starting. It does not classify
+the batch as succeeded or failed. Interpret LastErrorMessage and task outcomes
+for that distinction. Stopped means the batch was explicitly stopped through
+StopBatch.
+Stop, Resume and Restart are manual lifecycle operations. ExecuteBatch does not
+invoke them automatically; it manages the execution's Running and Completed
+transitions and preserves a manual Stop.
 Stopping replaces cancellation. ExecuteBatch finalizes batch state after its
-workers exit. RunWorker records task outcomes without changing batch state;
+workers exit. ExecuteBatchWorker records task outcomes without changing batch state;
 callers using it directly own batch finalization.
 
 `z.usp_TaskQueueCreateBatch` accepts an optional `@BatchID = null output` argument. A supplied value is used unchanged; `NULL` generates a System datetime-encoded ID using `z.SeqGeneralID` and `z.fn_GenerateZSequenceID`. Pass `OUTPUT` to receive the generated ID. Direct table inserts must supply their own ID; there is no table ID default. `CreatedAtUTC` records creation time independently of the chosen ID.
@@ -92,7 +97,7 @@ but need not be unique.
 | Parameters | nvarchar(max), nullable | Unvalidated text passed unchanged to the executor |
 | SortOrder | bigint | Execution level; duplicate values allow parallel tasks |
 | CompletionCondition | varchar(16) | Succeeded (default), Failed or Finished |
-| Status | varchar(16) | Pending (default), Running, Succeeded, Failed, Blocked or NeedsReview |
+| Status | varchar(16) | Pending (default), Running, Succeeded or Failed |
 | MaxRetries | int | Nonnegative retries after the initial attempt; default 0 |
 | RetryIntervalSecond | int | Nonnegative interval before a retry, in seconds; default 60 |
 | AttemptsStarted | int | Nonnegative execution attempts actually started; default 0 |
@@ -110,10 +115,11 @@ but need not be unique.
 Every task at one SortOrder must satisfy its completion condition before the
 next higher level is eligible. Succeeded requires success; Failed requires
 failure with no retries remaining; Finished accepts either success or failure
-with no retries remaining. Pending retries, Blocked and NeedsReview do not
+with no retries remaining. Pending tasks, Running tasks and retryable failures do not
 satisfy these conditions. A successful task requiring Failed also prevents
 advancement. Eligible tasks at that same level can still run; later levels remain
-blocked. ExecuteBatch records Stopped after its workers finish.
+blocked. ExecuteBatch records Completed after its workers finish unless the
+batch was explicitly stopped. Tasks that never started remain Pending.
 
 IX_z_TaskQueueTasks_BatchID_Status_SortOrder_AvailableAtUTC on (BatchID, Status, SortOrder, AvailableAtUTC) supports
 pending selection in a batch and execution level. The clustered key supplies
@@ -122,7 +128,7 @@ with row compression. Parent deletion is rejected while child tasks remain.
 
 Parameters is nullable and its content is not validated. No task is executed by inserting a row.
 The worker implements claiming, retry scheduling, claim-token checks and recovery;
-these tables do not enforce execution ownership. The pending view applies level barriers
+these tables do not enforce execution ownership. The worker applies level barriers
 to selection, not to mutations of the base tables. The task baseline creates the
 complete table when absent; it contains no incremental upgrade logic.
 
@@ -140,6 +146,7 @@ finished/error fields are omitted from this current-execution view.
 Exclusive Session lock cannot currently be granted; 0 means it is available and
 not held by that session under Session ownership.
 The APPLOCK_MODE/APPLOCK_TEST probes do not acquire a lock or change task state.
+Both probes reuse the TaskSemaphoreSlot alias defined by one CROSS APPLY expression.
 The flag does not verify that WorkerSessionID owns the lock and is a momentary
 observation, not proof of a particular worker's ownership. Rows remain restricted
 to Status = Running. Lifecycle and cleanup checks reject any row for their batch,
@@ -153,12 +160,11 @@ task execution lock. Worker completion ordering is unchanged.
 
 ## Pending task view
 
-`z.v_TaskQueuePendingTasks` returns tasks eligible under batch/task scheduling rules,
-including failed tasks whose retry is due. It does not mean every row with Status
-Pending. The view requires a Running batch, remaining attempts, AvailableAtUTC
-reached and every earlier level's completion conditions satisfied. It does not
-filter by worker capacity: eligible tasks remain visible when all execution slots
-are occupied. The worker acquires a batch capacity slot before claiming a task.
+`z.v_TaskQueuePendingTasks` returns Pending tasks and retryable Failed tasks in
+Running batches, including tasks with a future AvailableAtUTC or later SortOrder.
+It requires remaining attempts but does not filter availability, execution order
+or worker capacity. The worker applies these scheduling rules before claiming a
+task and acquires a batch capacity slot.
 
 The projection includes task/batch identity and definitions, retry configuration,
 attempt count, creation time, AvailableAtUTC and previous LastErrorNumber/
@@ -169,11 +175,12 @@ MaxRetries excludes the initial attempt, so a retry is allowed while
 AttemptsStarted < MaxRetries + 1. A failed task must have at least one recorded
 attempt. Exhausted failures remain barriers unless their completion condition
 accepts failure. Pending retries at an earlier level block later levels even
-while delayed. Other batches and peers at the same level do not block a task.
+while delayed. The worker checks those earlier-level barriers; other batches and
+peers at the same level do not block a task.
 
 The worker sets AvailableAtUTC to the retry eligibility time when recording
-a failure, applying RetryIntervalSecond. The view uses that stored timestamp;
-RetryIntervalSecond is not independently added by the view. MaxConcurrentWorkers
+a failure, applying RetryIntervalSecond. The view exposes that stored timestamp;
+the worker requires it to be reached before starting an attempt. MaxConcurrentWorkers
 is projected as configuration for worker admission; the view does not count
 Running tasks or acquire execution slots.
 
@@ -181,9 +188,7 @@ A read is not a claim: the worker atomically claims and revalidates eligibility
 under its batch semaphore before executing. Apply ORDER BY BatchID, SortOrder,
 TaskID in the calling query when required.
 
-Both views are ordinary views backed by the existing table indexes. The pending
-view's current-time filtering and earlier-task subqueries prevent indexing its
-definition under SQL Server indexed-view rules.
+Both views are ordinary views backed by the existing table indexes.
 
 These views replace `z.v_TaskQueueActiveTasks`; `IsReadyToExecute` is removed.
 Update external queries to use the appropriate view before deployment. TaskQueue's
@@ -212,22 +217,47 @@ Add and Start, and callers choose one when they need coordinated changes.
 
 The lifecycle APIs, including batch creation, worker claim/completion paths and
 parallel-backup cleanup delegate to this helper. Execution launcher setup obtains
-the same gate through StartBatch. Task execution/recovery keeps
-its Session-owned semaphores. The launcher uses the batch-change gate for admission
+the same gate directly during setup. Task execution keeps its Session-owned
+semaphores; recovery inspects task-lock diagnostics under the batch-change gate.
+The launcher uses the batch-change gate for admission
 and does not acquire a separate launcher semaphore.
+
+## Task semaphore
+
+`z.fn_TaskQueueGetTaskSemaphore(@BatchID, @TaskID)` returns the logical name
+`z.TaskQueue.Task:<BatchID>:<TaskID>` as nvarchar(200), for the shared semaphore
+acquire/release procedures.
+
+`z.fn_TaskQueueGetTaskSemaphoreSlot(@BatchID, @TaskID)` calls that function and
+returns `1-` plus the logical name as nvarchar(255). Each task has exactly one
+slot. Worker ownership checks and the RunningTasks view use this full
+application-lock resource.
+
+Both functions build names without reading tables; NULL in either identifier
+returns NULL. Names and lock resources retain their existing format, so task
+acquisition, recovery and diagnostics refer to the same lock.
+
+## Batch worker semaphore
+
+`z.fn_TaskQueueGetBatchSemaphore(@BatchID)` returns the logical worker-capacity
+name `z.TaskQueue.Worker:<BatchID>` as nvarchar(200), or NULL for a NULL BatchID.
+Workers use this name with the shared acquire/release procedures and the current
+MaxConcurrentWorkers value. Its slots range from 1 through that positive limit.
+This resource is separate from the transaction-owned batch-change gate
+`z.TaskQueue.Batch:<BatchID>`.
 
 ## Worker and execution ownership
 
 ```sql
-exec z.usp_TaskQueueRunWorker;
-exec z.usp_TaskQueueRunWorker @BatchID = 123;
-exec z.usp_TaskQueueRunWorker @BatchName = N'FullBackup-2026-11-09';
+exec z.usp_TaskQueueExecuteBatchWorker @BatchID = 123;
+exec z.usp_TaskQueueExecuteBatchWorker @BatchName = N'FullBackup-2026-11-09';
 ```
 
-BatchID and BatchName are optional. When neither is supplied, the worker selects
-across all eligible batches. Either selects only that batch. BatchID takes priority
+Supply BatchID or BatchName to select one batch. BatchID takes priority
 when both are supplied; an unknown ID does not fall back to the name. Unknown selectors
-are errors. Call outside a transaction with implicit transactions off, on a dedicated connection without MARS or
+are errors. The worker resolves that batch once and uses its BatchID for every
+task lookup, recovery, claim and outcome. It does not scan or switch to other
+batches. Call outside a transaction with implicit transactions off, on a dedicated connection without MARS or
 other commands interleaved on that session. Nested worker calls are rejected.
 
 A short transaction-owned semaphore named `z.TaskQueue.Batch:<BatchID>` serializes
@@ -245,12 +275,16 @@ completion and error cleanup release it; disconnect releases Session locks.
 The default 0 skips this capacity semaphore and imposes no per-batch concurrency
 restriction; negative values and NULL are rejected by storage constraints.
 Each worker executes one task at a time. Slot acquisition is nonblocking: at
-capacity it releases the unclaimed task's mutex and batch transaction, then can
-visit other batches or wait and rescan its selected scope. Idle workers and
-delayed retries do not reserve slots. Pending view rows remain visible at capacity.
-Change the configured limit only while the batch is Stopped and no task is still
-executing; active slot capacity changes are unsupported. Resume and Restart
-preserve the configured limit.
+capacity it releases the unclaimed task's mutex and batch transaction, then returns.
+Delayed retries do not reserve slots. Pending view rows remain visible at capacity.
+Each loop pass reads the batch's Running state and current MaxConcurrentWorkers
+under the batch-change gate before selecting a task. A changed limit controls
+subsequent capacity-slot requests. Running attempts finish under their existing
+admission; after a reduction or a change from unlimited to a positive limit,
+those attempts can temporarily keep total concurrency above the new limit.
+The launcher keeps its original job count. Increasing the limit does not create
+new jobs or revive workers that already returned. Resume and Restart preserve
+the configured limit.
 
 Direct writes to execution state or
 commands that release worker locks bypass this protocol and are unsupported.
@@ -263,31 +297,38 @@ or session ID alone do not prove abandonment. CONTEXT_INFO is not overwritten.
 Session-owned locks are released on disconnect; see [application-lock lifetime](https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-getapplock-transact-sql).
 
 An Agent stop, KILL or broken connection may bypass CATCH. On a subsequent worker
-invocation in a Running batch, a Running task whose semaphore can be acquired is marked NeedsReview
-without changing batch state. The command may already have committed effects,
-so abandoned tasks are not automatically retried. Reconcile those effects before
-an operator changes the task state. This is not an exactly-once execution guarantee.
+invocation in a Running batch, the worker uses v_TaskQueueRunningTasks to update
+all tasks in that batch with IsTaskLockHeld = 0 to Failed in one statement.
+It holds the batch-change gate throughout recovery, preventing new cooperating
+task claims, and uses one Recover ActionID and finish timestamp for the affected
+rows. Tasks with a held lock are left unchanged. Batch state is unchanged.
+Recovery leaves AttemptsStarted unchanged because claiming already counted that
+attempt, and schedules AvailableAtUTC using the task's RetryIntervalSecond.
+The failed attempt follows the normal retry limit and CompletionCondition rules.
+Retrying can repeat effects already committed by the interrupted attempt; this
+is not an exactly-once execution guarantee.
 An attention that leaves the connection alive may retain its task lock and worker
 session flag; disconnect that session before recovery. See [TRY/CATCH limitations](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/try-catch-transact-sql).
 
-The worker executes one task at a time, records its outcome and then looks for
-the next eligible task. A retry delay does not prevent other eligible tasks at
-the same level from running. When only delayed retries, future AvailableAtUTC
-values or running tasks remain, it waits one second outside a transaction before
-checking again. Existing execution-level barriers still apply.
-It exits when its selected scope has no running tasks or pending work that can
-become eligible automatically. A terminal unmet condition can leave later tasks
-Pending behind a level barrier; those tasks do not keep the worker waiting.
+While the selected batch is Running, the worker executes one task at a time,
+records its outcome and then looks for the next eligible task in that batch.
+A retry delay does not prevent other eligible tasks at
+the same level from running. It returns when no task can be claimed now, including
+when only delayed retries, future AvailableAtUTC values or running tasks remain.
+It does not poll for eligibility or free capacity. Existing execution-level
+barriers still apply: a terminal unmet condition can leave later tasks Pending.
 An explicit Stop makes idle workers exit. A task already executing finishes and
 records its outcome, then its worker exits without another claim. Recovery and
 new claims recheck Running status under the batch gate, so a concurrent Stop
-also prevents recovery. Stopped orphan tasks require explicit reconciliation.
-Without a batch selector, it scans only Running batches with the same rules.
+also prevents recovery. Stopped orphan tasks require task-state correction before
+Resume because workers do not recover Stopped batches.
 An empty Running batch does not keep it alive, and it does not wait for Ready or
-Draft batches or future batch creation. RunWorker never changes batch status, timestamps or
+Draft batches or future batch creation. ExecuteBatchWorker never changes batch status, timestamps or
 errors; direct callers own those lifecycle changes. It creates no jobs or schedules.
-Task failures are recorded and retried within their configured
-limits; queue infrastructure errors propagate to the caller. Queue writers must
+Task failures are recorded with their next retry availability. Eligible retries
+can run within the same call; a delayed retry requires another invocation if no
+other task keeps the worker busy until it becomes due. Queue infrastructure
+errors propagate to the caller. Queue writers must
 be trusted at the execution privilege level of the worker's job owner. There is
 no EXECUTE AS elevation or automatic permission grant.
 
@@ -338,7 +379,7 @@ that leaves a transaction open is rolled back and its task fails. Retry timing,
 completion conditions and ownership remain TaskQueue responsibilities.
 AvailableAtUTC advances by RetryIntervalSecond after failure; a later successful
 attempt clears the task error. MaxRetries excludes the
-initial attempt. At the int attempt-counter limit the task becomes NeedsReview
+initial attempt. At the int attempt-counter limit the task becomes terminal Failed
 instead of overflowing. The worker leaves batch state unchanged even when all
 tasks finish or the batch is empty; ExecuteBatch owns final reconciliation.
 
@@ -395,7 +436,7 @@ transaction and implicit transactions off.
 
 Create produces Draft; Start publishes Ready; ExecuteBatch sets Running before
 starting workers and finalizes batch status after all its worker jobs exit.
-RunWorker only executes tasks while the batch is Running. Direct worker callers
+ExecuteBatchWorker only executes tasks while the batch is Running. Direct worker callers
 must own both the Running transition and final batch status themselves.
 
 Start uses one UPDATE to change Draft to Ready or accept an already Ready batch and return MaxConcurrentWorkers
@@ -410,15 +451,15 @@ worker invokes each task.
 
 Stop accepts Ready, Running or already Stopped batches and rejects Draft/Completed.
 Resume requires no rows for the batch in z.v_TaskQueueRunningTasks and refuses
-NeedsReview/Blocked or
-exhausted unmet conditions. Reconcile those outcomes first or explicitly Restart
+terminal unmet completion conditions or Pending tasks with exhausted attempts.
+Resolve those outcomes first or explicitly Restart
 the entire workflow. Resume preserves ExecutionID, attempt counts, successful tasks,
 error history and retry availability times.
 
 Restart accepts Draft, Ready, Running, Completed or Stopped, but refuses if any
 task is represented in z.v_TaskQueueRunningTasks. Recover orphan Running rows
-through a worker while the batch is Running, or explicitly reconcile their effects
-and task state while Stopped. Restart repeats work and does not undo earlier effects.
+through a worker while the batch is Running, or correct abandoned attempts to
+Failed with normal retry metadata while Stopped. Restart repeats work and does not undo earlier effects.
 It preserves batch ID/name/description/creation time and task definitions, assigns
 a new ExecutionID, clears batch execution timestamps/errors, resets tasks to
 Pending with zero attempts and no execution/ownership/errors, sets availability
@@ -564,24 +605,23 @@ The caller needs Agent administration/visibility and task execution permissions.
 Agent liveness uses the existing visible-session heuristic; it is not a service
 control query. Task semaphores remain authoritative for abandoned ownership.
 
-Startup begins a transaction owned by ExecuteBatch and immediately calls
-StartBatch, which uses that active transaction to acquire the batch-change gate.
-Its single UPDATE changes Draft to Ready or accepts Ready and returns MaxConcurrentWorkers and
-the existing ExecutionID through OUTPUT. The launcher requests RequireWorkerLimit
-= 1, so the UPDATE also requires a positive limit. StartBatch does not finish or
-roll back the launcher's transaction. The launcher retains its transaction and
-gate while defining jobs, sets Running and StartedAtUTC, then commits the batch
-and job definitions together.
+Startup begins a transaction owned by ExecuteBatch and acquires the batch-change
+gate. It reads MaxConcurrentWorkers, ExecutionID and the prior launch timestamp
+from a Draft or Ready batch with a positive worker limit. The launcher retains
+its transaction and gate while defining jobs, sets Running and StartedAtUTC,
+clears the previous finish time and batch diagnostic, then commits the batch
+and job definitions together. It does not call StartBatch or write Ready.
 ExecuteBatch rolls back setup failure; Agent jobs start only after its commit.
-A second launcher is rejected by StartBatch before creating or starting any jobs.
+A second launcher is rejected by the gated admission read before creating or starting any jobs.
 No separate Running-task scan is performed: Draft/Ready admission and the held batch
 gate prevent worker claims until setup commits.
-No separate launcher semaphore is needed. Workers enforce MaxConcurrentWorkers
-during serialized task claims.
+No separate launcher semaphore is needed. Workers use current MaxConcurrentWorkers
+for capacity-slot admission during serialized task claims.
 
 If a candidate worker job name already exists, the launcher reuses it. Reused
 jobs are expected to have the matching worker command and delete-on-completion
-setting. New jobs use CreateServiceJob's JobID output; existing IDs are resolved
+setting; reuse does not rewrite their stored command. New jobs use
+CreateServiceJob's JobID output; existing IDs are resolved
 through GetServiceJobID. Each tracked job retains its logical service name.
 
 Before starting a job, the launcher checks `z.fn_IsSQLJobRunning(JobID)` for a
@@ -591,9 +631,9 @@ The caller needs visibility of other sessions as described in the
 [function reference](../../010-Jobs/docs/reference/supporting-objects.md#zfn_issqljobrunning).
 Task semaphores continue to control recovery of uncertain task outcomes.
 
-Each job calls RunWorker once; while its batch is Running the worker stays available
-during delayed retries and waits for running tasks, polling once a second. It exits
-when no work can progress or the batch stops Running. The launcher waits until all
+Each job calls ExecuteBatchWorker once. The worker executes eligible tasks while its batch
+is Running and returns when no task can be claimed now; it does not wait for
+delayed retries, other running tasks or free capacity. The launcher waits until all
 tracked jobs disappear from Agent metadata. It is intended to run inside an
 Agent job, with Agent owning that execution lifetime. Worker
 names use `TaskQueue-<BatchID>-<ExecutionID>-<WorkerNumber>`, with the complete
@@ -603,21 +643,24 @@ database name is rejected rather than allowing generated job names to collide.
 Temporary jobs use delete-on-completion for either success or failure.
 Existing schedules are neither created nor deleted for these workers.
 
-After all jobs finish, ExecuteBatch finalizes a Running batch as Completed when
-every task's CompletionState is satisfied, or Stopped when unresolved conditions
-remain. It preserves an explicitly Stopped batch. It records the error from the
-highest TaskID with a Failed or NeedsReview outcome, or an explanation for an
-unresolved batch, and throws when an error remains. A Failed task accepted by
-Finished still produces an overall execution error. Completed batches receive
-FinishedAtUTC; stopped batches retain a NULL finish time.
+After all jobs finish, ExecuteBatch finalizes a Running batch as Completed and
+records FinishedAtUTC, including when unresolved completion conditions remain.
+It preserves an explicitly Stopped batch. The launcher does not read task outcomes,
+collect task errors or throw because tasks failed or remained Pending. Callers
+inspect task rows to decide their own result. Completed batches receive
+FinishedAtUTC; stopped batches retain a NULL finish time. Infrastructure errors
+still propagate to the caller.
+The launcher does not relaunch workers to wait out retry delays. If all workers
+return before delayed work becomes eligible, the execution is Completed and
+the unresolved conditions remain on the task rows. Resume applies only to explicitly
+Stopped batches; use Restart to reset a Completed batch for another execution.
 Each launch records a distinct StartedAtUTC under the batch gate and clears the
 previous launch's LastErrorMessage; the audit log preserves that earlier diagnostic.
 The stamp uses current UTC or advances the previous value by 100 nanoseconds when
 the clock has not advanced. Finalization checks both ExecutionID and that exact
-stamp. If Restart changed ExecutionID, or Stop/Resume was followed by a newer
-launch, the old launcher reports the change without updating the replacement.
-A batch resumed to Ready
-before finalization is also reported without changing its state.
+stamp in the completion UPDATE. If Restart changed ExecutionID, Stop/Resume was
+followed by a newer launch, or a manual action left the batch Stopped or Ready,
+the old launcher completes successfully without updating that batch state.
 The procedure returns no summary result set. Batch/task rows and audit history
 remain available. Empty batches use the same Agent-worker path.
 
@@ -632,19 +675,21 @@ those procedures. Definition changes during execution are unsupported.
 CompletionState is computed from Status, CompletionCondition, AttemptsStarted
 and MaxRetries. State 2 means the completion condition is satisfied; state 1
 means a terminal unmet condition; state 0 covers remaining unresolved work.
+Failed is also terminal at the int attempt-counter limit, even when the configured
+MaxRetries would otherwise allow another attempt. The retry configuration is not changed.
 The worker does not maintain a separate mutable counter or completion flag.
 
 IX_z_TaskQueueTasks_BatchID_CompletionState_SortOrder_TaskID uses (BatchID, CompletionState, SortOrder, TaskID)
 and includes scalar eligibility/retry fields. It seeks unresolved work in
 execution order, checks terminal blockers and verifies completion without
 walking finished siblings. ExecutorProcedure and Parameters remain in the
-clustered row; they are not copied into this index. The earlier-level checks use separate exact-state
-probes so SortOrder remains an index range.
+clustered row; they are not copied into this index. The worker's earlier-level
+check filters CompletionState in (0, 1) and earlier SortOrder values.
 
 IX_z_TaskQueueTasks_BatchID_TaskID filters Status = Running with (BatchID, TaskID).
 It supports running counts and recovery within Running batches. The existing
-Claim index is preserved. Global worker discovery selects Running batches by
-batch status; explicit batch workers also restrict discovery to their BatchID. The batch gate
+Claim index is preserved. The worker reads the resolved batch's Running status
+and current worker limit by BatchID under the batch gate before recovery or claiming. The gate
 still serializes eligibility checks with acquisition, including capacity and
 the earliest unresolved execution level.
 
@@ -654,6 +699,18 @@ The guarded 0.0.1 migration adds the execution schema to existing tables and
 leaves a fresh baseline installation unchanged. It recognizes equivalent renamed
 indexes without duplication; incompatible computed columns or canonical index
 names require review rather than replacement.
+
+The same guarded migration converts retired task statuses to the four-status
+contract. A row with no started attempt becomes Pending and retains its existing
+availability; a row with prior
+attempts becomes Failed with its next retry availability scheduled from the
+migration time. Attempt counts, retry configuration, payloads and prior errors
+are preserved, and obsolete claim/session identity is cleared. Known previous
+CompletionState definitions are upgraded with equivalent completion indexes on
+ordinary filegroups with one partition, preserving their names, included-column
+order, compression and supported options. Unsupported dependencies or metadata
+require review before migration. Drain workers before applying this
+schema/module change so older code cannot write retired status values.
 
 Task writes and indexed reads require SQL Server's indexed-computed-column SET
 options: ANSI_NULLS, ANSI_PADDING, ANSI_WARNINGS, ARITHABORT,

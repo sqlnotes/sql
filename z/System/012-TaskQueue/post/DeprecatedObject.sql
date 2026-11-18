@@ -8,6 +8,7 @@ exec z.usp_DropObject @ObjectName = N'z.usp_ResolveTaskQueueBatch';
 exec z.usp_DropObject @ObjectName = N'z.usp_RestartTaskQueueBatch';
 exec z.usp_DropObject @ObjectName = N'z.usp_ResumeTaskQueueBatch';
 exec z.usp_DropObject @ObjectName = N'z.usp_RunTaskQueueWorker';
+exec z.usp_DropObject @ObjectName = N'z.usp_TaskQueueRunWorker';
 exec z.usp_DropObject @ObjectName = N'z.usp_SetTaskQueueAction';
 exec z.usp_DropObject @ObjectName = N'z.usp_StartTaskQueueBatch';
 exec z.usp_DropObject @ObjectName = N'z.usp_StopTaskQueueBatch';

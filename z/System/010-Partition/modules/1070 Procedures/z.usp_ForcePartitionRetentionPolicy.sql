@@ -90,7 +90,7 @@ begin
 						break;
 					end
 					select	top (1) @SQL = SQL from #PartitionPlan where Action = 'Error' order by Ordinal;
-					exec sys.sp_executesql @SQL;
+					exec(@SQL);
 				end
 				-- Execute-only preflight avoids nested INSERT EXEC for callers capturing preview.
 				if @ShowPlan = 0
@@ -124,7 +124,7 @@ begin
 				select	top (1) @SQL = SQL, @Action = Action from #PartitionPlan order by Ordinal;
 				if @SQL is null break;
 				select	@PreviousFanout = fanout from sys.partition_functions where name = @FunctionName;
-				exec sys.sp_executesql @SQL;
+				exec(@SQL);
 				select	@CurrentFanout = fanout from sys.partition_functions where name = @FunctionName;
 				if @CurrentFanout = @PreviousFanout
 					throw 50001, N'Partition maintenance made no boundary progress; refusing to repeat the action.', 1;

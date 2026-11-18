@@ -159,7 +159,7 @@ drop table ' + @Target + N';
 		close cSplitTables;
 		deallocate cSplitTables;
 		-- Each boundary script declares @ID; execute in separate scopes inside the same transaction.
-		select	@SQL = string_agg(convert(nvarchar(max), N'exec sys.sp_executesql N''' + replace(SQL, N'''', N'''''') + N''';'), nchar(13) + nchar(10)) within group(order by Ordinal) from @Splits;
+		select	@SQL = string_agg(convert(nvarchar(max), N'exec(N''' + replace(SQL, N'''', N'''''') + N''');'), nchar(13) + nchar(10)) within group(order by Ordinal) from @Splits;
 		insert into @Ret(Name, SQL, Action, PartitionNumber) values('Extend future boundaries', N'if @@trancount > 0 or @@options & 2 = 2
 begin
 	set xact_abort off;

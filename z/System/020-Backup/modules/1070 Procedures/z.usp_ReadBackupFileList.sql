@@ -63,7 +63,7 @@ begin
 	select	@RestoreSql = N'restore filelistonly from ' + iif(@IsUrl = 1, N'url', N'disk')
 			+ N' = N''' + replace(@BackupFile, N'''', N'''''') + N''' with file = '
 			+ convert(nvarchar(11), @Position) + N';';
-	insert #FileList exec sys.sp_executesql @RestoreSql;
+	insert #FileList exec(@RestoreSql);
 	select	@FileListJson = (select LogicalName, PhysicalName, Type, FileGroupName, Size, MaxSize, FileID, CreateLSN, DropLSN, UniqueID, ReadOnlyLSN, ReadWriteLSN, BackupSizeInBytes, SourceBlockSize, FileGroupID, LogGroupGUID, DifferentialBaseLSN, DifferentialBaseGUID, IsReadOnly, IsPresent, TDEThumbprint, SnapshotURL from #FileList order by FileID for json path, include_null_values);
 	if @ReturnResult = 1
 		select	LogicalName, PhysicalName, Type, FileGroupName, Size, MaxSize, FileID, CreateLSN, DropLSN, UniqueID, ReadOnlyLSN, ReadWriteLSN, BackupSizeInBytes, SourceBlockSize, FileGroupID, LogGroupGUID, DifferentialBaseLSN, DifferentialBaseGUID, IsReadOnly, IsPresent, TDEThumbprint, SnapshotURL from #FileList order by FileID;

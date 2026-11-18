@@ -37,16 +37,19 @@ begin
 		LastErrorNumber int,
 		LastErrorMessage nvarchar(4000),
 		CompletionState as convert(tinyint, case
-			when Status = 'Blocked' or Status = 'NeedsReview' then 1
-			when Status = 'Succeeded' then case when CompletionCondition = 'Failed' then 1 else 2 end
-			when Status = 'Failed' and convert(bigint, AttemptsStarted) >= convert(bigint, MaxRetries) + 1 then case when CompletionCondition = 'Succeeded' then 1 else 2 end
-			else 0 end),
+												when Status = 'Succeeded' then case when CompletionCondition = 'Failed' then 1 else 2 end
+												when Status = 'Failed' and AttemptsStarted = 2147483647 then case when CompletionCondition = 'Succeeded' then 1 else 2 end
+												when Status = 'Failed' and convert(bigint, AttemptsStarted) >= convert(bigint, MaxRetries) + 1 then 
+													case when CompletionCondition = 'Succeeded' then 1 else 2 end
+												else 0 
+											end
+								),
 		constraint PK_z_TaskQueueTasks primary key clustered (BatchID, TaskID) with (data_compression = row),
 		constraint FK_z_TaskQueueTasks_Batch foreign key (BatchID) references z.TaskQueueBatch (BatchID),
 		constraint CK_z_TaskQueueTasks_TaskName check (len(trim(TaskName)) > 0),
 		constraint CK_z_TaskQueueTasks_ExecutorProcedure check (len(trim(ExecutorProcedure)) > 0),
 		constraint CK_z_TaskQueueTasks_CompletionCondition check (CompletionCondition in ('Succeeded', 'Failed', 'Finished')),
-		constraint CK_z_TaskQueueTasks_Status check (Status in ('Pending', 'Running', 'Succeeded', 'Failed', 'Blocked', 'NeedsReview')),
+		constraint CK_z_TaskQueueTasks_Status check (Status in ('Pending', 'Running', 'Succeeded', 'Failed')),
 		constraint CK_z_TaskQueueTasks_MaxRetries check (MaxRetries >= 0),
 		constraint CK_z_TaskQueueTasks_RetryIntervalSecond check (RetryIntervalSecond >= 0),
 		constraint CK_z_TaskQueueTasks_AttemptsStarted check (AttemptsStarted >= 0),

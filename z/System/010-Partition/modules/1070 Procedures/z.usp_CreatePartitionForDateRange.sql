@@ -80,7 +80,7 @@ begin
 		fetch next from cQueries into @SQL;
 		while @@fetch_status = 0
 		begin
-			exec sys.sp_executesql @SQL;
+			exec(@SQL);
 			fetch next from cQueries into @SQL;
 		end
 		close cQueries;

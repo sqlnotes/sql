@@ -20,7 +20,7 @@ create or alter function z.fn_BuildQueryForcePartitionRetentionPolicy
 )
 ```
 
-Returns the retained `Ordinal`, `Name`, `SQL` columns plus `Action`, `TableName` and `PartitionNumber`. A row represents an atomic action affecting all tables sharing the function; TableName can be null for a grouped action. Error rows contain executable error text. Selecting the function does not execute copies or DDL. Today defaults to UTC. Review error rows first; execute action rows in Ordinal order through EXEC sys.sp_executesql with no caller transaction.
+Returns the retained `Ordinal`, `Name`, `SQL` columns plus `Action`, `TableName` and `PartitionNumber`. A row represents an atomic action affecting all tables sharing the function; TableName can be null for a grouped action. Error rows contain executable error text. Selecting the function does not execute copies or DDL. Today defaults to UTC. Review error rows first; execute action rows in Ordinal order through `exec(@SQL)` with no caller transaction.
 
 A positive interval and nonnegative forward count are required. Forward count means future boundaries: October with count 3 adds November, December, January, skipping existing values and anything at/below the maximum existing boundary. Missing historical periods remain combined. Date keys require Daily or coarser periods; Hourly/Minute policies are rejected.
 

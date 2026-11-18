@@ -13,9 +13,10 @@ select	t.BatchID, b.ExecutionID, b.BatchName, b.BatchType, b.Status BatchStatus,
 		t.TaskID, t.TaskName, t.Description, t.ExecutorProcedure, t.Parameters, t.SortOrder,
 		t.CompletionCondition, t.Status, t.MaxRetries, t.RetryIntervalSecond,
 		t.AttemptsStarted, t.ClaimToken, t.WorkerSessionID, t.WorkerLoginTime, t.CreatedAtUTC, t.StartedAtUTC,
-		cast(case when applock_mode('public', concat(N'1-z.TaskQueue.Task:', cast(t.BatchID as nvarchar(20)), N':', cast(t.TaskID as nvarchar(11))), 'Session') <> 'NoLock'
-			or applock_test('public', concat(N'1-z.TaskQueue.Task:', cast(t.BatchID as nvarchar(20)), N':', cast(t.TaskID as nvarchar(11))), 'Exclusive', 'Session') <> 1
+		cast(case when applock_mode('public', s.TaskSemaphoreSlot, 'Session') <> 'NoLock'
+			or applock_test('public', s.TaskSemaphoreSlot, 'Exclusive', 'Session') <> 1
 			then 1 else 0 end as bit) IsTaskLockHeld
 from z.TaskQueueTasks t
 	inner join z.TaskQueueBatch b on b.BatchID = t.BatchID
+	cross apply (select z.fn_TaskQueueGetTaskSemaphoreSlot(t.BatchID, t.TaskID) TaskSemaphoreSlot) s
 where t.Status = 'Running';

@@ -4,7 +4,7 @@
 
 ## Purpose and behavior
 
-Resolve null source to the current database; default snapshot name is <source>_Snapshot. Reject an unknown source or existing target. Read data-file logical names/paths through source-database sp_executesql and issue CREATE DATABASE AS SNAPSHOT OF. Sparse filenames append a dot and the snapshot name with spaces removed to each source path. Uses xact_abort; no explicit transaction or catch.
+Resolve null source to the current database; default snapshot name is <source>_Snapshot. Reject an unknown source or existing target. Read data-file logical names/paths through `exec(@SQL)` with a quoted source-database `use` statement and issue CREATE DATABASE AS SNAPSHOT OF. Sparse filenames append a dot and the snapshot name with spaces removed to each source path. Uses xact_abort; no explicit transaction or catch.
 
 ## Parameters and defaults
 

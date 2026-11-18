@@ -27,10 +27,11 @@ begin
 		throw 50000, @Error, 1;
 	end
 
-	declare @SQL nvarchar(max), @Proc sysname = quotename(@SourceDatabaseName)+'..sp_executesql'
+	declare @SQL nvarchar(max)
 	declare @t table(name sysname, physical_name nvarchar(260), i int identity(1,1))
+	select	@SQL = N'use ' + quotename(@SourceDatabaseName) + N'; select name, physical_name from sys.database_files where type = 0;';
 	insert into @t
-		exec @Proc N'select name, physical_name from sys.database_files where type = 0'
+		exec(@SQL);
 	if @@rowcount = 0
 	begin
 		throw 50000, 'Unknown error.', 1;

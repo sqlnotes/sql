@@ -37,7 +37,7 @@ begin
 			@Wrapper sysname,
 			@BatchName nvarchar(128) = @@servername + N' - ' + @BackupType + N' - ' + convert(nvarchar(27), sysdatetime(), 121),
 			@BackupArguments nvarchar(max), @DatabaseLiteral nvarchar(max), @IdentityPredicate nvarchar(max),
-			@SQL nvarchar(max), @ExecutorProcedure nvarchar(1035), @CleanupSQL nvarchar(max);
+			@SQL nvarchar(max), @ExecutorProcedure nvarchar(1035), @CleanupSQL nvarchar(max), @Error nvarchar(4000);
 
 	declare @Targets table (TaskID int primary key, DatabaseID int, DatabaseName sysname, CreateDate datetime, Wrapper nvarchar(128));
 	select	@BatchID = null;
@@ -100,7 +100,7 @@ begin
 	exec ' + quotename(db_name()) + N'.z.usp_BackupDatabase @Databases = ' + @DatabaseLiteral + @BackupArguments + N'
 end;';
 			if object_id(N'tempdb..' + quotename(@Wrapper), N'P') is null
-				exec sys.sp_executesql @SQL;
+				exec(@SQL);
 			update @Targets set Wrapper = @Wrapper where TaskID = @TaskID;
 
 			select	@ExecutorProcedure = quotename(@Wrapper);
@@ -115,13 +115,17 @@ end;';
 		exec z.usp_TaskQueueExecuteBatch @BatchID = @BatchID;
 		begin tran;
 		exec z.usp_TaskQueueLockBatchForChange @BatchID = @BatchID;
-		if exists (select 1 from z.TaskQueueBatch where BatchID = @BatchID and Status in ('Ready', 'Running'))
-			throw 50000, 'The batch was restarted before temporary command cleanup.', 1;
+		if not exists (select 1 from z.TaskQueueBatch where BatchID = @BatchID and Status = 'Completed')
+			throw 50000, 'The backup batch did not complete or was restarted before temporary command cleanup.', 1;
 		if exists (select 1 from z.v_TaskQueueRunningTasks where BatchID = @BatchID)
 			throw 50000, 'The batch has Running tasks; wait for completion or recover ownership before changing it.', 1;
+		select	top (1) @Error = isnull(LastErrorMessage, N'A parallel backup task did not succeed.')
+		from z.TaskQueueTasks where BatchID = @BatchID and Status <> 'Succeeded'
+		order by TaskID desc;
+		if @@rowcount > 0 throw 50000, @Error, 1;
 		select	@CleanupSQL = N'drop procedure if exists ' + string_agg(convert(nvarchar(max), quotename(Wrapper)), N', ') + N';'
 			from @Targets where Wrapper is not null;
-		exec tempdb.sys.sp_executesql @CleanupSQL;
+		exec(N'use tempdb; ' + @CleanupSQL);
 		commit;
 	end try
 	begin catch

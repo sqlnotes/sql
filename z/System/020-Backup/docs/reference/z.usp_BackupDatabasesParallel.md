@@ -44,10 +44,13 @@ before calling the backup procedure. Recovery-model eligibility is left to the
 backup procedure, which skips incompatible databases. Backup selection and execution follow
 the existing sequential procedure's behavior.
 
-The caller remains connected until the workers finish. The launcher returns
-BatchID, TotalTasks, SucceededTasks and FailedTasks, then throws if any task failed
-or the batch stopped. An empty selection returns without a result set, batch or
-jobs. SQL Server OUTPUT values are not reliable after THROW; use the summary's BatchID or retained TaskQueue rows to investigate failures.
+The caller remains connected until the workers finish. ExecuteBatch manages only
+the batch execution lifecycle. The backup procedure then requires a Completed
+batch and successful tasks before removing its wrappers; it throws a retained
+task error or a backup-specific explanation otherwise. An empty selection returns
+without a result set, batch or jobs. No summary result set is returned; BatchID is
+an OUTPUT parameter. SQL Server OUTPUT values are not reliable after THROW; use
+the retained TaskQueue rows to investigate failures.
 
 On success, jobs and run-specific procedures are removed; batch/task rows and
 audit history remain. No retention cleanup is performed. On error, the backup

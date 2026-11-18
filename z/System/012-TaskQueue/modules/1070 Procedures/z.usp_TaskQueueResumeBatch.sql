@@ -30,9 +30,7 @@ begin
 		if exists
 		(
 			select	1 from z.TaskQueueTasks where BatchID = @BatchID
-				and (Status in ('NeedsReview', 'Blocked')
-					or (Status = 'Succeeded' and CompletionCondition = 'Failed')
-					or (Status = 'Failed' and CompletionCondition = 'Succeeded' and cast(AttemptsStarted as bigint) >= cast(MaxRetries as bigint) + 1)
+				and (CompletionState = 1
 					or (Status = 'Pending' and cast(AttemptsStarted as bigint) >= cast(MaxRetries as bigint) + 1))
 		)
 			throw 50000, 'Unresolved task outcomes prevent resume; reconcile them or explicitly restart the batch.', 1;

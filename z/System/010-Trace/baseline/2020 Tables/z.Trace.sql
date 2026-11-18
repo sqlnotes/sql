@@ -13,9 +13,9 @@ begin
 	if exists(select 1 from z.Trace)
 		throw 50000, N'Close all existing traces with the previous installation before switching to native trace registration.', 1;
 	if object_id(N'z.TraceCollectorTrace', N'U') is not null
-		exec sys.sp_executesql N'if exists(select 1 from z.TraceCollectorTrace) throw 50000, N''Close existing native generations before switching trace registration.'', 1;';
+		exec(N'if exists(select 1 from z.TraceCollectorTrace) throw 50000, N''Close existing native generations before switching trace registration.'', 1;');
 	if object_id(N'z.TraceCollector', N'U') is not null
-		exec sys.sp_executesql N'if exists(select 1 from z.TraceCollector) throw 50000, N''Release existing collector sessions before switching trace registration.'', 1;';
+		exec(N'if exists(select 1 from z.TraceCollector) throw 50000, N''Release existing collector sessions before switching trace registration.'', 1;');
 	if exists(select 1 from z.TraceEvent) or exists(select 1 from z.TraceEventColumn)
 		or exists(select 1 from z.TraceFilter) or exists(select 1 from z.TraceTrigger)
 		throw 50000, N'Remove retained trace configuration with the previous installation before switching trace registration.', 1;

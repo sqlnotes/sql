@@ -87,7 +87,7 @@ begin
 				select	@SQL = N'create table ' + quotename(parsename(@ReceivingTable, 2)) + N'.' + quotename(parsename(@ReceivingTable, 1)) + N' (TraceSequence bigint not null constraint ' + quotename(left(N'DF_' + parsename(@ReceivingTable, 2) + N'_' + parsename(@ReceivingTable, 1) + N'_TraceSequence', 128))
 						+ N' default(datediff_big(second, ''1900-01-01'', getutcdate()) * 268435456 | next value for z.SeqGeneralID), EventID int not null, EventName nvarchar(128) not null, constraint '
 						+ quotename(left(N'PK_' + parsename(@ReceivingTable, 2) + N'_' + parsename(@ReceivingTable, 1), 128)) + N' primary key clustered(TraceSequence) with (data_compression = page) on PS_SchemaZPartitionGeneric(TraceSequence)) on PS_SchemaZPartitionGeneric(TraceSequence);';
-				exec sys.sp_executesql @SQL;
+				exec(@SQL);
 			end;
 			declare cColumns cursor local fast_forward for select c.ColumnName, c.Definition from #Columns c
 				where exists(select 1 from #SelectedColumns b inner join #Traces t on t.TraceID = b.TraceID
@@ -100,7 +100,7 @@ begin
 				if not exists(select 1 from sys.columns where object_id = object_id(@ReceivingTable) and name = @EventName)
 				begin
 					select	@SQL = N'alter table ' + quotename(parsename(@ReceivingTable, 2)) + N'.' + quotename(parsename(@ReceivingTable, 1)) + N' add ' + quotename(@EventName) + N' ' + @Definition + N' null;';
-					exec sys.sp_executesql @SQL;
+					exec(@SQL);
 				end;
 				fetch next from cColumns into @EventName, @Definition;
 			end;

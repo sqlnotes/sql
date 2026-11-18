@@ -15,5 +15,5 @@ end;
 if object_id(N'z.TaskQueueBatch', N'U') is not null
 	and not exists (select 1 from sys.indexes where object_id = object_id(N'z.TaskQueueBatch') and name = N'IX_z_TaskQueueBatch_BatchType')
 begin
-	exec sys.sp_executesql N'create index IX_z_TaskQueueBatch_BatchType on z.TaskQueueBatch (BatchType) with (data_compression = row);';
+	exec(N'create index IX_z_TaskQueueBatch_BatchType on z.TaskQueueBatch (BatchType) with (data_compression = row);');
 end;

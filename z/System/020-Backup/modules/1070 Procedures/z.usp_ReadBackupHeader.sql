@@ -100,7 +100,7 @@ begin
 	select	@RestoreSql = N'restore headeronly from ' + iif(@IsUrl = 1, N'url', N'disk')
 			+ N' = N''' + replace(@BackupFile, N'''', N'''''') + N''''
 			+ iif(@Position is null, N'', N' with file = ' + convert(nvarchar(11), @Position)) + N';';
-	insert #Header exec sys.sp_executesql @RestoreSql;
+	insert #Header exec(@RestoreSql);
 	-- Complete the stable output schema after capturing the SQL Server 2019 layout.
 	if @Major = 15
 		exec(N'alter table #Header add LastValidRestoreTime datetime, TimeZone nvarchar(32), CompressionAlgorithm nvarchar(32);');

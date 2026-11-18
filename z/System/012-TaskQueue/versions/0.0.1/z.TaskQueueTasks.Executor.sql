@@ -24,14 +24,14 @@ begin
 			if exists (select 1 from z.TaskQueueTasks with (tablockx, holdlock))
 				throw 50000, 'Migrate existing tasks to ExecutorProcedure and Parameters and remove TaskBody before deploying the executor contract; no executor mapping can be inferred from legacy task bodies.', 1;
 			if col_length(N'z.TaskQueueTasks', N'ExecutorProcedure') is null
-				exec sys.sp_executesql N'alter table z.TaskQueueTasks add ExecutorProcedure nvarchar(300) not null;';
+				exec(N'alter table z.TaskQueueTasks add ExecutorProcedure nvarchar(300) not null;');
 			if col_length(N'z.TaskQueueTasks', N'Parameters') is null
-				exec sys.sp_executesql N'alter table z.TaskQueueTasks add Parameters nvarchar(max);';
+				exec(N'alter table z.TaskQueueTasks add Parameters nvarchar(max);');
 			if col_length(N'z.TaskQueueTasks', N'TaskBody') is not null
 			begin
 				if object_id(N'z.CK_z_TaskQueueTasks_TaskBody', N'C') is not null
-					exec sys.sp_executesql N'alter table z.TaskQueueTasks drop constraint CK_z_TaskQueueTasks_TaskBody;';
-				exec sys.sp_executesql N'alter table z.TaskQueueTasks drop column TaskBody;';
+					exec(N'alter table z.TaskQueueTasks drop constraint CK_z_TaskQueueTasks_TaskBody;');
+				exec(N'alter table z.TaskQueueTasks drop column TaskBody;');
 			end;
 		end;
 		if not exists (select 1 from sys.columns where object_id = object_id(N'z.TaskQueueTasks', N'U') and name = N'ExecutorProcedure'
@@ -42,18 +42,18 @@ begin
 		if col_length(N'z.TaskQueueTasks', N'ExecutorProcedure') = 2070
 		begin
 			if exists (select 1 from sys.check_constraints where parent_object_id = object_id(N'z.TaskQueueTasks', N'U') and name = N'CK_z_TaskQueueTasks_ExecutorProcedure')
-				exec sys.sp_executesql N'alter table z.TaskQueueTasks drop constraint CK_z_TaskQueueTasks_ExecutorProcedure;';
-			exec sys.sp_executesql N'alter table z.TaskQueueTasks alter column ExecutorProcedure nvarchar(300) not null;';
+				exec(N'alter table z.TaskQueueTasks drop constraint CK_z_TaskQueueTasks_ExecutorProcedure;');
+			exec(N'alter table z.TaskQueueTasks alter column ExecutorProcedure nvarchar(300) not null;');
 		end;
 		if not exists (select 1 from sys.check_constraints where parent_object_id = object_id(N'z.TaskQueueTasks', N'U') and name = N'CK_z_TaskQueueTasks_ExecutorProcedure')
-			exec sys.sp_executesql N'alter table z.TaskQueueTasks with check add constraint CK_z_TaskQueueTasks_ExecutorProcedure check (len(trim(ExecutorProcedure)) > 0);';
+			exec(N'alter table z.TaskQueueTasks with check add constraint CK_z_TaskQueueTasks_ExecutorProcedure check (len(trim(ExecutorProcedure)) > 0);');
 		if exists (select 1 from sys.check_constraints where parent_object_id = object_id(N'z.TaskQueueTasks', N'U') and name = N'CK_z_TaskQueueTasks_Parameters')
-			exec sys.sp_executesql N'alter table z.TaskQueueTasks drop constraint CK_z_TaskQueueTasks_Parameters;';
+			exec(N'alter table z.TaskQueueTasks drop constraint CK_z_TaskQueueTasks_Parameters;');
 		if exists (select 1 from sys.columns where object_id = object_id(N'z.TaskQueueTasks', N'U') and name = N'Parameters' and is_nullable = 0)
-			exec sys.sp_executesql N'alter table z.TaskQueueTasks alter column Parameters nvarchar(max) null;';
+			exec(N'alter table z.TaskQueueTasks alter column Parameters nvarchar(max) null;');
 		if exists (select 1 from sys.check_constraints where parent_object_id = object_id(N'z.TaskQueueTasks', N'U')
 			and name = N'CK_z_TaskQueueTasks_ExecutorProcedure' and (is_disabled = 1 or is_not_trusted = 1))
-			exec sys.sp_executesql N'alter table z.TaskQueueTasks with check check constraint CK_z_TaskQueueTasks_ExecutorProcedure;';
+			exec(N'alter table z.TaskQueueTasks with check check constraint CK_z_TaskQueueTasks_ExecutorProcedure;');
 		commit;
 	end try
 	begin catch

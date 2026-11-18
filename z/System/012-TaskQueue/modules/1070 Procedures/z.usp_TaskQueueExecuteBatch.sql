@@ -21,14 +21,19 @@ begin
 		throw 50000, 'Batch execution requires no transaction and implicit transactions off.', 1;
 	declare	@MaxConcurrentWorkers int, @WorkerNumber int = 1, @ExecutionID uniqueidentifier,
 			@Name nvarchar(255), @Command nvarchar(max), @JobID uniqueidentifier,
-			@Now datetime2(7), @LaunchStartedAtUTC datetime2(7),
-			@Status varchar(16), @Error nvarchar(4000);
+			@Now datetime2(7), @LaunchStartedAtUTC datetime2(7);
 	declare @Jobs table (WorkerNumber int primary key, Name nvarchar(255), JobID uniqueidentifier not null);
 	exec z.usp_TaskQueueResolveBatch @BatchID = @BatchID output, @BatchName = @BatchName output;
 	begin try
 		begin tran;
-		exec z.usp_TaskQueueStartBatch @BatchID = @BatchID, @MaxConcurrentWorkers = @MaxConcurrentWorkers output, @RequireWorkerLimit = 1, @ExecutionID = @ExecutionID output;
-		select	@Command = N'exec z.usp_TaskQueueRunWorker @BatchID = ' + convert(nvarchar(20), @BatchID) + N';';
+		exec z.usp_TaskQueueLockBatchForChange @BatchID = @BatchID;
+		select	@MaxConcurrentWorkers = MaxConcurrentWorkers, @ExecutionID = ExecutionID,
+				@LaunchStartedAtUTC = StartedAtUTC
+		from z.TaskQueueBatch
+		where BatchID = @BatchID and Status in ('Draft', 'Ready') and MaxConcurrentWorkers > 0;
+		if @@rowcount = 0
+			throw 50000, 'Only a Draft or Ready batch with a positive worker limit can be executed.', 1;
+		select	@Command = N'exec z.usp_TaskQueueExecuteBatchWorker @BatchID = ' + convert(nvarchar(20), @BatchID) + N';';
 		while @WorkerNumber <= @MaxConcurrentWorkers
 		begin
 			select	@Name = N'TaskQueue-' + convert(nvarchar(20), @BatchID) + N'-' + convert(nvarchar(36), @ExecutionID) + N'-' + convert(nvarchar(11), @WorkerNumber);
@@ -44,12 +49,13 @@ begin
 		end;
 		select	@Now = sysutcdatetime();
 		-- The gate makes this stamp distinct even when Resume retains the execution ID.
-		select	@LaunchStartedAtUTC = case when StartedAtUTC is null or StartedAtUTC < @Now then @Now
-				else dateadd(nanosecond, 100, StartedAtUTC) end
-		from z.TaskQueueBatch where BatchID = @BatchID;
+		select	@LaunchStartedAtUTC = case when @LaunchStartedAtUTC is null or @LaunchStartedAtUTC < @Now then @Now
+				else dateadd(nanosecond, 100, @LaunchStartedAtUTC) end;
+		exec z.usp_TaskQueueSetAction @Action = N'Start';
 		update z.TaskQueueBatch
-			set Status = 'Running', StartedAtUTC = @LaunchStartedAtUTC, LastErrorMessage = null
+			set Status = 'Running', StartedAtUTC = @LaunchStartedAtUTC, FinishedAtUTC = null, LastErrorMessage = null
 		where BatchID = @BatchID;
+		exec z.usp_TaskQueueSetAction;
 		commit;
 		select	@WorkerNumber = 1;
 		while @WorkerNumber <= @MaxConcurrentWorkers
@@ -75,32 +81,12 @@ begin
 		end;
 		begin tran;
 		exec z.usp_TaskQueueLockBatchForChange @BatchID = @BatchID;
-		if not exists (select 1 from z.TaskQueueBatch where BatchID = @BatchID and ExecutionID = @ExecutionID and StartedAtUTC = @LaunchStartedAtUTC)
-			throw 50000, 'The batch execution changed before finalization.', 1;
-		select	@Status = Status, @Error = LastErrorMessage from z.TaskQueueBatch where BatchID = @BatchID;
-		if @Status = 'Ready'
-			throw 50000, 'The batch was resumed before finalization.', 1;
-		select	top (1) @Error = LastErrorMessage from z.TaskQueueTasks
-		where BatchID = @BatchID and Status in ('Failed', 'NeedsReview') and LastErrorMessage is not null
-		order by TaskID desc;
-		if @Status = 'Running'
-		begin
-			select	@Status = case when exists (select 1 from z.TaskQueueTasks where BatchID = @BatchID and CompletionState < 2)
-					then 'Stopped' else 'Completed' end;
-			if @Status = 'Stopped'
-				select	@Error = isnull(@Error, N'The batch has unresolved task completion conditions; inspect its retained task results.');
-			exec z.usp_TaskQueueSetAction @Action = N'Reconcile';
-			update z.TaskQueueBatch
-				set Status = @Status, LastErrorMessage = @Error,
-					FinishedAtUTC = case when @Status = 'Completed' then sysutcdatetime() end
-			where BatchID = @BatchID and Status = 'Running';
-			exec z.usp_TaskQueueSetAction;
-		end;
-		if @Status = 'Stopped'
-			select	@Error = isnull(@Error, N'The batch was stopped before execution completed.');
+		exec z.usp_TaskQueueSetAction @Action = N'Reconcile';
+		update z.TaskQueueBatch set Status = 'Completed', FinishedAtUTC = sysutcdatetime()
+		where BatchID = @BatchID and Status = 'Running'
+			and ExecutionID = @ExecutionID and StartedAtUTC = @LaunchStartedAtUTC;
+		exec z.usp_TaskQueueSetAction;
 		commit;
-		if @Error is not null
-			throw 50000, @Error, 1;
 	end try
 	begin catch
 		if @@trancount > 0 rollback;

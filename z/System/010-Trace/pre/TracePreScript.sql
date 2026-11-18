@@ -65,7 +65,7 @@ end;
 close cTraces;
 deallocate cTraces;
 delete z.TraceCollectorTrace;';
-			exec sys.sp_executesql @SQL;
+			exec(@SQL);
 		end;
 		if @LegacyTrace = 1
 		begin
@@ -76,7 +76,7 @@ delete z.TraceCollectorTrace;';
 			delete z.Trace;
 		end;
 		if object_id(N'z.TraceCollector', N'U') is not null
-			exec sys.sp_executesql N'delete z.TraceCollector;';
+			exec(N'delete z.TraceCollector;');
 		commit;
 	end try
 	begin catch

@@ -47,6 +47,6 @@ begin
 	select	@Sql = iif(@CredentialExists = 1, N'alter credential ', N'create credential ')
 			+ quotename(@CredentialUrl) + N' with identity = ''S3 Access Key'', secret = N'''
 			+ replace(@Secret, N'''', N'''''') + N''';';
-	exec sys.sp_executesql @Sql;
+	exec(@Sql);
 end
 GO

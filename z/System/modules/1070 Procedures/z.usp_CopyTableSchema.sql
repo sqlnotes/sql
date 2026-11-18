@@ -353,7 +353,7 @@ begin
 		while @@fetch_status = 0
 		begin
 			if @PrintCode = 1 exec z.usp_PrintString @SQL;
-			exec sys.sp_executesql @SQL;
+			exec(@SQL);
 			fetch next from cCopyParts into @SQL;
 		end
 		close cCopyParts;
