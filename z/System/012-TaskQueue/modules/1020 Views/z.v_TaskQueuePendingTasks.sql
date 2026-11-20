@@ -17,5 +17,4 @@ from z.TaskQueueTasks t
 	inner join z.TaskQueueBatch b on b.BatchID = t.BatchID
 where b.Status = 'Running' and t.CompletionState = 0
 	and t.Status in ('Pending', 'Failed')
-	and cast(t.AttemptsStarted as bigint) < cast(t.MaxRetries as bigint) + 1
-	and (t.Status = 'Pending' or t.AttemptsStarted > 0);
+	and t.AttemptsStarted <= t.MaxRetries;

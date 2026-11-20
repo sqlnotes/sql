@@ -20,8 +20,8 @@ begin
 	if @@trancount <> 0 or @@options & 2 = 2
 		throw 50000, 'Batch execution requires no transaction and implicit transactions off.', 1;
 	declare	@MaxConcurrentWorkers int, @WorkerNumber int = 1, @ExecutionID uniqueidentifier,
-			@Name nvarchar(255), @Command nvarchar(max), @JobID uniqueidentifier,
-			@Now datetime2(7), @LaunchStartedAtUTC datetime2(7);
+			@WorkerNamePrefix nvarchar(255), @Name nvarchar(255), @Command nvarchar(max), @JobID uniqueidentifier,
+			@Now datetime2(7), @LaunchStartedAtUTC datetime2(7), @StartErrorDetails nvarchar(max);
 	declare @Jobs table (WorkerNumber int primary key, Name nvarchar(255), JobID uniqueidentifier not null);
 	exec z.usp_TaskQueueResolveBatch @BatchID = @BatchID output, @BatchName = @BatchName output;
 	begin try
@@ -33,12 +33,13 @@ begin
 		where BatchID = @BatchID and Status in ('Draft', 'Ready') and MaxConcurrentWorkers > 0;
 		if @@rowcount = 0
 			throw 50000, 'Only a Draft or Ready batch with a positive worker limit can be executed.', 1;
-		select	@Command = N'exec z.usp_TaskQueueExecuteBatchWorker @BatchID = ' + convert(nvarchar(20), @BatchID) + N';';
+		select	@Command = N'exec z.usp_TaskQueueExecuteBatchWorker @BatchID = ' + convert(nvarchar(20), @BatchID) + N';',
+				@WorkerNamePrefix = N'TaskQueue-' + convert(nvarchar(20), @BatchID) + N'-' + convert(nvarchar(36), @ExecutionID) + N'-';
+		if len(N'z_' + quotename(db_name(), '(') + N'_' + @WorkerNamePrefix + convert(nvarchar(11), @MaxConcurrentWorkers)) > 128
+			throw 50000, 'The coordination database name is too long for unique worker job names.', 1;
 		while @WorkerNumber <= @MaxConcurrentWorkers
 		begin
-			select	@Name = N'TaskQueue-' + convert(nvarchar(20), @BatchID) + N'-' + convert(nvarchar(36), @ExecutionID) + N'-' + convert(nvarchar(11), @WorkerNumber);
-			if len(N'z_' + quotename(db_name(), '(') + N'_' + @Name) > 128
-				throw 50000, 'The coordination database name is too long for unique worker job names.', 1;
+			select	@Name = @WorkerNamePrefix + convert(nvarchar(11), @WorkerNumber);
 			select	@JobID = z.fn_GetServiceJobID(@Name);
 			if @JobID is null
 			begin
@@ -67,7 +68,24 @@ begin
 					exec z.usp_StartServiceJob @Name = @Name;
 				end try
 				begin catch
-					-- Another caller may have started the job after the session check.
+					select	@StartErrorDetails = (
+								select	@BatchName BatchName, @LaunchStartedAtUTC StartedAtUTC, @WorkerNumber WorkerNumber,
+										z.fn_GetServiceJobName(@Name) JobName, @JobID JobID,
+										error_number() ErrorNumber, error_severity() ErrorSeverity, error_state() ErrorState,
+										error_procedure() ErrorProcedure, error_line() ErrorLine, error_message() ErrorMessage
+								for json path, include_null_values, without_array_wrapper
+							);
+					begin try
+						insert z.TaskQueueLog (BatchID, ExecutionID, ActionID, Action, ChangeType,
+							LoginName, ApplicationName, HostName, SessionID, AfterJson)
+						values (@BatchID, @ExecutionID, newid(), N'WorkerJobStartError', 'Insert',
+							original_login(), app_name(), host_name(), @@spid, @StartErrorDetails);
+					end try
+					begin catch
+						print concat(N'Could not log worker job start error for TaskQueue batch ', @BatchID,
+							N', execution ', @ExecutionID, N'. ', error_message());
+						print @StartErrorDetails;
+					end catch;
 				end catch;
 			end;
 			select	@WorkerNumber += 1;

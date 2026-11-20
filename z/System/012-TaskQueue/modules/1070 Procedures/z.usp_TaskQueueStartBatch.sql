@@ -33,7 +33,7 @@ begin
 		update z.TaskQueueBatch set Status = 'Ready', @MaxConcurrentWorkers = MaxConcurrentWorkers, @ExecutionID = ExecutionID
 		where BatchID = @BatchID
 			and Status in ('Draft', 'Ready')
-			and (@BatchName is null or BatchName = @BatchName)
+			and BatchName = @BatchName
 			and (isnull(@RequireWorkerLimit, 0) = 0 or MaxConcurrentWorkers > 0);
 		if @@rowcount = 0 throw 50000, 'Only a Draft or Ready batch satisfying the requested worker limit can be started.', 1;
 		exec z.usp_TaskQueueSetAction;

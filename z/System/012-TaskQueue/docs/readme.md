@@ -50,9 +50,9 @@ Create, Add and Start participate in the caller's transaction and leave its tran
 
 ## Executor contract
 
-Each executor receives a single named `@Parameters nvarchar(max)` argument. The worker passes the stored value unchanged, including NULL and whitespace. The executor owns interpretation and validation. Supply a schema-qualified procedure name, optionally qualified by database and server, or a one-part global temporary procedure name (`##...`). The worker resolves the name at execution time. Remote calls need linked-server RPC and permissions. For a global temporary executor, keep its creating connection open and database-qualify references inside it.
+Each executor receives a single named `@Parameters nvarchar(max)` argument. The worker passes the stored value unchanged, including NULL and whitespace. The executor owns interpretation and validation. SQL Server resolves the stored procedure name at execution time. Use a schema-qualified name to select a specific procedure, with database or server qualifiers as needed. Remote calls need linked-server RPC and permissions. For a global temporary executor (`##...`), keep its creating connection open and database-qualify references inside it.
 
-An exception, nonzero return code or a transaction left open marks the attempt Failed. The worker rolls back any open executor transaction. It records error details and the next retry time. A successful attempt clears the prior error. Executors run with worker privileges. Limit who can write tasks accordingly. Executor result sets can reach a direct worker caller. The queue stores only status and diagnostics.
+Raise a SQL error to fail an attempt. The worker catches the error, rolls back any open executor transaction, records the error and next retry time, and continues under the normal scheduling rules. A procedure return code is ignored. A successful attempt clears the prior error. Executors run with worker privileges. Limit who can write tasks accordingly. Executor result sets can reach a direct worker caller. The queue stores only status and diagnostics.
 
 ## Execute a batch with Agent workers
 
@@ -60,7 +60,7 @@ The launcher requires a running, visible local SQL Server Agent, a positive `Max
 
 Admission and unscheduled job definitions commit together before workers start. Job names include the coordination database, BatchID, ExecutionID and worker number. A concurrent launcher cannot admit the same Running batch. An existing matching **name** is reused as configured, so its command must run the correct worker and its deletion mode must be “on completion.”
 
-The launcher skips a start when a job's T-SQL step is already visible. It ignores start errors and waits until every tracked job disappears from Agent metadata. A job that never starts, or finishes without deleting itself, can leave the caller waiting indefinitely. Inspect the tracked jobs and Agent history if the call stalls.
+The launcher skips a start when a job's T-SQL step is already visible. It records each caught start error in `z.TaskQueueLog` with action `WorkerJobStartError` and continues starting the remaining workers. If the log write fails, the launcher prints the diagnostic to the caller. After the start attempts, it waits until every tracked job disappears from Agent metadata. A job that never starts, or finishes without deleting itself, can leave the caller waiting indefinitely. Inspect the log, tracked jobs and Agent history if the call stalls.
 
 After the jobs disappear, the launcher sets Completed and records `FinishedAtUTC` only if the batch is still Running with the original ExecutionID and launch timestamp. Stop, Resume or a newer execution can make that final update a successful no-op. Completed means the launch ended. Tasks may still be Failed, Pending or waiting for a retry. Task failures do not raise a launcher error. Read task rows before reporting application success. For example, [parallel backup](../../020-Backup/docs/reference/z.usp_BackupDatabasesParallel.md) requires every selected task to succeed.
 
@@ -68,7 +68,9 @@ After the jobs disappear, the launcher sets Completed and records `FinishedAtUTC
 
 `z.usp_TaskQueueExecuteBatchWorker` runs one task at a time in one selected Running batch. Use a dedicated connection outside a transaction, with implicit transactions off and no MARS or interleaved commands. A direct worker caller owns the Running transition and finalization. Calling a worker on a Ready batch returns without processing tasks.
 
-Each pass acquires the batch-change lock, recovers unowned Running rows and selects an available task whose earlier levels are satisfied. A claim records an attempt, session identity and new claim token. The worker commits the claim before invoking the executor. Session locks protect the attempt until its outcome commits, and the token prevents stale completion writes. When no task is immediately claimable the worker returns, including at capacity or when only delayed retries remain. The launcher starts no replacement workers to wait out a delay.
+Each pass acquires the batch-change lock, recovers unowned Running rows, finds the first unsatisfied sort level and selects a due task at that level. If no task is due and work at that level is running or scheduled for later, the worker commits, waits one second and checks again. When a task is due, the worker acquires batch capacity before taking the task semaphore. If all batch slots are occupied, it commits and waits one second before rereading the worker limit. It returns when the batch leaves Running, the levels are satisfied, or the first unsatisfied level has no work that can progress. A failed task semaphore acquisition releases any batch slot and ends the call. A capacity error other than a timeout also ends the call.
+
+A claim records an attempt, session identity and new claim token. The worker commits the claim before invoking the executor, and the token prevents stale completion writes. To finish, the worker locks the batch, records the outcome and releases its session semaphores before committing. If a release fails, it commits the outcome before reporting the cleanup error.
 
 Recovery marks unlocked Running attempts Failed, keeps the recorded attempt count, and applies the normal retry interval and limit. It uses the task lock rather than elapsed time or a missing DMV row. A disconnected executor may already have committed effects. Design retried tasks to tolerate repetition. An interrupted but still-connected session can retain locks. Disconnect it before recovery or reuse. A worker recovers only Running batches. An orphaned Running task in a Stopped batch requires reconciliation before Resume or Restart.
 
@@ -82,7 +84,7 @@ Recovery marks unlocked Running attempts Failed, keeps the recorded attempt coun
 
 ### Batch worker semaphore
 
-`z.fn_TaskQueueGetBatchSemaphore` builds `z.TaskQueue.Worker:<BatchID>`. Each worker takes one session-owned slot before marking a task Running when the current batch limit is positive. Zero skips the capacity semaphore for independently managed workers. Changes to the limit affect subsequent claims. Existing attempts finish under their original admission, and increasing the limit does not create more Agent jobs.
+`z.fn_TaskQueueGetBatchSemaphore` builds `z.TaskQueue.Worker:<BatchID>`. Each worker takes one session-owned slot when the current batch limit is positive. Zero skips the capacity semaphore for independently managed workers. Changes to the limit affect subsequent claims. An increased limit can admit workers already waiting for capacity. The number of Agent jobs is set when the batch launches.
 
 ## Batch table
 
@@ -98,7 +100,7 @@ Recovery marks unlocked Running attempts Failed, keeps the recorded attempt coun
 | Failed | The task failed and cannot retry. A successful task blocks later levels. |
 | Finished | The task succeeded or failed with no retries left. |
 
-An unmet condition blocks higher levels while other eligible tasks at the same level can still run. `MaxRetries` counts retries **after** the initial attempt and defaults to 0. `RetryIntervalSecond` defaults to 60. `AvailableAtUTC` defaults to the time of insertion. After failure it is the earliest retry time. A Failed row at the maximum int attempt count is terminal. WorkerSessionID, WorkerLoginTime and ClaimToken identify the current attempt. AttemptsStarted and the latest finish/error fields describe progress.
+An unmet condition blocks higher levels while other eligible tasks at the same level can still run. `MaxRetries` counts retries **after** the initial attempt and defaults to 0. `RetryIntervalSecond` defaults to 60. Retry scheduling uses a minimum of one second. AddTask stores a supplied zero as one, and the worker treats previously stored zeros as one. `AvailableAtUTC` defaults to the time of insertion. After failure it is the earliest retry time. A Failed row at the maximum int attempt count is terminal. WorkerSessionID, WorkerLoginTime and ClaimToken identify the current attempt. AttemptsStarted and the latest finish/error fields describe progress.
 
 ### Running task view
 
@@ -110,7 +112,13 @@ An unmet condition blocks higher levels while other eligible tasks at the same l
 
 ## Audit log
 
-`z.TRI_TaskQueueBatch` and `z.TRI_TaskQueueTasks` write each changed row to [`z.TaskQueueLog`](../baseline/2020%20Tables/z.TaskQueueLog.sql) in the same transaction. NULL TaskID denotes a batch row. BeforeJson and AfterJson contain operational values including the executor payload and nulls, excluding the derived CompletionState. A restart records the batch's previous execution and the reset tasks' new execution under the same ActionID.
+`z.TRI_TaskQueueBatch` and `z.TRI_TaskQueueTasks` write each changed row to [`z.TaskQueueLog`](../baseline/2020%20Tables/z.TaskQueueLog.sql) in the same transaction. NULL TaskID denotes a batch entry. For row changes, BeforeJson and AfterJson contain operational values including the executor payload and nulls, excluding the derived CompletionState. A restart records the batch's previous execution and the reset tasks' new execution under the same ActionID.
+
+The worker logs the task claim and executor outcome under `ExecuteTask` with one ActionID per attempt. On executor failure, the finish entry includes `LastErrorNumber` and `LastErrorMessage` in AfterJson. Each retry gets a new ActionID.
+
+`WorkerError` entries have ChangeType `Insert` and store SQL error details in AfterJson, with the task ID when one was selected. The worker writes the entry after rolling back any open transaction and rethrows the original error even if the log write fails.
+
+`WorkerJobStartError` entries have ChangeType `Insert` and store the batch name, launch timestamp, worker number, full Agent job name and ID, and SQL error details in AfterJson. BatchID and ExecutionID are log columns. Each entry is written independently of batch and task state changes.
 
 Action identifies the lifecycle or worker operation. `z.usp_TaskQueueSetAction` sets the optional Action and ActionID session-context keys. Calling it without arguments clears both. Direct writes with no action context are labeled DirectInsert, DirectUpdate or DirectDelete. Client-supplied host/application and action labels are diagnostic. Rolled-back changes leave no history.
 
@@ -118,7 +126,7 @@ Query by BatchID/ExecutionID for a batch run, or by ActionID for one operation. 
 
 ## Execution indexes and retained history
 
-The indexed computed CompletionState is 0 for unresolved, 1 for terminal unmet and 2 for satisfied. The worker uses it to check earlier levels, a status/order/availability index to find pending work, and a filtered Running index for recovery. Task writes require ANSI_NULLS, ANSI_PADDING, ANSI_WARNINGS, ARITHABORT, CONCAT_NULL_YIELDS_NULL and QUOTED_IDENTIFIER ON with NUMERIC_ROUNDABORT OFF.
+The indexed computed CompletionState is 0 for unresolved, 1 for terminal unmet and 2 for satisfied. The worker uses it to find the first unsatisfied level, then looks for due work at that level. A status/order/availability index supports the task lookup, and a filtered Running index supports recovery. Task writes require ANSI_NULLS, ANSI_PADDING, ANSI_WARNINGS, ARITHABORT, CONCAT_NULL_YIELDS_NULL and QUOTED_IDENTIFIER ON with NUMERIC_ROUNDABORT OFF.
 
 ## Procedure names
 

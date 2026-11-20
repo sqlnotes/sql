@@ -195,7 +195,8 @@ begin
 		declare @Now datetime2(7) = sysutcdatetime();
 		update z.TaskQueueTasks
 		set Status = case when AttemptsStarted = 0 then 'Pending' else 'Failed' end,
-			AvailableAtUTC = case when AttemptsStarted = 0 then AvailableAtUTC else dateadd(second, RetryIntervalSecond, @Now) end,
+			AvailableAtUTC = case when AttemptsStarted = 0 then AvailableAtUTC
+				else dateadd(second, iif(RetryIntervalSecond = 0, 1, RetryIntervalSecond), @Now) end,
 			ClaimToken = null, WorkerSessionID = null, WorkerLoginTime = null
 		where Status in ('Blocked', 'NeedsReview');
 		if @StatusKind = 'L'

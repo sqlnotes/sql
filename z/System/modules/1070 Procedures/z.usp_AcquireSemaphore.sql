@@ -24,6 +24,7 @@ begin
 			@Delay varchar(12), @SaveLegacy bit, @SaveGeneration binary(8), @SaveValue sql_variant,
 			@Hash binary(32), @Generation binary(8), @Entry varbinary(44), @LookupOwner varchar(32),
 			@Prefix nvarchar(64), @Key sysname, @FreeKey sysname, @Index int, @ResolvedSlot int, @Legacy bit;
+
 	if nullif(trim(@SemaphoreName), N'') is null or @TotalCount is null or @TotalCount < 1
 		throw 50000, 'A semaphore requires a nonempty name and positive capacity.', 1;
 	if @LockOwner is null or @LockOwner not in ('Transaction', 'Session')

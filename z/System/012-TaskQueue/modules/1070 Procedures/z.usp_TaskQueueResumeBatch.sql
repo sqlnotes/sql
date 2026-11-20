@@ -21,7 +21,7 @@ begin
 	declare @ActionID uniqueidentifier = newid();
 	begin try
 		begin tran;
-		exec z.usp_TaskQueueResolveBatch @BatchID = @BatchID output, @BatchName = @BatchName output;
+		exec z.usp_TaskQueueResolveBatch @BatchID = @BatchID output, @BatchName = @BatchName;
 		exec z.usp_TaskQueueLockBatchForChange @BatchID = @BatchID;
 		if not exists (select 1 from z.TaskQueueBatch where BatchID = @BatchID and Status = 'Stopped')
 			throw 50000, 'Only a Stopped batch can be resumed.', 1;
@@ -31,7 +31,7 @@ begin
 		(
 			select	1 from z.TaskQueueTasks where BatchID = @BatchID
 				and (CompletionState = 1
-					or (Status = 'Pending' and cast(AttemptsStarted as bigint) >= cast(MaxRetries as bigint) + 1))
+					or (Status = 'Pending' and AttemptsStarted > MaxRetries))
 		)
 			throw 50000, 'Unresolved task outcomes prevent resume; reconcile them or explicitly restart the batch.', 1;
 		exec z.usp_TaskQueueSetAction @Action = N'Resume', @ActionID = @ActionID;
