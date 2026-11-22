@@ -21,8 +21,15 @@ begin
 		throw 50000, 'Batch execution requires no transaction and implicit transactions off.', 1;
 	declare	@MaxConcurrentWorkers int, @WorkerNumber int = 1, @ExecutionID uniqueidentifier,
 			@WorkerNamePrefix nvarchar(255), @Name nvarchar(255), @Command nvarchar(max), @JobID uniqueidentifier,
-			@Now datetime2(7), @LaunchStartedAtUTC datetime2(7), @StartErrorDetails nvarchar(max);
-	declare @Jobs table (WorkerNumber int primary key, Name nvarchar(255), JobID uniqueidentifier not null);
+			@Now datetime2(7), @LaunchStartedAtUTC datetime2(7), @NextStartAttemptAtUTC datetime2(7),
+			@StartAttempts tinyint, @StartRequested bit, @Started bit, @AnyWorkerStarted bit = 0,
+			@RemoveReturnCode int, @JobAction nvarchar(64), @JobDetails nvarchar(max), @LaunchError nvarchar(2048);
+	declare @Jobs table
+	(
+		WorkerNumber int primary key, JobID uniqueidentifier not null, ServiceName sysname not null,
+		StartAttempts tinyint not null default (0), NextStartAttemptAtUTC datetime2(7),
+		StartRequested bit not null default (0), Started bit not null default (0)
+	);
 	exec z.usp_TaskQueueResolveBatch @BatchID = @BatchID output, @BatchName = @BatchName output;
 	begin try
 		begin tran;
@@ -30,7 +37,9 @@ begin
 		select	@MaxConcurrentWorkers = MaxConcurrentWorkers, @ExecutionID = ExecutionID,
 				@LaunchStartedAtUTC = StartedAtUTC
 		from z.TaskQueueBatch
-		where BatchID = @BatchID and Status in ('Draft', 'Ready') and MaxConcurrentWorkers > 0;
+		where BatchID = @BatchID
+			and Status in ('Draft', 'Ready')
+			and MaxConcurrentWorkers > 0;
 		if @@rowcount = 0
 			throw 50000, 'Only a Draft or Ready batch with a positive worker limit can be executed.', 1;
 		select	@Command = N'exec z.usp_TaskQueueExecuteBatchWorker @BatchID = ' + convert(nvarchar(20), @BatchID) + N';',
@@ -45,7 +54,7 @@ begin
 			begin
 				exec z.usp_CreateServiceJob @Name = @Name, @Command = @Command, @CreateSchedule = 0, @DeleteAfterExecution = 3, @SetJobOwnerToSA = 0, @JobID = @JobID output;
 			end;
-			insert @Jobs (WorkerNumber, Name, JobID) values (@WorkerNumber, @Name, @JobID);
+			insert @Jobs (WorkerNumber, JobID, ServiceName) values (@WorkerNumber, @JobID, @Name);
 			select	@WorkerNumber += 1;
 		end;
 		select	@Now = sysutcdatetime();
@@ -58,51 +67,99 @@ begin
 		where BatchID = @BatchID;
 		exec z.usp_TaskQueueSetAction;
 		commit;
-		select	@WorkerNumber = 1;
-		while @WorkerNumber <= @MaxConcurrentWorkers
+		select	@WorkerNumber = 0;
+		while exists (select * from @Jobs)
 		begin
-			select	@JobID = JobID, @Name = Name from @Jobs where WorkerNumber = @WorkerNumber;
-			if z.fn_IsSQLJobRunning(@JobID) = 0
+			select	top (1)
+					@WorkerNumber = WorkerNumber, @JobID = JobID, @Name = ServiceName, @Started = Started,
+					@StartAttempts = StartAttempts, @StartRequested = StartRequested, @NextStartAttemptAtUTC = NextStartAttemptAtUTC
+			from @Jobs
+			where WorkerNumber > @WorkerNumber
+			order by WorkerNumber;
+			if @@rowcount = 0
 			begin
-				begin try
-					exec z.usp_StartServiceJob @Name = @Name;
-				end try
-				begin catch
-					select	@StartErrorDetails = (
-								select	@BatchName BatchName, @LaunchStartedAtUTC StartedAtUTC, @WorkerNumber WorkerNumber,
-										z.fn_GetServiceJobName(@Name) JobName, @JobID JobID,
-										error_number() ErrorNumber, error_severity() ErrorSeverity, error_state() ErrorState,
-										error_procedure() ErrorProcedure, error_line() ErrorLine, error_message() ErrorMessage
-								for json path, include_null_values, without_array_wrapper
-							);
-					begin try
-						insert z.TaskQueueLog (BatchID, ExecutionID, ActionID, Action, ChangeType,
-							LoginName, ApplicationName, HostName, SessionID, AfterJson)
-						values (@BatchID, @ExecutionID, newid(), N'WorkerJobStartError', 'Insert',
-							original_login(), app_name(), host_name(), @@spid, @StartErrorDetails);
-					end try
-					begin catch
-						print concat(N'Could not log worker job start error for TaskQueue batch ', @BatchID,
-							N', execution ', @ExecutionID, N'. ', error_message());
-						print @StartErrorDetails;
-					end catch;
-				end catch;
+				select	@WorkerNumber = 0;
+				waitfor delay '00:00:01';
+				continue;
 			end;
-			select	@WorkerNumber += 1;
+			if not exists (select 1 from msdb.dbo.sysjobs where job_id = @JobID)
+			begin
+				-- A requested worker can run and delete its job between polls.
+				if @StartRequested = 1 select @AnyWorkerStarted = 1;
+				delete @Jobs where WorkerNumber = @WorkerNumber;
+				continue;
+			end;
+			if @Started = 1 continue;
+			if z.fn_IsSQLJobRunning(@JobID) = 1
+			begin
+				update @Jobs
+					set Started = 1, @AnyWorkerStarted = 1
+				where WorkerNumber = @WorkerNumber;
+				continue;
+			end;
+			if @NextStartAttemptAtUTC > sysutcdatetime() continue;
+
+			begin try
+				if @StartAttempts < 3
+				begin
+					select	@JobAction = N'WorkerJobStartError', @StartAttempts += 1;
+					exec msdb.dbo.sp_start_job @job_id = @JobID;
+					select	@StartRequested = 1, @JobAction = null;
+				end
+				else
+				begin
+					select	@JobAction = N'WorkerJobRemoveError';
+					exec @RemoveReturnCode = msdb.dbo.sp_delete_job @job_id = @JobID, @delete_unused_schedule = 0;
+					if @RemoveReturnCode <> 0 throw 50000, 'SQL Agent rejected removal of the idle worker job.', 1;
+					select	@StartRequested = 0, @JobAction = N'WorkerJobRemoved';
+				end;
+			end try
+			begin catch
+				if @@trancount > 0 rollback;
+				-- A worker may have finished while the Agent call was in flight.
+				if not exists (select 1 from msdb.dbo.sysjobs where job_id = @JobID)
+					continue;
+				select	@JobDetails = (
+							select	@BatchName BatchName, @LaunchStartedAtUTC StartedAtUTC, @WorkerNumber WorkerNumber,
+									@Name JobName, @JobID JobID, @StartAttempts StartAttempts,
+									error_number() ErrorNumber, error_severity() ErrorSeverity, error_state() ErrorState,
+									error_procedure() ErrorProcedure, error_line() ErrorLine, error_message() ErrorMessage
+							for json path, include_null_values, without_array_wrapper
+							);
+			end catch;
+			update @Jobs set StartAttempts = @StartAttempts, StartRequested = @StartRequested,
+					NextStartAttemptAtUTC = dateadd(second, 10, sysutcdatetime())
+			where WorkerNumber = @WorkerNumber;
+			if @JobAction is null continue;
+
+			if @JobAction = N'WorkerJobRemoved'
+				select	@JobDetails = (
+							select	@BatchName BatchName, @LaunchStartedAtUTC StartedAtUTC, @WorkerNumber WorkerNumber,
+									@Name JobName, @JobID JobID, @StartAttempts StartAttempts
+							for json path, without_array_wrapper
+							);
+			begin try
+				insert z.TaskQueueLog (BatchID, ExecutionID, ActionID, Action, ChangeType,
+					LoginName, ApplicationName, HostName, SessionID, AfterJson)
+				values (@BatchID, @ExecutionID, newid(), @JobAction, 'Insert',
+					original_login(), app_name(), host_name(), @@spid, @JobDetails);
+			end try
+			begin catch
+				print concat(N'Could not log ', @JobAction, N' for TaskQueue batch ', @BatchID,
+					N', execution ', @ExecutionID, N'. ', error_message());
+				print @JobDetails;
+			end catch;
 		end;
-		while exists(	select *
-						from @Jobs j
-							inner join msdb.dbo.sysjobs b on b.job_id = j.JobID
-					)
-		begin
-			waitfor delay '00:00:01';
-		end;
+		if @AnyWorkerStarted = 0
+			select	@LaunchError = concat(N'No SQL Agent worker jobs started for TaskQueue batch ', @BatchID, N'.');
 		begin tran;
 		exec z.usp_TaskQueueLockBatchForChange @BatchID = @BatchID;
 		exec z.usp_TaskQueueSetAction @Action = N'Reconcile';
-		update z.TaskQueueBatch set Status = 'Completed', FinishedAtUTC = sysutcdatetime()
+		update z.TaskQueueBatch set Status = 'Completed', FinishedAtUTC = sysutcdatetime(),
+				LastErrorMessage = isnull(@LaunchError, LastErrorMessage)
 		where BatchID = @BatchID and Status = 'Running'
 			and ExecutionID = @ExecutionID and StartedAtUTC = @LaunchStartedAtUTC;
+		if @@rowcount = 0 select @LaunchError = null;
 		exec z.usp_TaskQueueSetAction;
 		commit;
 	end try
@@ -111,4 +168,21 @@ begin
 		exec z.usp_TaskQueueSetAction;
 		throw;
 	end catch;
+	if @LaunchError is null return;
+
+	begin try
+		select	@JobDetails = (
+					select	@BatchName BatchName, @LaunchStartedAtUTC StartedAtUTC, @LaunchError ErrorMessage
+					for json path, without_array_wrapper
+					);
+		insert z.TaskQueueLog (BatchID, ExecutionID, ActionID, Action, ChangeType,
+			LoginName, ApplicationName, HostName, SessionID, AfterJson)
+		values (@BatchID, @ExecutionID, newid(), N'WorkerLaunchError', 'Insert',
+			original_login(), app_name(), host_name(), @@spid, @JobDetails);
+	end try
+	begin catch
+		print concat(N'Could not log WorkerLaunchError for TaskQueue batch ', @BatchID,
+			N', execution ', @ExecutionID, N'. ', error_message());
+	end catch;
+	throw 50000, @LaunchError, 1;
 end;
