@@ -90,6 +90,17 @@ returns nvarchar(128)
 
 Returns nvarchar(128) index/constraint name for Index, UniqueKey, PrimaryKey, columnstore, ForeignKey, Default or XML kinds. Unsupported type returns null; long names can truncate/collide.
 
+## z.fn_GetFullErrorJson
+
+[Source](../../modules/1010%20Functions/z.fn_GetFullErrorJson.sql)
+
+```sql
+create or alter function z.fn_GetFullErrorJson()
+returns nvarchar(max)
+```
+
+Returns one JSON object for the current `catch` context with `ErrorNumber`, `ErrorSeverity`, `ErrorState`, `ErrorProcedure`, `ErrorLine`, and `ErrorMessage`. Includes fields with null values and returns SQL NULL outside a `catch` context.
+
 ## z.fn_GetFullErrorMessage
 
 [Source](../../modules/1010%20Functions/z.fn_GetFullErrorMessage.sql)

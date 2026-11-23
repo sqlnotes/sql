@@ -15,9 +15,11 @@ create or alter procedure z.usp_TaskQueueLockBatchForChange
 as
 begin
 	set nocount on;
-	if @@trancount = 0 return;
+	if @@trancount = 0
+		return;
 	declare @SemaphoreName nvarchar(200), @Slot int;
 	select	@SemaphoreName = N'z.TaskQueue.Batch:' + convert(nvarchar(20), @BatchID);
 	exec @Slot = z.usp_AcquireSemaphore @SemaphoreName = @SemaphoreName, @TotalCount = 1, @LockOwner = 'Transaction';
-	if @Slot <= 0 throw 50000, 'Cannot acquire the TaskQueue batch change semaphore.', 1;
+	if @Slot <= 0
+		throw 50000, 'Cannot acquire the TaskQueue batch change semaphore.', 1;
 end;

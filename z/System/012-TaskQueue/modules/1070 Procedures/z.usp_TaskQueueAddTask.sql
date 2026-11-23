@@ -38,17 +38,30 @@ begin
 	begin try
 		exec z.usp_TaskQueueResolveBatch @BatchID = @BatchID output, @BatchName = @BatchName;
 		exec z.usp_TaskQueueLockBatchForChange @BatchID = @BatchID;
-		if not exists (select 1 from z.TaskQueueBatch where BatchID = @BatchID and Status = 'Draft')
+		if not exists
+		(
+			select	1
+			from z.TaskQueueBatch
+			where BatchID = @BatchID
+				and Status = 'Draft'
+		)
 			throw 50000, 'Tasks can only be added to a Draft batch.', 1;
 		if @TaskID is null
 			select	@TaskID = isnull(max(TaskID), 0) + 1 from z.TaskQueueTasks where BatchID = @BatchID;
 		if @SortOrder is null
 			select	@SortOrder = isnull(max(SortOrder), 0) + 1 from z.TaskQueueTasks where BatchID = @BatchID;
-		if @TaskName is null select @TaskName = N'Task - ' + convert(nvarchar(11), @TaskID);
+		if @TaskName is null
+			select	@TaskName = N'Task - ' + convert(nvarchar(11), @TaskID);
 		exec z.usp_TaskQueueSetAction @Action = N'AddTask', @ActionID = @ActionID;
-		insert z.TaskQueueTasks (BatchID, TaskID, TaskName, Description, ExecutorProcedure, Parameters, SortOrder, CompletionCondition, MaxRetries, RetryIntervalSecond, AvailableAtUTC)
-			values (@BatchID, @TaskID, @TaskName, @Description, @ExecutorProcedure, @Parameters, @SortOrder, @CompletionCondition, @MaxRetries,
-				iif(@RetryIntervalSecond = 0, 1, @RetryIntervalSecond), isnull(@AvailableAtUTC, sysutcdatetime()));
+		insert z.TaskQueueTasks (
+			BatchID, TaskID, TaskName, Description, ExecutorProcedure, Parameters,
+			SortOrder, CompletionCondition, MaxRetries, RetryIntervalSecond, AvailableAtUTC
+		)
+		values (
+			@BatchID, @TaskID, @TaskName, @Description, @ExecutorProcedure, @Parameters,
+			@SortOrder, @CompletionCondition, @MaxRetries,
+			iif(@RetryIntervalSecond = 0, 1, @RetryIntervalSecond), isnull(@AvailableAtUTC, sysutcdatetime())
+		);
 		exec z.usp_TaskQueueSetAction;
 	end try
 	begin catch

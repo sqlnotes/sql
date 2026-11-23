@@ -15,6 +15,7 @@ select	t.BatchID, b.ExecutionID, b.BatchName, b.BatchType, b.Status BatchStatus,
 		t.AttemptsStarted, t.AvailableAtUTC, t.CreatedAtUTC, t.LastErrorNumber, t.LastErrorMessage
 from z.TaskQueueTasks t
 	inner join z.TaskQueueBatch b on b.BatchID = t.BatchID
-where b.Status = 'Running' and t.CompletionState = 0
+where b.Status = 'Running'
+	and t.CompletionState = 0
 	and t.Status in ('Pending', 'Failed')
 	and t.AttemptsStarted <= t.MaxRetries;

@@ -23,15 +23,25 @@ begin
 		begin tran;
 		exec z.usp_TaskQueueResolveBatch @BatchID = @BatchID output, @BatchName = @BatchName;
 		exec z.usp_TaskQueueLockBatchForChange @BatchID = @BatchID;
-		if not exists (select 1 from z.TaskQueueBatch where BatchID = @BatchID and Status in ('Ready', 'Running', 'Stopped'))
+		if not exists
+		(
+			select	1
+			from z.TaskQueueBatch
+			where BatchID = @BatchID
+				and Status in ('Ready', 'Running', 'Stopped')
+		)
 			throw 50000, 'Only a Ready, Running or Stopped batch can be stopped.', 1;
 		exec z.usp_TaskQueueSetAction @Action = N'Stop', @ActionID = @ActionID;
-		update z.TaskQueueBatch set Status = 'Stopped', FinishedAtUTC = null where BatchID = @BatchID and Status <> 'Stopped';
+		update z.TaskQueueBatch
+			set Status = 'Stopped', FinishedAtUTC = null
+		where BatchID = @BatchID
+			and Status <> 'Stopped';
 		commit;
 		exec z.usp_TaskQueueSetAction;
 	end try
 	begin catch
-		if @@trancount > 0 rollback;
+		if @@trancount > 0
+			rollback;
 		exec z.usp_TaskQueueSetAction;
 		throw;
 	end catch;

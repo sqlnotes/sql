@@ -18,7 +18,7 @@ create or alter procedure z.usp_AcquireSemaphore
 )
 ```
 
-Acquires a capacity slot through native locks; returns a positive slot or negative failure. If the same database, session and owner already hold it, returns the existing slot without another native acquisition or reference-count increment. Validates inputs and bounds waits with @LockTimeout. The outer acquisition owns release. No internal transaction/result set. See coordination.
+Acquires an exclusive lock on a capacity slot. Returns the positive slot number on success, `-1` when the scan times out, `-2` when the same session already holds the semaphore under the other owner, or another negative native status. Reacquisition by the same owner returns the existing slot without adding a native lock reference. The outer operation owns release. The procedure does not open a transaction or return a result set. [Ownership and timeouts](coordination.md#semaphores)
 
 ## z.usp_CopyTableSchema
 
@@ -190,11 +190,12 @@ Name is spelled Refesh. Refreshes all visible current-database modules with defi
 ```sql
 create or alter procedure z.usp_ReleaseSemaphore
 (
-	@SemaphoreName nvarchar(200)
+	@SemaphoreName nvarchar(200),
+	@SuppressException bit = 0
 )
 ```
 
-Releases any held Session and Transaction semaphore slots and markers in the current database/session. NULL, empty, missing and already-released names return 0 without an error; stale context is cleared. If both scopes hold the semaphore, both are released. Transaction scope is probed only while a transaction is active; release never commits or rolls back it. Catchable cleanup failures return a negative status without throwing and do not prevent attempting the other scope. No internal transaction/result set. Callers supply only `@SemaphoreName`; remove former `@LockOwner` arguments.
+Releases the slot for the recorded owner in the current database and session and clears its context entry on successful cleanup. NULL, blank, missing and already-released names return `0`. A native negative release status is returned to the caller. Caught exceptions are rethrown by default. With `@SuppressException = 1`, the procedure prints the exception and returns `-999`. The procedure preserves the caller's transaction and returns no result set. [Ownership and cleanup](coordination.md#semaphores)
 
 ## z.usp_RemoveSchemaZ
 

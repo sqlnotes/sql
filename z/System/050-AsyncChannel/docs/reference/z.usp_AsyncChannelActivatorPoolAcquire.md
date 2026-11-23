@@ -25,7 +25,7 @@ A nonpositive shared-helper result produces a Warning log and return code `-1`, 
 
 The permit survives transaction commit or rollback because it is Session-owned. Release the acquired pool ID through `z.usp_AsyncChannelActivatorPoolRelease` in the same session after the outer processing operation finishes. Repeated same-session acquisition returns the held slot without adding a reference; nested callers must leave release to the outer owner.
 
-`TimeoutSeconds = -1` waits indefinitely. Finite seconds are converted to milliseconds and capped at 2147483647. Cancellation can leave a main marker without a slot until disconnect; the pool view can count that marker as a waiter. Requires access to the registry and the underlying shared helper and logging operations through the applicable permission context.
+`TimeoutSeconds = -1` waits indefinitely. Finite seconds are converted to milliseconds and capped at 2147483647. The current helper uses slot locks, so its waiting sessions do not contribute to `SessionsWaiting` in the pool view. If cancellation leaves a Session-owned slot held, release it on the same connection or disconnect. Requires access to the registry and the underlying shared helper and logging operations through the applicable permission context.
 
 ## Dependencies
 

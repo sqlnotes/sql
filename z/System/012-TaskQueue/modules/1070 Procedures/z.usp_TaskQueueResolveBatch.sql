@@ -21,13 +21,13 @@ begin
 	begin
 		select	@BatchID = BatchID, @BatchName = BatchName
 		from z.TaskQueueBatch
-		where BatchName = @BatchName
+		where BatchName = @BatchName;
 	end
 	else
 	begin
 		select	@BatchID = BatchID, @BatchName = BatchName
 		from z.TaskQueueBatch
-		where BatchID = @BatchID
+		where BatchID = @BatchID;
 	end
 	if @@rowcount = 0
 		throw 50000, 'The specified TaskQueue batch does not exist.', 1;

@@ -16,7 +16,7 @@
 
 ## Semaphore wait
 
-Check that the name is nonempty, capacity is positive, and an active transaction exists for a Transaction-owned permit. A timeout of 0 tries once. The default -1 waits indefinitely. For session-context error 15665 on a long-lived MARS connection, move work that uses many distinct semaphore names to a connection with MARS disabled. [Semaphore ownership and cleanup](reference/coordination.md#semaphores)
+Check that the name is nonempty, capacity is positive, and an active transaction exists for a Transaction-owned permit. A timeout of `0` scans the slots once. The default `-1` waits indefinitely. If error 15665 occurs, check how many distinct semaphore names the connection has used. Explicit release clears the entry for its name, and closing the connection clears its session context. [Semaphore ownership and cleanup](reference/coordination.md#semaphores)
 
 ## Generated SQL
 

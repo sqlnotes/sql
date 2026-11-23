@@ -23,24 +23,35 @@ begin
 		begin tran;
 		exec z.usp_TaskQueueResolveBatch @BatchID = @BatchID output, @BatchName = @BatchName;
 		exec z.usp_TaskQueueLockBatchForChange @BatchID = @BatchID;
-		if not exists (select 1 from z.TaskQueueBatch where BatchID = @BatchID and Status = 'Stopped')
+		if not exists
+		(
+			select	1
+			from z.TaskQueueBatch
+			where BatchID = @BatchID
+				and Status = 'Stopped'
+		)
 			throw 50000, 'Only a Stopped batch can be resumed.', 1;
 		if exists (select 1 from z.v_TaskQueueRunningTasks where BatchID = @BatchID)
 			throw 50000, 'The batch has Running tasks; wait for completion or recover ownership before changing it.', 1;
 		if exists
 		(
-			select	1 from z.TaskQueueTasks where BatchID = @BatchID
+			select	1
+			from z.TaskQueueTasks
+			where BatchID = @BatchID
 				and (CompletionState = 1
 					or (Status = 'Pending' and AttemptsStarted > MaxRetries))
 		)
 			throw 50000, 'Unresolved task outcomes prevent resume; reconcile them or explicitly restart the batch.', 1;
 		exec z.usp_TaskQueueSetAction @Action = N'Resume', @ActionID = @ActionID;
-		update z.TaskQueueBatch set Status = 'Ready', FinishedAtUTC = null where BatchID = @BatchID;
+		update z.TaskQueueBatch
+			set Status = 'Ready', FinishedAtUTC = null
+		where BatchID = @BatchID;
 		commit;
 		exec z.usp_TaskQueueSetAction;
 	end try
 	begin catch
-		if @@trancount > 0 rollback;
+		if @@trancount > 0
+			rollback;
 		exec z.usp_TaskQueueSetAction;
 		throw;
 	end catch;

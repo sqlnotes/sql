@@ -27,17 +27,21 @@ begin
 			throw 50000, 'The batch has Running tasks; wait for completion or recover ownership before changing it.', 1;
 		exec z.usp_TaskQueueSetAction @Action = N'Restart', @ActionID = @ActionID;
 		-- Publish the new execution identity before resetting tasks so their audit rows use it.
-		update z.TaskQueueBatch set Status = 'Ready', ExecutionID = @ExecutionID, LastErrorMessage = null,
-			StartedAtUTC = null, FinishedAtUTC = null where BatchID = @BatchID;
-		update z.TaskQueueTasks set Status = 'Pending', AttemptsStarted = 0, AvailableAtUTC = @Now,
-			ClaimToken = null, WorkerSessionID = null, WorkerLoginTime = null,
-			StartedAtUTC = null, FinishedAtUTC = null, LastErrorNumber = null, LastErrorMessage = null
+		update z.TaskQueueBatch
+			set Status = 'Ready', ExecutionID = @ExecutionID, LastErrorMessage = null,
+				StartedAtUTC = null, FinishedAtUTC = null
+		where BatchID = @BatchID;
+		update z.TaskQueueTasks
+			set Status = 'Pending', AttemptsStarted = 0, AvailableAtUTC = @Now,
+				ClaimToken = null, WorkerSessionID = null, WorkerLoginTime = null,
+				StartedAtUTC = null, FinishedAtUTC = null, LastErrorNumber = null, LastErrorMessage = null
 		where BatchID = @BatchID;
 		commit;
 		exec z.usp_TaskQueueSetAction;
 	end try
 	begin catch
-		if @@trancount > 0 rollback;
+		if @@trancount > 0
+			rollback;
 		exec z.usp_TaskQueueSetAction;
 		throw;
 	end catch;

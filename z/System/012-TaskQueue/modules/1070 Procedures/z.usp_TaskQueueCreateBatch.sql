@@ -16,7 +16,7 @@ Clears Action and ActionID after success or error.
 */
 create or alter procedure z.usp_TaskQueueCreateBatch
 (
-	@BatchID bigint =  null output,
+	@BatchID bigint = null output,
 	@BatchName nvarchar(128),
 	@Description nvarchar(max) = null,
 	@MaxConcurrentWorkers int = 0,

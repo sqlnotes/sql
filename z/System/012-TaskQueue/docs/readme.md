@@ -19,17 +19,21 @@ begin try
 	commit;
 end try
 begin catch
-	if @@trancount > 0 rollback;
+	if @@trancount > 0
+		rollback;
 	throw;
 end catch;
 
 exec z.usp_TaskQueueExecuteBatch @BatchID = @BatchID;
 
 select	BatchID, Status, StartedAtUTC, FinishedAtUTC
-from z.TaskQueueBatch where BatchID = @BatchID;
+from z.TaskQueueBatch
+where BatchID = @BatchID;
 
 select	TaskID, TaskName, Status, AttemptsStarted, CompletionCondition, LastErrorMessage
-from z.TaskQueueTasks where BatchID = @BatchID order by SortOrder, TaskID;
+from z.TaskQueueTasks
+where BatchID = @BatchID
+order by SortOrder, TaskID;
 ```
 
 ## Batch lifecycle
@@ -58,19 +62,21 @@ Raise a SQL error to fail an attempt. The worker catches the error, rolls back a
 
 The launcher requires a running, visible local SQL Server Agent, a positive `MaxConcurrentWorkers`, no active transaction and implicit transactions off. This also applies to an empty batch. Callers need Agent job-management permissions and visibility into worker jobs and T-SQL sessions. Each job runs as its owner. [Jobs permissions and visibility](../../010-Jobs/docs/reference/supporting-objects.md#zfn_issqljobrunning)
 
-Admission and unscheduled job definitions commit together before workers start. Job names include the coordination database, BatchID, ExecutionID and worker number. A concurrent launcher cannot admit the same Running batch. An existing matching **name** is reused as configured, so its command must run the correct worker and its deletion mode must be “on completion.”
+The launcher resolves one batch and captures `StartedAtUTC` during admission. Admission and unscheduled job definitions commit together, followed by a short delay before polling begins. Job names include the coordination database, BatchID, ExecutionID and worker number. A concurrent launcher cannot admit the same Running batch. An existing matching **name** is reused as configured, so its command must run the correct worker and its deletion mode must be “on completion.”
 
-One polling loop starts and monitors all worker jobs. It requests up to three starts for each job, at least 10 seconds apart. Once the job-running function sees a worker session, the launcher waits for that job to delete itself. A job that disappears on its own after a start request also counts as having run, since a worker can finish between polls. If the job still exists with no visible worker session 10 seconds after the third request, the launcher tries to remove it. If removal fails, the launcher logs the error and retries after 10 seconds while polling the other jobs. The launcher stops tracking a job as soon as its Agent job disappears.
+One loop polls the tracked jobs with a one-second delay between passes. It requests up to three starts per job, at least 10 seconds apart. A visible worker session marks the job as started, and the launcher tracks that job until it disappears. A tracked job found missing also counts as a start, including a job that finished between polls.
 
-After monitoring the jobs, the launcher sets Completed and records `FinishedAtUTC` only if the batch is still Running with the original ExecutionID and launch timestamp. Stop, Resume or a newer execution can make that final update a successful no-op. Completed means the launch ended. If no workers started, the launcher records the batch error during finalization, then logs and raises the error. Tasks may still be Failed, Pending or waiting for a retry. Task failures do not raise a launcher error. Read task rows before reporting application success. For example, [parallel backup](../../020-Backup/docs/reference/z.usp_BackupDatabasesParallel.md) requires every selected task to succeed.
+Ten seconds after the third request, if the job still exists and no worker session has been seen, the launcher stops tracking it and attempts to delete it with its history and unused schedules. Successful launcher deletion does not count as a worker start. If the Agent call errors and the job is already missing, the launcher counts it as a start. If the job is still present, the launcher logs the removal error. The job can remain in Agent for manual cleanup.
+
+When the launcher finishes tracking jobs, it sets Completed and records `FinishedAtUTC` only if its batch is still Running with the same `ExecutionID` and `StartedAtUTC`. Stop, Resume or a newer launch can make that update a successful no-op. If no job counted as started and the guarded update succeeds, the launcher records the error in `LastErrorMessage`, commits, then logs and raises it. Completed means the launch ended. Tasks can remain Failed, Pending or waiting for a retry. Inspect task rows to decide whether the work succeeded. [Parallel backup](../../020-Backup/docs/reference/z.usp_BackupDatabasesParallel.md) requires every selected task to succeed.
 
 ## Worker and execution ownership
 
 `z.usp_TaskQueueExecuteBatchWorker` runs one task at a time in one selected Running batch. Use a dedicated connection outside a transaction, with implicit transactions off and no MARS or interleaved commands. A direct worker caller owns the Running transition and finalization. Calling a worker on a Ready batch returns without processing tasks.
 
-Each pass acquires the batch-change lock, recovers unowned Running rows, finds the first unsatisfied sort level and selects a due task at that level. If no task is due and work at that level is running or scheduled for later, the worker commits, waits one second and checks again. When a task is due, the worker acquires batch capacity before taking the task semaphore. If all batch slots are occupied, it commits and waits one second before rereading the worker limit. It returns when the batch leaves Running, the levels are satisfied, or the first unsatisfied level has no work that can progress. A failed task semaphore acquisition releases any batch slot and ends the call. A capacity error other than a timeout also ends the call.
+On each pass, the worker takes the batch-change lock and checks that the batch is Running with a positive worker limit. It recovers unowned Running rows, finds the first unsatisfied sort level and selects a due task there. If that level can progress but no task is due, the worker commits and waits 300 milliseconds before checking again. When a task is due, the worker tries the batch-capacity semaphore before the task semaphore. A capacity timeout causes a commit and a one-second wait before rechecking the batch. Other negative capacity return codes end the call. A failed task semaphore acquisition causes a commit, an error and an attempt to release held slots. The worker stops when the batch leaves Running or the first unsatisfied level has no work that can progress. It also stops when all levels are satisfied.
 
-A claim records an attempt, session identity and new claim token. The worker commits the claim before invoking the executor, and the token prevents stale completion writes. To finish, the worker locks the batch, records the outcome and releases its session semaphores before committing. If a release fails, it commits the outcome before reporting the cleanup error.
+A claim records an attempt, session identity and new claim token. The worker commits the claim before invoking the executor, and the token prevents stale completion writes. To finish, the worker locks the batch, records the outcome and attempts both session semaphore releases before committing. The release helper prints caught exceptions and returns a failure status. The worker proceeds with the commit regardless of those return codes.
 
 Recovery marks unlocked Running attempts Failed, keeps the recorded attempt count, and applies the normal retry interval and limit. It uses the task lock rather than elapsed time or a missing DMV row. A disconnected executor may already have committed effects. Design retried tasks to tolerate repetition. An interrupted but still-connected session can retain locks. Disconnect it before recovery or reuse. A worker recovers only Running batches. An orphaned Running task in a Stopped batch requires reconciliation before Resume or Restart.
 
@@ -84,7 +90,7 @@ Recovery marks unlocked Running attempts Failed, keeps the recorded attempt coun
 
 ### Batch worker semaphore
 
-`z.fn_TaskQueueGetBatchSemaphore` builds `z.TaskQueue.Worker:<BatchID>`. Each worker takes one session-owned slot when the current batch limit is positive. Zero skips the capacity semaphore for independently managed workers. Changes to the limit affect subsequent claims. An increased limit can admit workers already waiting for capacity. The number of Agent jobs is set when the batch launches.
+`z.fn_TaskQueueGetBatchSemaphore` builds `z.TaskQueue.Worker:<BatchID>`. Each worker takes one session-owned slot before claiming a task. `StartBatch` can mark a batch with a zero limit Ready by default, but both execution procedures require a positive limit for work. Changes to the limit affect subsequent claims. An increased limit can admit workers already waiting for capacity. The number of Agent jobs is set when the batch launches.
 
 ## Batch table
 
@@ -116,9 +122,9 @@ An unmet condition blocks higher levels while other eligible tasks at the same l
 
 The worker logs the task claim and executor outcome under `ExecuteTask` with one ActionID per attempt. On executor failure, the finish entry includes `LastErrorNumber` and `LastErrorMessage` in AfterJson. Each retry gets a new ActionID.
 
-`WorkerError` entries have ChangeType `Insert` and store SQL error details in AfterJson, with the task ID when one was selected. The worker writes the entry after rolling back any open transaction and rethrows the original error even if the log write fails.
+`WorkerError` entries have ChangeType `Insert` and store the caught SQL error in AfterJson, with the task ID when one was selected. The JSON has separate `ErrorNumber`, `ErrorSeverity`, `ErrorState`, `ErrorProcedure`, `ErrorLine`, and `ErrorMessage` fields. The worker rolls back any open transaction before writing the entry and rethrows the original error even if the log write fails. [Error JSON format](../../docs/reference/functions.md#zfn_getfullerrorjson)
 
-`WorkerJobStartError`, `WorkerJobRemoved` and `WorkerJobRemoveError` entries identify the batch, launch, worker, service name (`JobName`), Agent job ID, and attempt count. Error entries also include the SQL error details. `WorkerLaunchError` records the zero-worker error after the launch is finalized. Each entry has ChangeType `Insert` and stores details in AfterJson. BatchID and ExecutionID are log columns. If a diagnostic log write fails, the launcher prints the failure to the caller.
+`WorkerJobStartError`, `WorkerJobRemoved` and `WorkerJobRemoveError` include `BatchName`, `StartedAtUTC`, `WorkerNumber`, `JobName` (the service name), `JobID`, and `StartAttempts` in AfterJson. The two job error entries include formatted SQL error text in `ErrorMessage`. `WorkerLaunchError` records `BatchName`, `StartedAtUTC`, and `ErrorMessage` after a zero-worker launch is finalized. Each entry has ChangeType `Insert` and stores BatchID and ExecutionID in log columns. If a diagnostic log write fails, the launcher prints the failure to the caller.
 
 Action identifies the lifecycle or worker operation. `z.usp_TaskQueueSetAction` sets the optional Action and ActionID session-context keys. Calling it without arguments clears both. Direct writes with no action context are labeled DirectInsert, DirectUpdate or DirectDelete. Client-supplied host/application and action labels are diagnostic. Rolled-back changes leave no history.
 

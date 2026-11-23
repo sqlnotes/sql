@@ -47,7 +47,7 @@ Creates a batch when BatchID=-1, creates file log when BatchLogID=-1, otherwise 
 create or alter procedure z.usp_AcquireDeploymentLock
 ```
 
-No arguments/result set. Session-owned binary z.Deploy semaphore through z.usp_AcquireSemaphore, timeout 0. A nonpositive/null acquisition result throws 51000.
+Takes no arguments and returns no result set. Uses `sys.sp_getapplock` with resource `z.Deploy`, Exclusive mode, Session ownership and a timeout of `0`. A null or negative native result raises error `51000`.
 
 ### z.usp_ReleaseDeploymentLock
 
@@ -57,7 +57,7 @@ No arguments/result set. Session-owned binary z.Deploy semaphore through z.usp_A
 create or alter procedure z.usp_ReleaseDeploymentLock
 ```
 
-No arguments/result set. Releases session z.Deploy lock; failure throws 51001.
+Takes no arguments and returns no result set. Releases the session-owned `z.Deploy` application lock until it is gone or a native call returns a negative status. Caught cleanup exceptions are suppressed.
 
 ### z.usp_GetDeploymentSystems
 

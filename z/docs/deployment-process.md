@@ -58,9 +58,9 @@ Logs reference owner/hash and retain failure text/times. Pruning deactivates obs
 
 ## Transactions, locking and failures
 
-Bootstrap table creation is transactional; individual metadata begin/complete operations are transactional. The metadata connection holds session-owned binary semaphore `z.Deploy` with zero wait; a competing installer fails promptly. Bootstrap installs the shared semaphore helpers before the deployment-lock procedures. Bootstrap precedes this semaphore acquisition, so it does not serialize the complete bootstrap phase.
+Bootstrap table creation and individual metadata begin and complete operations are transactional. After bootstrap, the metadata connection takes the exclusive session-owned application lock `z.Deploy` with zero wait. A competing installer using the same lock fails promptly. Bootstrap runs before the lock is taken. The shared semaphore procedures are installed later by System module traversal.
 
-Before installing this synchronization update, stop active installers and drain affected Session-owned routines. Older callers may hold native locks without shared-helper context; replacing their release procedures mid-run cannot release those old holds through the new protocol. Let the old operation release them first, or close its physical connection before updating.
+Finish active installations before applying this update. Earlier installers acquired the slot lock `1-z.Deploy`. This version acquires `z.Deploy`, so the two versions can hold different locks at the same time. Let routines using the earlier semaphore format release their permits or disconnect before the System helpers are replaced. [Semaphore ownership and upgrades](../System/docs/reference/coordination.md#semaphores)
 
 Product files execute through separate SQL execution connections. Each starts with standard session options/open-transaction guard and ends with an open-transaction rollback/error guard. A file manages its own transaction. Entire deployment is not atomic; successful prior files/children remain after a later failure.
 

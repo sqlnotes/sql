@@ -30,12 +30,14 @@ begin
 		exec z.usp_TaskQueueResolveBatch @BatchID = @BatchID output, @BatchName = @BatchName output;
 		exec z.usp_TaskQueueLockBatchForChange @BatchID = @BatchID;
 		exec z.usp_TaskQueueSetAction @Action = N'Start', @ActionID = @ActionID;
-		update z.TaskQueueBatch set Status = 'Ready', @MaxConcurrentWorkers = MaxConcurrentWorkers, @ExecutionID = ExecutionID
+		update z.TaskQueueBatch
+			set Status = 'Ready', @MaxConcurrentWorkers = MaxConcurrentWorkers, @ExecutionID = ExecutionID
 		where BatchID = @BatchID
 			and Status in ('Draft', 'Ready')
 			and BatchName = @BatchName
 			and (isnull(@RequireWorkerLimit, 0) = 0 or MaxConcurrentWorkers > 0);
-		if @@rowcount = 0 throw 50000, 'Only a Draft or Ready batch satisfying the requested worker limit can be started.', 1;
+		if @@rowcount = 0
+			throw 50000, 'Only a Draft or Ready batch satisfying the requested worker limit can be started.', 1;
 		exec z.usp_TaskQueueSetAction;
 	end try
 	begin catch

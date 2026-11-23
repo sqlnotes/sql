@@ -36,14 +36,18 @@ begin
 		FinishedAtUTC datetime2(7),
 		LastErrorNumber int,
 		LastErrorMessage nvarchar(4000),
-		CompletionState as convert(tinyint, case
-												when Status = 'Succeeded' then case when CompletionCondition = 'Failed' then 1 else 2 end
-												when Status = 'Failed' and AttemptsStarted = 2147483647 then case when CompletionCondition = 'Succeeded' then 1 else 2 end
-												when Status = 'Failed' and convert(bigint, AttemptsStarted) >= convert(bigint, MaxRetries) + 1 then 
-													case when CompletionCondition = 'Succeeded' then 1 else 2 end
-												else 0 
-											end
-								),
+		CompletionState as convert(tinyint,
+			case
+				when Status = 'Succeeded' then case when CompletionCondition = 'Failed' then 1 else 2 end
+				when Status = 'Failed'
+					and AttemptsStarted = 2147483647 then
+					case when CompletionCondition = 'Succeeded' then 1 else 2 end
+				when Status = 'Failed'
+					and convert(bigint, AttemptsStarted) >= convert(bigint, MaxRetries) + 1 then
+					case when CompletionCondition = 'Succeeded' then 1 else 2 end
+				else 0
+			end
+		),
 		constraint PK_z_TaskQueueTasks primary key clustered (BatchID, TaskID) with (data_compression = row),
 		constraint FK_z_TaskQueueTasks_Batch foreign key (BatchID) references z.TaskQueueBatch (BatchID),
 		constraint CK_z_TaskQueueTasks_TaskName check (len(trim(TaskName)) > 0),
