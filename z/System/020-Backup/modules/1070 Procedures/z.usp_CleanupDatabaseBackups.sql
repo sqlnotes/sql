@@ -31,7 +31,8 @@ begin
 	declare	@Platform nvarchar(256), @Separator nchar(1), @Root nvarchar(4000), @Folder nvarchar(4000),
 			@Path nvarchar(4000), @Sql nvarchar(max), @LockName nvarchar(255), @LockResult int, @DeleteResult int,
 			@Family uniqueidentifier, @Fork uniqueidentifier, @Major int,
-			@Cutoff datetime2(7), @Now datetime2(7) = sysdatetime(), @AnchorStart datetime2(7), @AnchorFirstLSN numeric(25,0),
+			@Cutoff datetime2(7), @Now datetime2(7) = iif(@UseBackupHeader = 1, sysdatetime(), sysutcdatetime()),
+			@AnchorStart datetime2(7), @AnchorFirstLSN numeric(25,0),
 			@Prefix nvarchar(128), @PredecessorLog datetime2(7),
 			@SkipReason nvarchar(2048), @Pass int = 1, @Fingerprint varbinary(32), @ExpectedFingerprint varbinary(32),
 			@LockHeld bit = 0, @TypeFolder nvarchar(4), @Character int = 1, @LongestPath int;

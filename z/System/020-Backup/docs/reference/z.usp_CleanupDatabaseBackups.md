@@ -38,9 +38,11 @@ DIFF/Server$Instance$Database_yyyyMMdd_HHmmssfffffff.diff
 LOG/Database_yyyyMMdd_HHmmss_ffffff.trn
 ```
 
-The default instance is included as MSSQLSERVER. Custom formats may omit it. Timestamp precision is retained
-as datetime2(7). Malformed names, other database hints and custom layouts outside
-the parser's recognized shapes are preserved; use header mode for those layouts.
+The default instance is included as MSSQLSERVER. Custom formats may omit it.
+Filename timestamps and the cutoff use UTC with datetime2(7) precision.
+Use header mode for inventories with older server-local filename timestamps.
+Malformed names, other database hints and custom layouts outside the parser's
+recognized shapes are preserved. Use header mode for those layouts.
 
 Keep the latest recognized full filename at or before the cutoff, all recognized backups at or after that timestamp, and the immediately preceding recognized log file. Without a recognized full anchor, preserve everything. Older recognized files can be deleted. Recheck inventory membership, sizes and modification times before deletion.
 
@@ -55,7 +57,9 @@ This mode trusts managed filenames. It does not inspect database identity, copy-
 
 ## Optional: header-based cleanup
 
-With `UseBackupHeader = 1`, inspect all relevant backup-shaped files, regardless of their naming, using native `RESTORE LABELONLY` and `RESTORE HEADERONLY`:
+With `UseBackupHeader = 1`, inspect all relevant backup-shaped files using native
+`RESTORE LABELONLY` and `RESTORE HEADERONLY`. This mode compares the header
+timestamps with a server-local cutoff.
 
 - Require understood, single-file, single-set, nonmirrored full, differential or log backups matching the current database lineage and recovery fork.
 - Keep the newest usable ordinary full backup completed at or before the cutoff. Without such an anchor, preserve the whole inventory.
