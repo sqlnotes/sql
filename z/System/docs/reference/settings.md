@@ -2,6 +2,8 @@
 
 [Object index](readme.md)
 
+Use settings to share named text values among procedures in one database. Write a value with `z.usp_SetSetting` and read it with `z.fn_GetSetting`; for example, an application can store its default retention period as `System.DefaultRetentionDays`. Settings affect only code that chooses to read them.
+
 ## z.Settings
 
 [Source](../../baseline/2020%20Tables/z.Settings.sql)
@@ -19,17 +21,15 @@ Values are text; consumers own type conversion and validation. No settings are
 seeded and no existing routine automatically reads this table. Missing settings
 and empty values are distinct. The table does not provide encrypted secret storage.
 
-The guarded table script belongs to System's baseline. The installer includes
-baseline when a subsystem has no version folders or when its installed version
-is `0.0.0` or equals the first version in `versions/`; installed versions above
-the first version skip baseline. Because System's installed version (`0.0.1`)
-equals its first version folder, baseline remains eligible on existing
-installations. Hash checking skips unchanged ordinary scripts, while a new
-table script executes before the helpers. Re-running the table script preserves
-existing rows; it does not reconcile an existing table's schema. See the
-[deployment rules](../../../docs/deployment-process.md#source-and-plan).
+The table is installed with System's baseline. When updating an existing
+database, baseline eligibility determines whether a newly added table script
+runs; see the [deployment rules](../../../docs/deployment-process.md#baselines-and-identities).
+Re-running the guarded table script preserves existing rows, but does not
+change the definition of a table that already exists.
 
 ## z.fn_GetSetting
+
+Reads one setting by name. It returns the stored text, or NULL when the setting does not exist. Convert the text to the type your application expects.
 
 [Source](../../modules/1010%20Functions/z.fn_GetSetting.sql)
 
@@ -47,6 +47,8 @@ Grant EXECUTE on this scalar function to callers who need to read settings.
 
 ## z.usp_SetSetting
 
+Creates a setting or changes its value. Supply a name and a non-NULL text value; an optional description explains what the setting means. There is no returned result set.
+
 [Source](../../modules/1070%20Procedures/z.usp_SetSetting.sql)
 
 ```sql
@@ -63,13 +65,11 @@ null values. Names are stored as supplied, without trimming. A null description
 preserves the existing description on update; an empty string replaces it with
 an empty string. A new row may have a null description.
 
-The single MERGE uses HOLDLOCK to protect the matching key or missing-key range
-through the statement's transaction. It participates in an existing caller
-transaction, which retains those locks until completion. Normal blocking and
-deadlock handling still apply. The procedure sets XACT_ABORT ON; errors can make
-a caller transaction uncommittable or roll it back. It opens no explicit
-transaction and returns no result set. Grant EXECUTE to writers; ordinary
-same-owner ownership chaining permits access to the table through the helpers.
+Concurrent writes to the same setting are serialized by the update. Within a
+caller transaction, its locks remain until that transaction completes; normal
+blocking and deadlocks are still possible. Errors can affect the caller's
+transaction because the procedure uses `XACT_ABORT ON`. Grant EXECUTE to writers;
+ordinary same-owner ownership chaining permits access through the helpers.
 
 ```sql
 exec z.usp_SetSetting

@@ -4,7 +4,7 @@
 
 ## Purpose and output
 
-Produces per-channel SQL templates alongside installed definitions and deployment indicators. Reading the view generates text only; [z.usp_AsyncChannelDeploy](z.usp_AsyncChannelDeploy.md) executes selected scripts separately.
+Previews the SQL needed to build a registered channel and compares it with what is already installed. Use it to review generated objects, see missing infrastructure and inspect definition differences before deployment. Querying the view only returns text and indicators; [z.usp_AsyncChannelDeploy](z.usp_AsyncChannelDeploy.md) applies selected scripts separately.
 
 | Column | Meaning |
 | --- | --- |
@@ -42,4 +42,4 @@ Forced deployment selects existing generated modules and activation binding, but
 
 Depends on [z.v_AsyncChannel](z.v_AsyncChannel.md), [z.fn_AsyncChannelColumns](z.fn_AsyncChannelColumns.md), native object/service catalogs and framework helpers referenced by its templates. Metadata access and later CREATE/ALTER/EXECUTE permissions are distinct requirements.
 
-Author the interface before generation: the deploy procedure materializes a static script cursor, so a placeholder interface created during that call does not refresh its already-built codec templates. Conventional names and supported built-in types are assumed. Review GeneratedScript explicitly; IsValid, drift equality and NeedDeployment do not establish safe or correct application behavior. See [architecture](../architecture.md) for transaction, retry and nested-pool restrictions.
+Author the interface before generation: deployment prepares its codecs from the initial metadata, so a placeholder interface created during that call does not refresh them. Conventional names and supported built-in types are assumed. Review GeneratedScript explicitly; IsValid, drift equality and NeedDeployment do not establish correct application processing. See [architecture](../architecture.md) for transaction, retry and nested-pool restrictions.

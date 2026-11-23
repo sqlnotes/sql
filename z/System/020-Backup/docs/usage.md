@@ -2,7 +2,7 @@
 
 [Subsystem](readme.md) | [Object reference](reference/readme.md)
 
-Run sequential backups from the database containing Schema Z. Each call processes its selected list again.
+Run these calls from the database containing Schema Z. Start with a sequential backup when you want one database backed up at a time; use the parallel example below when several should run concurrently. Each call takes new backups of its selected list.
 
 ```sql
 exec z.usp_BackupDatabase
@@ -12,7 +12,8 @@ exec z.usp_BackupDatabase
 	@ServerName = N'ProductionLabel';
 ```
 
-To back up a single database named `Region,West` or `AllDatabases`, supply `@ExactDatabaseName` with that literal name. Use `@Databases` for groups or lists.
+To back up a database named `Region,West`, pass `@Databases = N'["Region,West"]'`.
+For a copy-only full or log backup, set `@CopyOnly = 1`.
 
 ServerName controls the destination prefix only. Omit it or pass NULL to use @@servername. It does not connect to another server. Windows accepts slash-separated inputs through normalization; use a mounted filesystem path such as `/mnt/backup` on Linux.
 
@@ -52,7 +53,7 @@ exec z.usp_CleanupDatabaseBackups
 	@ShowPlan = 1;
 ```
 
-Use `@UseBackupHeader = 1` on the cleanup procedure for header-based cleanup. URL retention belongs to storage lifecycle policies or separate provider tooling. Inspect [cleanup rules](reference/z.usp_CleanupDatabaseBackups.md) before deletion. Read-only FULL and LOG backups automatically use COPY_ONLY. SQL Server ignores that option for DIFF backups. Request COPY_ONLY explicitly through OtherBackupOptions for read-write backups when needed.
+Use `@UseBackupHeader = 1` on the cleanup procedure for header-based cleanup. URL retention belongs to storage lifecycle policies or separate provider tooling. Inspect [cleanup rules](reference/z.usp_CleanupDatabaseBackups.md) before deletion. Read-only FULL and LOG backups automatically use COPY_ONLY. SQL Server ignores that option for DIFF backups.
 
 ## Restore a full backup, differential and logs
 

@@ -4,7 +4,9 @@
 
 ## Purpose and behavior
 
-Generates explicit server permissions and server-role membership statements (`alter server role ... add member ...`) for `@SourceLogin`, substituting `@TargetLogin` when supplied. Supports `SERVER`, `ENDPOINT`, `SERVER_PRINCIPAL`, and `AVAILABILITY GROUP` permission classes.
+Produces scripts to copy a login's explicit server permissions and server-role memberships. It does not create the destination login or execute the returned statements.
+
+Supply the existing principal in `@SourceLogin`. Set `@TargetLogin` to put the copied permissions on another principal, or leave it NULL to keep the source name. A NULL source returns no rows. Supported permission classes are `SERVER`, `ENDPOINT`, `SERVER_PRINCIPAL` and `AVAILABILITY GROUP`.
 
 ## Parameters and defaults
 
@@ -15,7 +17,7 @@ Generates explicit server permissions and server-role membership statements (`al
 
 ## Results, permissions, and limits
 
-Returns `Ordinal int identity`, `Type varchar(100)`, `SQL nvarchar(max)`; order explicitly by `Ordinal`. Read-only. A `null` `@SourceLogin` returns no rows.
+Returns `Ordinal int`, `Type varchar(100)` and `SQL nvarchar(max)`. `Type` describes the generated statement and `SQL` contains the text to review or apply. Read rows in `Ordinal` order. Catalog visibility limits which permissions and role memberships can be scripted.
 
 ## Dependencies
 

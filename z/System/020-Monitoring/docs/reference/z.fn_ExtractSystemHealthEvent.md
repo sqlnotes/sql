@@ -4,11 +4,9 @@
 
 ## Purpose and behavior
 
-Inline table-valued XML decoder, following the same input/return structure as
-z.fn_ExtractErrorEvent and z.fn_ExtractLongRunningQueryEvent. Shreds each event
-under RingBufferTarget in the supplied XML. It does not read server DMVs, convert
-to local time, filter event names or deduplicate rows. The collector owns server
-access, event filtering and persistence.
+Turns a `system_health` ring-buffer XML snapshot into one queryable row per event, including UTC time, name and original XML. Use it when you already have the target XML and want to inspect or filter it yourself. To read the live server buffer and save selected events, use `z.usp_CollectSystemHealthEvents` instead.
+
+Like the Error and Long Running Query extractors, this function only decodes the XML supplied by its caller. It does not access the server, change time zones, filter event names or remove repeated events.
 
 ## Parameters and defaults
 

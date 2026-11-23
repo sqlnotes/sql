@@ -4,7 +4,9 @@
 
 ## Purpose and behavior
 
-Generates explicit database permissions and database-role membership statements (`alter role ... add member ...`) for `@SourceUser`, substituting `@TargetUser` when supplied.
+Produces scripts to copy a user's explicit permissions and role memberships in the current database. It does not create the destination user or execute the returned statements.
+
+Supply the existing user in `@SourceUser`. Set `@TargetUser` to apply the copied permissions to another user, or leave it NULL to keep the source name. A NULL source returns no rows.
 
 ## Parameters and defaults
 
@@ -15,7 +17,7 @@ Generates explicit database permissions and database-role membership statements 
 
 ## Results, permissions, and limits
 
-Returns `Ordinal int identity`, `Type varchar(100)`, `SQL nvarchar(max)`; order explicitly by `Ordinal`. Read-only. A `null` `@SourceUser` returns no rows.
+Returns `Ordinal int`, `Type varchar(100)` and `SQL nvarchar(max)`. `Type` describes the generated statement and `SQL` contains the text to review or apply. Read rows in `Ordinal` order. Catalog visibility and the permission classes covered by the source limit what can be scripted.
 
 ## Dependencies
 

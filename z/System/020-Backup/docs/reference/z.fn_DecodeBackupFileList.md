@@ -2,7 +2,7 @@
 
 [Backup objects](readme.md) | [File-list reader](z.usp_ReadBackupFileList.md)
 
-An inline table-valued function that decodes the FileListJson output from z.usp_ReadBackupFileList. It returns all 22 file-list columns in the same order and SQL types as the reader, including exact sizes/LSNs, GUIDs, bit flags and a varbinary(32) TDEThumbprint.
+Turns the JSON output of `z.usp_ReadBackupFileList` into typed rows that you can query, join or insert into a table. Use it to inspect the logical and physical files in a backup without writing your own JSON mappings. It returns the reader's 22 file-list columns in the same order and SQL types, including exact sizes/LSNs, GUIDs, flags and a `varbinary(32)` TDEThumbprint.
 
 ## Parameter and behavior
 

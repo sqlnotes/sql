@@ -2,6 +2,8 @@
 
 [Subsystem](readme.md) | [Object reference](reference/readme.md)
 
+If a script is empty, check the source principal name and your metadata visibility. If a mapping or ownership change fails, check that the destination login exists and that you have permission to alter the selected principals. Earlier direct changes may remain applied after a later failure.
+
 ## Behavior and constraints
 
 - A `null` `@SourceLogin` or `@SourceUser` in `z.fn_BuildQueryCopyLoginPermission` or `z.fn_BuildQueryCopyUserPermission` returns no rows because the catalog filter compares the principal name to `@SourceLogin` / `@SourceUser`.

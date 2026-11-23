@@ -4,7 +4,7 @@
 
 ## Purpose and behavior
 
-Call z.usp_BackupDatabase for AllDatabases, FULL, compression enabled, stats = 1, and the fixed path shown in source.
+Takes compressed full backups of the databases selected by `AllDatabases`, using [z.usp_BackupDatabase](z.usp_BackupDatabase.md). This is a parameterless scheduling shortcut with a fixed destination in its source. Review that destination before using it; call the main procedure when you need to choose a folder or database list. Progress is reported with `stats = 1`.
 
 ## Parameters and defaults
 

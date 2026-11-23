@@ -2,25 +2,29 @@
 
 [Subsystem](readme.md) | [Object index](reference/readme.md)
 
+Trace connects SQL Server's event capture to database tables and optional stored-procedure callbacks. The creating connection owns the trace configuration and collection workflow. Each definition is independent, so choose its events and destination before starting capture.
+
 ## Native traces
 
-Each z.Trace registration identifies one native SQL Server rowset trace. TraceID is the native ID. Create allocates it stopped with no scheduled stop time. Configure events, output columns and filters before the first Start. Start applies that configuration to the same native trace; once native event binding begins, changing those selections requires Close/Create. Stop pauses capture and Start resumes the same trace with its fixed native configuration. Callbacks and destination metadata can be changed while stopped. There is no shared capture, local filter routing or automatic trace replacement. SQL Trace rowset SPID bindings cannot be removed; keeping the native configuration fixed avoids a destructive reset on explicit restart.
+Each `z.Trace` registration describes one SQL Server trace; `TraceID` is its server-assigned ID. Create prepares it stopped. Configure events, output columns and filters before the first Start attempt. Once applying those selections begins, changing them requires Close/Create. Stop pauses capture and Start resumes the same configuration. Callbacks and destination metadata can be changed while stopped. Traces have no scheduled stop time and are not automatically replaced on restart.
 
 Configuration, create, start, stop, close, collection and abandoned cleanup reject existing caller transactions. Native SQL Trace actions cannot be rolled back with metadata.
 
-Each trace has its own receiving table and callbacks. SQL Trace evaluates filters natively: `z.usp_TraceStart` applies predicates ordered by `ColumnID, FilterOrdinal` using each row's configured logical operator (`and`/`or`). SQL Trace groups predicates per column and combines different columns with `AND`, rather than evaluating a global cross-column `FilterOrdinal` boolean chain. Native filtering semantics and collation apply.
+Each trace has its own receiving table and callbacks. SQL Server evaluates its filters: predicates on one column follow their configured `and`/`or` operators, while different columns combine with `AND`. Filters are not one global boolean expression ordered across all columns. Native SQL Trace comparison and collation rules apply.
 
 ## Collection and transactions
 
-z.usp_TraceCollectAndClose selects running traces created by the current session/login, optionally restricted by name or native ID. One dedicated, non-MARS connection polls them in turn with bounded sp_trace_getdata reads (records = 1), then decodes an ordinal temporary buffer. It does not stop traces between reads. Every complete decoded event is inserted and its callback executes in the same transaction. EventClass is restored from the frame header when selected; fields reset for each event and datetime values use numeric parts.
+`z.usp_TraceCollectAndClose` reads this connection's running traces in turn and stores received events in their destination tables. Capture continues while collection reads events. Each insert and its callback share a transaction, so their database changes succeed or fail together. Use one dedicated connection without MARS.
 
-Transactions span buffers, native reads and idle waits, committing pending work after a configurable window (5 seconds by default). The optional event cap defaults to NULL. Idle polling requests a 4 ms wait. Deadline checks occur before each read, after each event and before idle waits; blocking reads, callbacks and scheduling can extend the window. Locks persist until commit. Normal completion flushes a partial batch. An all-event callback overrides event-specific registrations. Callbacks receive named @TraceSequence, @TraceID and @EventName and must not change transaction ownership. Failed work rolls back the current batch; earlier commits remain. Native consumption cannot be rolled back.
+Received work commits in batches, approximately every five seconds by default, or sooner when an optional event limit is reached. Reads, callbacks and scheduling can extend both a commit window and the requested total duration; locks remain held until commit. Normal completion commits pending work. A failed batch rolls back, but earlier commits remain and consumed native events cannot be recovered through rollback.
+
+Callbacks receive named `@TraceSequence`, `@TraceID` and `@EventName` arguments and must not change transaction ownership. A callback registered for `all` takes precedence over event-specific registrations.
 
 An externally stopped or closed trace normally leaves polling; other selected traces continue. If a concurrent native read error leaves the pending transaction uncommittable, collection rolls it back and preserves the original error. Normal completion closes the originally selected native traces and removes their configuration, retaining destination data. Error cleanup attempts the same and rethrows the original error. Cancellation may require cleanup after disconnect.
 
 ## Abandoned traces
 
-z.Trace records CreatorSessionID and CreatorLoginTime. z.usp_TraceCleanup removes registrations whose original session/login no longer exists, stopping and closing only a matching registered native rowset trace. An idle connected owner keeps its traces. A recycled session ID does not keep a previous owner's trace alive. Cleanup locks the registration and acts on its TraceID; unregistered SQL Server traces are outside its scope. Use the framework lifecycle APIs to keep registrations synchronized.
+`z.usp_TraceCleanup` removes framework traces whose creating connection has ended. An idle connection keeps its traces, while a new connection reusing an old session ID does not inherit them. Cleanup uses both the recorded session ID and login time and never targets arbitrary unregistered server traces. Use the framework lifecycle APIs to keep registrations synchronized.
 
 z.usp_TraceCreate calls cleanup automatically before allocating a trace; operators can also invoke it explicitly. Cleanup requires full server session visibility. It never infers abandonment from the absence of an active request.
 
@@ -28,7 +32,7 @@ z.usp_TraceCreate calls cleanup automatically before allocating a trace; operato
 
 System supplies sequence, partition and semaphore foundations. Trace installs before Monitoring, which owns diagnostic presets, tables and snapshot callbacks. Installation does not start capture. Internal configuration tables have guarded baselines and no foreign keys.
 
-During normal deployment with collector calls quiesced, `TracePreScript.sql` stops and closes matching registered legacy trace generations, deletes collector mappings and clears old configuration before the baseline runs. As a direct-script fallback when the pre-script has not cleared legacy state, the baseline guard rejects populated old configuration or collector mappings instead of guessing which server traces to close. Old collector helpers are retired; diagnostic receiving tables and data are preserved.
+When upgrading the former shared-collector design, stop collector calls for the maintenance window. The installer closes registered legacy traces and clears their old configuration, while retaining diagnostic receiving tables and data. Directly running modules without the installer does not perform that transition; the baseline rejects populated legacy state instead of guessing which traces to close. Native cleanup failures stop installation for a safe retry.
 
 ## Transport limits
 

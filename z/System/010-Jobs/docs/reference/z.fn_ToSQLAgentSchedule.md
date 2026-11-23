@@ -4,7 +4,9 @@
 
 ## Purpose and behavior
 
-Eight shared schedule inputs -> Name nvarchar(128) and ten native integer schedule fields. Split requested days/times into combinations, consolidate weekly bitmasks, and derive deterministic `Schema z: [DatabaseName]: <native fields>` names through z.fn_GetScheduleNamePrefix. Read-only; inspect returned fields before use.
+Previews the SQL Server Agent schedule fields for a readable schedule definition. Use it before creating a job to see exactly which schedules your requested days and times will produce. It does not create or change schedules.
+
+The result contains one row per required schedule, with its proposed `Name` and ten native timing fields. Several requested days or time ranges can produce several rows. See [the shared schedule parameters](../usage.md#schedule-vocabulary) for the meaning of the inputs.
 
 Invalid input returns no rows; no valid subset is emitted from a partially invalid list. Call z.fn_ValidateScheduleParameter with the same arguments for the diagnostic. The creation procedures raise that diagnostic as an error before modifying Agent metadata.
 

@@ -4,7 +4,9 @@
 
 ## Purpose and behavior
 
-Resolve the current database-prefixed job by Name and call msdb Agent enable operation when found. Missing job is a no-op. No explicit transaction or catch; native errors propagate.
+Enables a service job belonging to the current database so Agent can run it on its schedule. Pass the service name in `@Name`, without the `z_(DatabaseName)_` prefix. If the job does not exist, the call finishes without doing anything.
+
+Enabling does not start the job immediately; use [z.usp_StartServiceJob](z.usp_StartServiceJob.md) for that. Native Agent errors are returned to the caller.
 
 ## Parameters and defaults
 

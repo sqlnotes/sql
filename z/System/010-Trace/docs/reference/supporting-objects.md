@@ -2,73 +2,75 @@
 
 [Subsystem](../readme.md) | [Object index](readme.md)
 
+Use the views to choose available events and columns or inspect configured traces. The tables hold framework configuration; change that configuration through the Trace procedures so it remains consistent with SQL Server's traces.
+
 ## z.Trace
 
 [Source](../../baseline/2020%20Tables/z.Trace.sql)
 
-One native trace registration per TraceID (native ID, not identity). Stores name, description, destination, dates, CreatorSessionID and CreatorLoginTime. Creator session/login distinguishes reused SPIDs. The physical TraceID is the only trace identifier; no scheduled stop is configured. Configuration is removed on close; collected data remains.
+Records each framework trace's name, description, receiving table, dates and owner connection. `TraceID` is the SQL Server trace ID. `CreatorSessionID` and `CreatorLoginTime` identify the original connection even if a session ID is later reused. Closing a trace removes its configuration but retains collected data.
 
 ## z.TraceEvent
 
 [Source](../../baseline/2020%20Tables/z.TraceEvent.sql)
 
-Configured native event IDs keyed by TraceID/EventID. TraceStart applies event/column bindings.
+Stores which event types each trace is configured to capture. Each row identifies a `TraceID` and `EventID`; use AddEvents and RemoveEvents to change the selection before capture starts.
 
 ## z.TraceEventColumn
 
 [Source](../../baseline/2020%20Tables/z.TraceEventColumn.sql)
 
-Selected output bindings keyed by TraceID/EventID/ColumnID. SPID is retained where supported. No internal overlap columns are required.
+Stores the selected information to record for each trace event, identified by `TraceID`, `EventID` and `ColumnID`. `SPID` is retained where supported. Use AddColumns and RemoveColumns instead of editing the table directly.
 
 ## z.TraceFilter
 
 [Source](../../baseline/2020%20Tables/z.TraceFilter.sql)
 
-Typed predicates keyed by TraceID/FilterOrdinal. TraceStart applies native filters in ColumnID/FilterOrdinal order; native filtering semantics apply. Predicates on different columns combine with AND.
+Stores the filters limiting which events SQL Server captures for a trace. Filters on different columns combine with `AND`; predicates on one column retain their configured order and logical operators. Use AddFilter before the first Start attempt.
 
 ## z.TraceTrigger
 
 [Source](../../baseline/2020%20Tables/z.TraceTrigger.sql)
 
-Procedure callbacks keyed by TraceID/EventName, not DML triggers. EventName all overrides event-specific callbacks. Named TraceSequence, native TraceID and EventName arguments execute after insert in the event transaction.
+Stores the procedure callbacks to invoke after an event is recorded. These are callback registrations, not DML triggers. An `all` callback takes precedence over event-specific callbacks and receives named `TraceSequence`, `TraceID` and `EventName` arguments in the event's transaction.
 
 ## z.v_TraceOwned
 
 [Source](../../modules/1020%20Views/z.v_TraceOwned.sql)
 
-Restricts z.v_Trace to the creating session/login. No UUID or collector context is used.
+Lists only traces created by the current connection, using the same status and destination information as `z.v_Trace`.
 
 ## z.v_Trace
 
 [Source](../../modules/1020%20Views/z.v_Trace.sql)
 
-Registered native traces, destinations, creator session/login. Status Running/Stopped/Not Available uses the registered TraceID. No separate trace-ID alias or native start-time column is exposed.
+Lists registered traces with their receiving table and owner connection. `Status` is Running, Stopped or Not Available according to the registered SQL Server trace ID. Use it to inspect framework traces before configuring, collecting or cleaning them up.
 
 ## z.v_TraceColumn
 
 [Source](../../modules/1020%20Views/z.v_TraceColumn.sql)
 
-SQL Trace column catalog -> ColumnID, ColumnName, SystemDataType, DataType, MaxSize, Definition, IsFilterable, IsRepeatable, IsRepeatedBase. Converts image/text definitions to varbinary(max)/nvarchar(max).
+Lists information that trace events can provide, such as query text, duration and session ID. Use `ColumnName` when selecting output columns or filters. The result includes `ColumnID`, `ColumnName`, `SystemDataType`, `DataType`, `MaxSize`, `Definition`, `IsFilterable`, `IsRepeatable` and `IsRepeatedBase`; legacy image/text definitions are represented as varbinary(max)/nvarchar(max).
 
 ## z.v_TraceEvent
 
 [Source](../../modules/1020%20Views/z.v_TraceEvent.sql)
 
-SQL Trace category/event catalog -> TraceEventID, CategoryName, EventName.
+Lists available SQL Trace event types and their categories. Use complete `EventName` values when selecting activity with AddEvents. The result contains `TraceEventID`, `CategoryName` and `EventName`.
 
 ## z.v_TraceEventColumn
 
 [Source](../../modules/1020%20Views/z.v_TraceEventColumn.sql)
 
-Allowed event/column bindings -> TraceEventID, CategoryName, EventName, ColumnID, ColumnName, DataType, MaxSize and three capability flags.
+Shows which columns each event supports, so you can choose output that is available for the activity being captured. Rows contain `TraceEventID`, `CategoryName`, `EventName`, `ColumnID`, `ColumnName`, `DataType`, `MaxSize` and the three capability flags described by `z.v_TraceColumn`.
 
 ## z.v_TraceMetaData
 
-Generated by [z.usp_TraceRefreshMetaData](z.usp_TraceRefreshMetaData.md). Event/category/ID plus one capability flag per current SQL Trace column. No parameters or persistent storage.
+Provides a matrix of events and their supported columns, generated by [z.usp_TraceRefreshMetaData](z.usp_TraceRefreshMetaData.md). Each row identifies an event and category, with one capability flag per current trace column. The view takes no parameters and does not store captured events.
 
 ## z.v_TraceDefinition
 
-Generated by [z.usp_TraceRefreshMetaData](z.usp_TraceRefreshMetaData.md). Native TraceID, IsActive, CategoryName, EventName, TraceEventID, IsEventSelected plus one native selection/filter string per trace column. This matrix describes native server trace configuration; registered destinations are available through z.v_Trace. Empty strings can mean a selected column without a filter; null can mean unselected. Server trace visibility controls rows.
+Shows the live SQL Server trace configuration as an event/column matrix, generated by [z.usp_TraceRefreshMetaData](z.usp_TraceRefreshMetaData.md). Rows identify `TraceID`, `IsActive`, `CategoryName`, `EventName`, `TraceEventID` and `IsEventSelected`, followed by one selection/filter string per trace column. An empty string can mean selected without a filter; NULL can mean unselected. Server trace visibility limits the rows. Use `z.v_Trace` for the framework's receiving-table information.
 
 ## Generated receiving tables
 

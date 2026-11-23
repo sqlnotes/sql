@@ -4,7 +4,7 @@
 
 ## Build and run the demo
 
-[`z.usp_CreateDemoAsyncChannel`](../modules/1070%20Examples/z.usp_CreateDemoAsyncChannel.sql) demonstrates channel construction. Its leading SQL comments contain the complete usage sequence. Installation defines the procedure; invoke it explicitly in a database where Service Broker is enabled. Choose unused channel and pool IDs. The procedure rejects existing Demo registrations or objects instead of overwriting them.
+The demo shows the complete send/process cycle: inserting typed rows sends messages, invoking the manual activator processes them, and querying the destination shows the saved records. Create it explicitly with [`z.usp_CreateDemoAsyncChannel`](reference/z.usp_CreateDemoAsyncChannel.md) in a database where Service Broker is enabled. Choose unused channel and pool IDs; existing Demo registrations or objects are rejected rather than overwritten.
 
 ```sql
 exec z.usp_CreateDemoAsyncChannel @AsyncChannelID = 0, @ActivatorPoolID = 0;
@@ -16,7 +16,7 @@ exec z.usp_AsyncChannel_Demo_Activator;
 select RecordID, Description, Date from z.AsyncChannel_Demo order by RecordID;
 ```
 
-The creator builds a pool, destination table `z.AsyncChannel_Demo`, authored interface `z.AsyncChannel_Demo_Interface`, and a Manual channel registration. It creates the interface before invoking the generator so column metadata is available. After generation supplies the codecs and processing scaffold, it replaces that new scaffold with `z.usp_AsyncChannel_Demo_Process`, which decodes payload rows into the destination table. Manual activation makes the send/receive steps visible; the creator sends no sample data itself.
+The creator provides the destination table `z.AsyncChannel_Demo`, the insert interface `z.AsyncChannel_Demo_Interface`, a one-place processing pool and the Demo processor. Manual activation keeps sending and processing visible as separate steps. The creator itself sends no sample data. Delivery is asynchronous, so another activator invocation may be needed if the first one runs before messages arrive.
 
 Use the same sequence for an application channel: define the interface, register settings, generate infrastructure, and implement processing. The demo is separate from the generic framework objects and is created only on request. Channel removal preserves the authored view, processor and destination table; its pool is also retained. The SQL header describes cleanup ownership.
 

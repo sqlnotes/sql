@@ -2,6 +2,8 @@
 
 [Subsystem](readme.md) | [Object index](reference/readme.md)
 
+The module has two kinds of tools: functions that produce security scripts for review, and procedures that change existing user mappings or role ownership. Generating a script does not apply it. Direct-change procedures require the caller's normal SQL Server administration permissions.
+
 ## Dependencies and installation
 
 Server and database security catalogs provide input; native `create login`, `grant`/`deny`/`revoke`, `alter user`, and `alter authorization` provide execution. There are no cross-feature dependencies.

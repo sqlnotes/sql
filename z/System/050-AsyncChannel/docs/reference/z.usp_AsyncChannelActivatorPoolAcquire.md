@@ -4,7 +4,9 @@
 
 ## Purpose and behavior
 
-Resolve a channel's configured pool and acquire a processing permit through `z.usp_AcquireSemaphore`. The semaphore is named `ADPool/<ActivatorPoolID>`, uses Session ownership, and takes its capacity from `MaxConcurrency`. Different channels assigned to the same pool share that capacity.
+Reserves one processing place in the pool assigned to a channel. Use it before processing work when several channels must share a concurrency limit. The returned pool ID tells the matching release procedure which reservation to release. Generated channel activators already perform this acquisition and release.
+
+Pool capacity comes from `MaxConcurrency` and is shared across its channels. The reservation uses a Session-owned System semaphore named `ADPool/<ActivatorPoolID>`, so transaction completion alone does not release it.
 
 ## Parameters and defaults
 

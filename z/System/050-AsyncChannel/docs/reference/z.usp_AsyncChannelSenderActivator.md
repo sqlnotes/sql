@@ -12,7 +12,7 @@ None.
 
 ## Results and side effects
 
-No result set or explicit return-code contract. RECEIVE one message at a time with a 1,100 ms empty-queue timeout, ending the invocation when no message arrives. For Broker Error and EndDialog messages, end the local conversation, delete matching `z.AsyncChannelSession` rows, and write an Error or Info log. Attribution uses registry values resolved before deletion and may be NULL when none are found.
+No result set or explicit return-code contract. It processes replies one at a time and returns after a 1,100 ms wait finds no message. Broker Error and EndDialog notifications close the local conversation and remove its reusable-session registration, with an Error or Info diagnostic. Channel/session attribution can be NULL when no registration remains.
 
 Other message types are received but have no further processing branch. The routine does not deserialize application rows or acquire an activator-pool slot.
 

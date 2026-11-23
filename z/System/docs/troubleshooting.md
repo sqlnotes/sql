@@ -2,9 +2,11 @@
 
 [Guide](readme.md) · [Source-linked object reference](reference/readme.md)
 
+Use this page when a shared helper fails, waits unexpectedly, or produces a result you did not expect. It links each symptom to the relevant usage or reference details.
+
 ## Compatibility
 
-`z.v_Indexes` references `sys.indexes.optimize_for_sequential_key` and schema-copy emits that option. The minimum supported version is SQL Server 2019 (15.x), which supports these paths. Microsoft lists this column as available from SQL Server 2019 in its [sys.indexes reference](https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-indexes-transact-sql?view=sql-server-ver17).
+Schema Z requires SQL Server 2019 (15.x) or later. Older versions cannot read some catalog fields used by the index view or execute all schema-copy options. See the [System guide](readme.md#compatibility-and-permissions).
 
 ## Environment detection
 

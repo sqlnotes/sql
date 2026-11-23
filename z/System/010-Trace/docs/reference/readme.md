@@ -2,7 +2,7 @@
 
 [Subsystem](../readme.md) | [System](../../../docs/readme.md)
 
-Exact SQL identifiers link to behavior and source. Native system dependencies are described in [architecture](../architecture.md).
+Start with Create, AddEvents, optional AddFilter, Start, and CollectAndClose to capture activity into a table. Stop pauses capture; Close finishes it while retaining the received data. The catalog views help you choose valid events and columns. See [usage](../usage.md) for the complete workflow.
 
 | Object | Documentation | Definition |
 | --- | --- | --- |

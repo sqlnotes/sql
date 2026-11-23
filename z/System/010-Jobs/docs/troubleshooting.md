@@ -2,6 +2,8 @@
 
 [Subsystem](readme.md) | [Object reference](reference/readme.md)
 
+Use this page when a job cannot be created, a schedule is rejected, or a job appears not to be running. Check schedule input first, then Agent availability and permissions.
+
 ## Diagnose current behavior
 
 Creation procedures reject an invalid schedule with error 51000 before changing jobs, categories or schedule attachments. A partially invalid list is rejected as a whole. Use z.fn_ValidateScheduleParameter to obtain the validation message; z.fn_ToSQLAgentSchedule returns no rows for invalid input. An empty conversion result is an error, not a request to remove all schedules. Agent Start is supported.

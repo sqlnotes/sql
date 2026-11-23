@@ -2,6 +2,8 @@
 
 [Subsystem](readme.md) | [Architecture](architecture.md) | [Object index](reference/readme.md)
 
+Start by checking the registered trace's status and owner connection. Configuration and collection must use the connection that created it. If expected events are missing, also consider the receiver's best-effort delivery limit; successful collection does not prove every event arrived.
+
 Inspect z.v_Trace and z.v_TraceOwned for registered trace IDs, owner session/login and Running/Stopped/Not Available status. TraceID is the native ID. Configure and start on the creator connection; configure events/columns/filters before the first Start attempt. Once native event bindings exist, Close/Create is required to change them; Stop/Start resumes the same trace. Callbacks and destination metadata can be changed while stopped.
 
 External Stop/Close is normal and ends polling for that trace. Actual read, decode, insert or callback failures print trace/operation context and rethrow the original SQL error. Current-batch changes roll back, earlier commits remain. Cleanup failures are reported separately and do not replace the collection error.

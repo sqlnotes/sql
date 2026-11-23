@@ -4,7 +4,9 @@
 
 ## Purpose and behavior
 
-Generate z.v_TraceMetaData (event/column capability matrix) and z.v_TraceDefinition (live native trace selections/filters). Compare generated MD5 against each view Code Hash extended property; alter/add property only when hash differs. Trace post stage calls this procedure. Catch rolls back any open transaction and rethrows, though no transaction is started here.
+Updates the generated views used to inspect available trace columns and live trace configuration. Run it when those views need to reflect the server's trace catalog; deployment runs it during Trace's post stage. Unchanged definitions are left in place.
+
+`z.v_TraceMetaData` shows which columns each event supports. `z.v_TraceDefinition` shows selected events, columns and filters for live server traces. The procedure takes no parameters and returns no defined result set. On error it rolls back any open transaction and rethrows, so avoid nesting it inside unrelated work.
 
 ## Parameters and defaults
 

@@ -2,11 +2,13 @@
 
 [Installer guide](readme.md) · [Metadata reference](reference.md)
 
+The installer applies local SQL files in a predictable order, skips eligible scripts that have already succeeded unchanged, and keeps a history of each update. Use this page to understand repeat deployments, add a migration, or decide what to do after a failure. For commands and connection options, start with [install and update](deploy.md).
+
 ## Source and plan
 
 [Deploy.ps1](../Deploy.ps1) orchestrates execution. [Deploy.Common.ps1](../Deploy.Common.ps1) defines traversal/connection/RPC helpers. [Deploy.sql](../Deploy.sql) bootstraps database/schema and current metadata; it requires SQLcmd mode and DatabaseName substitution.
 
-Each folder visits pre -> baseline -> versions -> modules -> direct SQL files -> other folders alphabetically -> post. Files sort by filename with ordinal case-insensitive comparison. Version children parse as .NET Version and sort numerically. The installed version is included, along with newer versions; hashing normally prevents unchanged replay.
+Within a folder, setup scripts run before definitions and cleanup runs afterward: `pre` → `baseline` → `versions` → `modules` → direct SQL files → other child folders → `post`. Ordinary files and child folders sort alphabetically, ignoring case; version folders sort by version number. The installed version is included along with newer versions, but unchanged scripts normally skip through hash checking.
 
 Only nonreserved children of subsystem roots become separately owned/versioned systems. Reserved names are pre, baseline, versions, modules, post, tests, docs. Descendants within a reserved stage organize that stage's files. Docs are excluded. Linked/reparse-point folders and invalid version paths are rejected.
 
@@ -52,7 +54,7 @@ Every executed product script, including pre/post, gets SHA-256 from UTF-8 encod
 
 Only current successful hashes skip eligible scripts. Pre/post always execute within an eligible subtree, even if their hashes exist. Failed content retries. Identical contents share a canonical first filename; filenames alone do not determine identity.
 
-Before metadata RPC, content containing password or encryption is replaced entirely with `***`. This keyword filter is not general secret detection; keep secret literals out of source. Original text is used for execution/hashing.
+Stored source text is replaced with `***` when it contains the keywords `password` or `encryption`. This limits what is recorded in deployment metadata; it does not change the SQL that executes or reliably detect every secret. Keep secret values out of source files.
 
 Logs reference owner/hash and retain failure text/times. Pruning deactivates obsolete hashes, preserving history and successful baseline/version rows. Tests have null hashes and no retained source content.
 

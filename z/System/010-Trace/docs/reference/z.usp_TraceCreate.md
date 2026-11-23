@@ -2,7 +2,9 @@
 
 [Trace](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_TraceCreate.sql)
 
-Create a stopped native rowset trace without a scheduled stop time and return its native TraceID. Names are unique within the creator session/login. A stopped existing registration can be reused and its metadata updated; a running trace must first be stopped. A destination is a quoted two-part current-database table name fitting the registry limit; default z.Trace_<TraceName>. No receiving table is created here. Runs abandoned cleanup before allocation. Rejects ambient transactions.
+Creates a trace ready for configuration and returns its SQL Server trace ID through `@TraceID output`. It does not start capture or create the receiving table. Add the events, columns and filters you want, then call Start and CollectAndClose on the same connection.
+
+`@TraceName` identifies the trace within your connection; NULL creates nothing. `@Description` records its purpose. `@ReceivingTable` selects a two-part table name in the current database, defaulting to `z.Trace_<TraceName>`. The complete quoted name must fit the registry's 128-character limit. A stopped trace with the same name can be reused and updated; a running trace must first be stopped. Run outside an existing transaction.
 
 ```text
 @TraceName nvarchar(128) = null,

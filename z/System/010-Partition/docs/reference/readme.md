@@ -2,6 +2,8 @@
 
 [Guide](../readme.md)
 
+Use the boundary helpers to add partitions for a date range, or the retention helpers to apply a saved policy that both prepares future partitions and handles expired data. The storage reference explains how to configure that policy.
+
 | Object | Reference |
 | --- | --- |
 | PF_SchemaZPartitionGeneric, PS_SchemaZPartitionGeneric, PF_SchemaZPartitionGenericDateTime, PS_SchemaZPartitionGenericDateTime | [Storage and policy](storage.md) |

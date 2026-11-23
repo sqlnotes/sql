@@ -2,7 +2,9 @@
 
 [System guide](../../docs/readme.md)
 
-Partition creates missing date boundaries and applies sliding retention to configured partition functions. Shared System schemes support datetime and datetime-encoded bigint storage.
+Keeps date-partitioned tables ready for new data and removes or retains expired partitions according to a policy. Configure a policy for a partition function, preview the work, then run it manually or through the general-maintenance Agent job.
+
+The same partition function can serve several tables and indexes, so a policy applies to all of them together. The shared System schemes support datetime keys and datetime-encoded bigint IDs.
 
 - [Usage and previews](usage.md)
 - [Architecture and dependencies](architecture.md)

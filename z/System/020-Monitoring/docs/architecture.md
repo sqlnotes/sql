@@ -2,6 +2,8 @@
 
 [Subsystem](readme.md) | [Object index](reference/readme.md)
 
+Monitoring has two kinds of tools: views that report the server's current state, and collectors that save selected readings or events in the Schema Z database. Live views answer immediate questions; saved tables let you investigate after a request or event has disappeared from the native source.
+
 ## Dependencies and installation
 
 System supplies z.SeqGeneralID, PS_SchemaZPartitionGeneric and PS_SchemaZPartitionGenericDateTime. Server DMVs, Extended Events, and msdb Database Mail supply external data. System orchestration can schedule collection through Jobs. [Trace](../../010-Trace/docs/readme.md) supplies the SQL Trace framework for monitoring presets and installs before Monitoring.

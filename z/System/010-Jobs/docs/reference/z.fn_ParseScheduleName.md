@@ -4,7 +4,9 @@
 
 ## Purpose and behavior
 
-ScheduleName nvarchar(128) -> normalized schedule columns. Accept legacy `Schema z: <native fields>` and database-prefixed `Schema z: [DatabaseName]: <native fields>` names. Validate quoted database-name delimiters, then parse ten hyphen-separated integer fields through System z.fn_SplitString and z.fn_FromSQLAgentSchedule. Names from another database can be inspected. Malformed names can return no rows; invalid dates can throw.
+Reads the timing information encoded in a Schema Z schedule name and returns readable schedule settings. Use it to inspect a name without looking up or changing the schedule in `msdb`.
+
+`@ScheduleName` can use the current format, `Schema z: [DatabaseName]: <native fields>`, or the legacy format without a database prefix. Names belonging to another database can also be inspected. The result uses the normalized schedule columns returned by [z.fn_FromSQLAgentSchedule](z.fn_FromSQLAgentSchedule.md). Malformed names can return no rows; invalid dates can raise an error.
 
 ## Parameters and defaults
 

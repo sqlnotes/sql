@@ -4,11 +4,15 @@
 
 ## Purpose and behavior
 
-Create or reconcile a database-prefixed SQL Agent job with a database availability guard in master and up to ten T-SQL steps in the current database. The guard requires a known ONLINE, MULTI_USER, READ_WRITE database outside standby. Guard rejection ends the job reporting success. A failed user command ends the job reporting failure.
+Creates a SQL Server Agent job for the current database, or updates the existing job with the same name. Supply up to ten T-SQL commands; Agent runs them in order after checking that the database is available.
 
-By default, validate the complete schedule before writing metadata. Attach resolved schedule IDs before detaching obsolete IDs. Set `@CreateSchedule = 0` for a manually started job. This ignores schedule inputs and detaches existing schedules without deleting them. NULL is invalid. See [schedule matching, dates and validation](z.usp_CreateSchedule.md).
+`@Name` is the service name, without the database prefix. `@Command` through `@Command10` contain the work to run. The schedule parameters describe when Agent should run it; see [schedule vocabulary](../usage.md#schedule-vocabulary). Use `@CreateSchedule = 0` for a job you will start manually, and the optional `@JobName` and `@JobID` outputs to identify the resulting Agent job.
 
-Creation, removal and orphan cleanup share the database's transaction-owned lock. A failed acquisition raises 51001 after at most 15 seconds of waiting. Nested calls retain the lock until the outer transaction ends. Category creation is best effort outside the job transaction. Other errors during transactional updates roll back the active transaction. A sysadmin can assign the owner whose SID is 0x01.
+The database check requires ONLINE, MULTI_USER, READ_WRITE status outside standby. A rejected check ends the job reporting success without running user commands. A failed user command ends the job reporting failure.
+
+The complete schedule is validated before job or schedule changes. `@CreateSchedule = 0` ignores schedule inputs and removes the job's schedule attachments while retaining the schedules themselves; NULL is invalid. See [schedule matching, dates and validation](z.usp_CreateSchedule.md).
+
+Definition changes wait up to 15 seconds for another change in the same database. Lock acquisition failure raises 51001. A transactional failure rolls back the active transaction, including a caller's transaction; category creation can remain applied. Setting `@SetJobOwnerToSA = 1` lets a sysadmin assign ownership to the built-in administrator login.
 
 ## Parameters and defaults
 
@@ -47,7 +51,7 @@ Reapplying preserves enabled and notification settings, server assignments, and 
 
 The guard is step 1, named `Check Database Status`. When supplied, Command uses the job name as its step name for compatibility. Optional commands use `Command 2` through `Command 10`, preserving their parameter numbers even when intervening NULL commands are omitted. Agent step IDs remain consecutive: Command followed by Command4 produces IDs 2 and 3. Supplying only Command2 creates one user step at ID 2, named Command 2, after the guard. NULL, empty and ASCII-whitespace-only commands add no steps. Remaining commands retain their original text and order. NULL Name raises error 50000 before category, job or schedule writes; an empty command list is valid and creates a guard-only job.
 
-Steps 1 and 2 retain the existing managed-repair policy. Additional steps at IDs 3 through 11 must have one of the generated managed names; otherwise error 51000 rejects the operation. Steps outside IDs 1 through 11 also reject it. Generated names identify library-managed steps, so custom steps must not use those names. Managed-name swaps/cycles are repaired through temporary names. Removing optional commands removes their obsolete managed steps transactionally; an error rolls back the rebuild.
+Reapplying a definition repairs the managed steps and removes commands omitted from the new definition. Custom extra steps are rejected with error 51000 rather than silently overwritten: steps outside IDs 1 through 11, and unrecognized names at IDs 3 through 11, are not accepted. The first two step positions retain the existing repair policy. Do not use the generated names for custom steps. An error rolls back a managed-step rebuild.
 
 ## Results, permissions, and limits
 

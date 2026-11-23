@@ -2,7 +2,7 @@
 
 [Subsystem](../readme.md) | [System](../../../docs/readme.md)
 
-Exact SQL identifiers link to behavior and source. Native system dependencies are described in [architecture](../architecture.md).
+Choose a backup, restore, cleanup or inspection object below. Each reference explains its inputs, results and operational requirements and links to the defining SQL. Start with [usage](../usage.md) for complete calls, or [architecture](../architecture.md) for how the operations fit together.
 
 | Object | Documentation | Definition |
 | --- | --- | --- |

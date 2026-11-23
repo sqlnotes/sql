@@ -2,7 +2,7 @@
 
 [Subsystem](../readme.md) | [System](../../../docs/readme.md)
 
-Exact SQL identifiers link to behavior and source. Native system dependencies are described in [architecture](../architecture.md).
+Choose a `BuildQueryCopy` function when you want SQL scripts to review and apply separately. Choose a procedure when you want to repair existing user/login mappings or change server-role ownership directly. Each reference describes the inputs, returned information and scope of changes.
 
 | Object | Documentation | Definition |
 | --- | --- | --- |

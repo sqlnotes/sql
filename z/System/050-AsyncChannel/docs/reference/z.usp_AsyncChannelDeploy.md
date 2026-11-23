@@ -4,7 +4,9 @@
 
 ## Purpose and behavior
 
-Execute the selected channel's generated scripts from `z.v_AsyncChannelScripts` in `Ordinal` order. By default only rows with `NeedDeployment = 1` run; text drift (`IsSameScript`) alone does not trigger replacement.
+Creates the infrastructure needed by a registered application channel: message codecs, send entry points, queue/service and receiver activation. Register the channel and author its interface view first, then use this procedure to make that configuration usable.
+
+By default it installs missing objects and required activation changes identified by `z.v_AsyncChannelScripts`. A difference between generated and installed SQL (`IsSameScript`) does not by itself replace an existing object. Review the generated scripts before choosing forced deployment.
 
 ## Parameters and defaults
 
@@ -23,7 +25,7 @@ No defined result set or explicit return-code contract. Dynamic DDL creates miss
 
 The procedure sets `xact_abort on` but starts no transaction of its own. Outside a caller transaction, a later failure can leave earlier scripts installed. Requires permissions for the generated DDL and referenced schemas, types, Broker objects and activation context; no grants are supplied by this procedure.
 
-Author the expected channel interface before calling: the static cursor snapshots generated scripts, so a placeholder interface created during this call does not refresh dependent column metadata. Inspect `z.v_AsyncChannel` and `z.v_AsyncChannelScripts` before deployment. Generated names/types must satisfy the limits in [architecture](../architecture.md).
+Author the expected channel interface before calling: all scripts are prepared from the metadata available at the start, so a placeholder interface created during deployment does not refresh the already-prepared codecs. Inspect `z.v_AsyncChannel` and `z.v_AsyncChannelScripts` before deployment. Generated names/types must satisfy the limits in [architecture](../architecture.md).
 
 ## Example
 

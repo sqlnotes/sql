@@ -4,6 +4,8 @@
 
 ## Examples
 
+Use these views to inspect active requests and database space, then call the snapshot or event collector when you want to keep the visible information for later. The queries return current data; the procedures save rows in their corresponding Monitoring tables.
+
 ```sql
 select SessionID, BlockerSessionID, DurationInSecond, DatabaseName, SQLText
 from z.v_ActiveSessions;
@@ -21,6 +23,8 @@ exec z.usp_CollectSystemHealthEvents;
 Snapshots capture requests visible at collection time. Restrict access to the stored SQL text, plans and session details.
 
 ## CPU and memory history
+
+Save the recent native CPU/memory observations, then query the retained history:
 
 ```sql
 exec z.usp_CollectCPUMemoryStats;

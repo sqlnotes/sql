@@ -4,13 +4,15 @@
 
 ## Purpose and behavior
 
-Validate input through z.fn_ValidateScheduleParameter and translate it through z.fn_ToSQLAgentSchedule. Invalid input, an empty conversion result or an overlength database-prefixed name raises error 51000 before schedule writes; a partially invalid list is rejected as a whole. In a transaction, acquire the current database's exclusive transaction-owned job/schedule lock, list schedules with sp_help_schedule, and create missing deterministic names with sp_add_schedule. Resolve eligible schedules by native timing fields; enabled state is preserved. Lock acquisition waits at most 15 seconds and failures raise 51001. The lock remains held until the actual outer transaction ends, including when called inside job creation. Commit; on error within the transaction rollback any open transaction and rethrow.
+Creates the SQL Server Agent schedules needed for a readable schedule definition, or reuses equivalent schedules already owned by the current database. Use it when you need schedule IDs to attach to jobs; [z.usp_CreateServiceJob](z.usp_CreateServiceJob.md) normally does this for you.
 
-Before creating any missing schedules, compare all ten native timing fields against each same-name schedule and eligible reuse candidate's own encoded tuple, accounting for SQL Agent storing a zero end time as 235959. Candidates qualify by their encoded or actual timing, so relevant shared schedules with drift are rejected. Generated names and creation inputs are preserved. Any mismatch, including a NULL field, raises error 51000 naming the conflicting schedule; no requested schedules are created. Restore the existing schedule's timing or rename it before retrying. Existing enabled/disabled state is preserved, and matching shared schedules are never automatically repaired. ScheduleNames and ScheduleIDs are valid only after successful execution. A thrown error can leave the caller's output variable at its prior value; callers should handle the exception rather than consume that value.
+Describe the recurrence using [the shared schedule parameters](../usage.md#schedule-vocabulary). Invalid input, a partly invalid list, or an overlength database-prefixed name raises error 51000 before any requested schedules are created. Existing schedules keep their enabled or disabled state.
 
-An omitted StartDate uses the SQL Server local date; EndDate remains unlimited (9999-12-31). Creation captures one operation date and passes it through validation, conversion and nested schedule creation. Explicit dates and recurring ByTime defaults are unchanged. Specific derives execution dates from ByDay, ignores StartDate/EndDate, and retains date-only values as midnight.
+Reused schedules must still match the timing encoded in their names. If a schedule has been manually changed without being renamed, error 51000 identifies the conflict before any requested schedules are created. Restore its timing or rename it before retrying; another job may share it. The procedure does not repair or enable existing schedules automatically.
 
-Reuse requires the current database's literal prefix and matching native timing fields/end date. For every-day schedules (daily interval one), different start dates can share a schedule when both are on or before the captured operation date. Future starts require the same start date. Multi-day, weekly, monthly and other frequencies retain exact start-date matching. Prefer an exact date match, then the lowest schedule ID among eligible historical starts. Disabled schedules stay disabled. No existing schedule is renamed or modified.
+An omitted `@StartDate` uses SQL Server's local date; an omitted `@EndDate` is unlimited (`9999-12-31`). Specific schedules take execution dates from `@ByDay` and ignore these two date parameters. A date-only Specific value runs at midnight.
+
+Schedules can be shared only within the current database and with matching timing and end date. For daily interval-one schedules, an equivalent schedule that has already started can be reused despite a different historical start date. Future starts and other frequencies require the same start date. An exact date match is preferred; otherwise the lowest eligible schedule ID is used.
 
 ## Parameters and defaults
 
@@ -28,11 +30,15 @@ Reuse requires the current database's literal prefix and matching native timing 
 @OperationDate date = null
 ```
 
-These are the source-declared types and defaults. OperationDate coordinates nested creation: callers normally omit it, using the captured SQL Server local date. CreateServiceJob supplies its captured operation date. When explicitly supplied, it controls omitted StartDate and the historical-start reuse boundary.
+Use `@ScheduleIDs output` to receive the schedules that were created or reused, and `@ScheduleNames output` for their display names. Callers normally omit `@OperationDate`; it lets nested job/schedule creation use the same local date for default start dates and historical schedule reuse.
 
 ## Results, permissions, and limits
 
-ScheduleNames is a Unicode comma-joined display string of actual resolved names. ScheduleIDs is a JSON array of distinct integer IDs (for example [12,34]), ordered by ID, with names in the same order. Both outputs are reset to null internally at entry. Database names can contain commas, so do not split ScheduleNames. Consume ScheduleIDs through OPENJSON and use native schedule-ID parameters. Converter Name rows describe requested names and may differ from reused historical names. No defined result set. Requires msdb schedule authority; schedules reside in msdb and use the current database's prefix.
+Schedule changes are serialized within the current database. A competing change waits up to 15 seconds; lock acquisition failure raises error 51001. Protection lasts until the outer transaction ends. A transactional error rolls back any open transaction, including a caller's transaction, then rethrows the error.
+
+`@ScheduleIDs` is a JSON array of distinct integer IDs, for example `[12,34]`, ordered by ID. `@ScheduleNames` contains their display names in the same order. Names can contain commas, so use the IDs rather than splitting the display string. The actual names can differ from a conversion preview when a historical schedule is reused.
+
+There is no defined result set. Consume outputs only after successful execution; an exception can leave a receiving variable's previous value unchanged. The caller needs schedule-management permissions in `msdb`.
 
 ## Dependencies
 

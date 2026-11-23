@@ -2,9 +2,28 @@
 
 [Object index](readme.md) | [Source](../../modules/1070%20Procedures/z.usp_RestoreDatabase.sql)
 
-Restores a full database backup, an optional compatible differential and transaction logs, or continues a compatible
-database already in RESTORING or standby. All paths are interpreted by SQL Server,
-using the SQL Server service account's access.
+Restores a database from its full, differential and log backups, or applies newer backups to a compatible database already in RESTORING or standby. Use it to recover a database, create a renamed copy, or keep an unrecovered secondary up to date. It works with native SQL Server backup files, recursive filesystem folders, and individual supported storage URLs.
+
+Start with `@ShowPlan = 1` to see the selected backup sequence, destination files and per-database outcomes before changing a database. Specify `@TargetDatabaseName` for one destination, or omit it to process eligible source databases under their own names. All paths are interpreted by SQL Server using its service account's access.
+
+The default `NORECOVERY` leaves databases ready for more restores. Choose `RECOVERY` to bring them online, or `STANDBY` for read access between restores. An explicit target can be replaced because `@ReplaceExisting` defaults to 1; automatic selection skips existing ONLINE databases. Review the [destination rules](#destination-state-and-replacement) before execution.
+
+## Parameters at a glance
+
+| Parameter | What it controls |
+| --- | --- |
+| `@BackupPath` | Backup file, recursively searched filesystem folder, or one HTTP(S)/S3 backup-object URL |
+| `@TargetDatabaseName` | Destination name; NULL enables automatic per-source processing |
+| `@RecoveryType` | Final state: `NORECOVERY` (default), `RECOVERY` or `STANDBY` |
+| `@ReplaceExisting` | Whether an explicitly named existing destination may be replaced; default 1 |
+| `@OtherRestoreOptions` | Extra native restore options; default `stats = 10` |
+| `@DataFolder`, `@LogFolder` | Optional directory overrides for new data and log files |
+| `@StandbyFolder` | Optional directory for the standby undo file |
+| `@UseDefaultFolder` | Use instance-default directories for unspecified folders (1), or directories recorded in the backup (0) |
+| `@ShowPlan` | Return the plan without executing restores when 1; default 0 executes it |
+| `@DropConnections` | Disconnect users from an existing ONLINE destination before pending restores when 1; default 1 |
+
+The declaration below gives the exact types and defaults. Later sections explain source selection, replacement, file destinations and results in detail.
 
 ```sql
 create or alter procedure z.usp_RestoreDatabase

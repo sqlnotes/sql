@@ -2,9 +2,13 @@
 
 [Object index](readme.md)
 
+Add missing boundaries to an existing date-based partition function. Use the function to generate a plan, or the procedure to preview or execute it. These helpers leave existing boundaries in place and do not expire data.
+
 ## z.fn_BuildQueryCreatePartitionForDateRange
 
 [Source](../../modules/1020%20Functions/z.fn_BuildQueryCreatePartitionForDateRange.sql)
+
+Returns the SQL needed for the requested date range without executing it. Supply either a table using the function or the partition-function name directly.
 
 ```sql
 create or alter function z.fn_BuildQueryCreatePartitionForDateRange
@@ -25,6 +29,8 @@ returns @ret table(Ordinal int identity(1,1), SQL nvarchar(max), Date datetime)
 
 [Source](../../modules/1070%20Procedures/z.usp_CreatePartitionForDateRange.sql)
 
+Executes the boundary plan, or returns it for review with `@ShowPlan = 1`. Execution affects every partition scheme using the selected function.
+
 ```sql
 create or alter procedure z.usp_CreatePartitionForDateRange
 (
@@ -42,9 +48,17 @@ create or alter procedure z.usp_CreatePartitionForDateRange
 
 ## Parameters and returned plan
 
-Use ObjectName or PartitionFunctionName to identify the existing function. Supported key types are date, datetime, datetime2, smalldatetime or bigint System IDs. Date keys require Daily or coarser periods. Default period Monthly, interval 1, DateFrom current UTC time when null, DateTo computed from count when null, count 3, storage default filegroup when null/Default/[Default]. Negative count requests backward boundaries.
+Use `@ObjectName` or `@PartitionFunctionName` to identify the existing function. Supported keys are date, datetime, datetime2, smalldatetime or bigint System IDs. Date keys require Daily or coarser periods.
 
-Both rounded endpoints are included. The TVF returns Ordinal identity, SQL and Date. Procedure ShowPlan returns Ordinal, Date and SQL in Ordinal order; the default ShowPlan = 0 preserves execution behavior. Each missing boundary emits next-used statements for all schemes, a split and next-used statements again. Validation failures become executable throw text in a row. Selecting output does not throw those generated errors.
+| Parameter | Meaning |
+| --- | --- |
+| `@PartitionRangeType`, `@PartitionRangeTypeInterval` | Period and number of periods between boundaries; defaults are Monthly and 1. |
+| `@DateFrom`, `@DateTo` | Requested range. An omitted start uses current UTC time; an omitted end is calculated from the count. Both rounded endpoints are included. |
+| `@NumberOfPartitions` | Number of interval increments when calculating the end; defaults to 3. A negative value requests boundaries backward in time. |
+| `@FileGroup` | Filegroup for new partitions. NULL, Default and [Default] use the database default. |
+| `@ShowPlan` | Procedure only: 1 returns the proposed SQL; 0 executes it. |
+
+The function returns `Ordinal`, `SQL` and `Date`; procedure preview returns `Ordinal`, `Date` and `SQL` in execution order. An error can appear as executable error text in a plan row. Reading the plan does not execute that error or any partition changes.
 
 ## Execution and limits
 

@@ -2,6 +2,8 @@
 
 [Guide](readme.md) · [Reference](reference/readme.md)
 
+Partition maintenance works on a partition function and every table or index that uses it. The policy decides how far ahead to create boundaries and how far back to retain data. Preview shows the proposed changes; execution applies each recovery or expiration operation as a unit.
+
 ## Objects and dependencies
 
 System owns shared storage: `PF_SchemaZPartitionGeneric` / `PS_SchemaZPartitionGeneric` use datetime-encoded bigint and `range left`; `PF_SchemaZPartitionGenericDateTime` / `PS_SchemaZPartitionGenericDateTime` use datetime and `range right`. Both start without boundaries on the default filegroup. Guards preserve existing definitions.
@@ -12,11 +14,11 @@ System owns shared storage: `PF_SchemaZPartitionGeneric` / `PS_SchemaZPartitionG
 
 Automatic maintenance uses UTC and adds only future period boundaries. A count of three in October means November, December and January. It does not backfill September/October into a populated catch-all after missed runs. For LEFT, the first recovery split preserves each scheme's original tail filegroup for switch-back; subsequent future splits use the policy filegroup.
 
-When the last partition contains data, one transaction creates absent `<Table>_Partition_SplitHold` tables, switches the affected tails out, adds boundaries, checks their destination range, switches them back and drops the holders. LEFT uses lower-exclusive/upper-inclusive bounds; RIGHT uses lower-inclusive/upper-exclusive bounds. Rows outside the destination range cause rollback rather than redistribution.
+If the last partition already contains data, maintenance temporarily holds that data while adding future boundaries. All held rows must fit the destination range; otherwise the operation rolls back rather than redistributing rows. Temporary tables use the `<Table>_Partition_SplitHold` suffix and must not already exist.
 
 ## Expiration and compression
 
-Each expired boundary is a separate transaction: create matching targets, switch every affected heap/clustered partition, merge the boundary and drop targets when `ArchivedSwappedPartitions = 0`. With value 1, targets remain for later processing. Existing targets cause failure even when empty. Names use `<Table>_Partition_YYYYMMDD`, or `_YYYYMMDD_HHMM` for hourly/minute policies.
+Each expiration operation handles every affected table in one transaction. `ArchivedSwappedPartitions = 0` permanently removes the expired rows; value 1 keeps them in same-schema tables for later processing. Existing targets cause failure even when empty. Names use `<Table>_Partition_YYYYMMDD`, or `_YYYYMMDD_HHMM` for hourly/minute policies.
 
 `z.usp_CopyTableSchema` receives the exact source partition number and inherits placement and compression independently for every copied index. Indexes must be partition aligned. Maintenance does not change desired compression or move retained tables to other servers.
 

@@ -1,6 +1,8 @@
 # System developer guide
 
-System is the shared foundation of Schema Z: identifiers, strings/dates, catalog views, schema scripting, coordination and maintenance. The framework objects use schema `z`. Numbered folders have independent deployment histories.
+System provides the helpers used throughout Schema Z and available to your own SQL: inspect table definitions, work with text and dates, generate scripts, store settings and coordinate concurrent work. Its objects are installed in schema `z` of the database you choose.
+
+The feature modules below build on these helpers to manage jobs, partitions, backups, diagnostics and asynchronous processing. Start with the usage examples for a task, then use the object reference for parameter meanings and returned values.
 
 ## Start here
 
@@ -12,7 +14,7 @@ System is the shared foundation of Schema Z: identifiers, strings/dates, catalog
 
 ## Subsystems
 
-Installation visits these children sequentially in the alphabetical order shown. Children with the same numeric prefix share an installation dependency tier and do not require installation precedence among themselves; runtime calls can still cross subsystem boundaries. After these features, `890-SystemBeforePost` installs cross-feature helpers before System post runs.
+Choose the module for the work you want to do. The numbered folders also determine installation order; see [architecture and dependencies](architecture.md) when changing or deploying the library.
 
 | Subsystem | Purpose |
 | --- | --- |

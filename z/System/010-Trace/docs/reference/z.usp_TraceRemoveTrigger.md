@@ -2,7 +2,7 @@
 
 [Trace](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_TraceRemoveTrigger.sql)
 
-Remove callback registrations from one stopped trace. Calling with `@EventName = N'all'` or `@EventName = null` removes all callbacks for the trace; otherwise removes callbacks matching the specified event name. Destination data is unaffected.
+Stops invoking a callback for a stopped trace without deleting collected events. `@EventName` selects the callback's event; `all` or NULL removes every callback registration for that trace. The callback procedure itself is not dropped.
 
 ```text
 @TraceName nvarchar(128) = null,

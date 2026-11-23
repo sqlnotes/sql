@@ -4,7 +4,9 @@
 
 ## Purpose and behavior
 
-Write one diagnostic row directly, or buffer it in session context while a transaction is open. Outside a transaction, first flush any retained buffer and then insert the current row. Debug rows are inserted directly in the current transaction and are skipped when the transaction is doomed.
+Records a diagnostic message for channel operations in `z.AsyncChannelLog`. You can include the channel, SQL session, conversation and related payload to help investigate processing failures. Non-Debug messages written during a transaction are buffered until they can be flushed outside the transaction, allowing them to survive a rollback on that connection.
+
+Outside a transaction, the procedure saves any buffered messages before the new one. Debug messages instead participate in the current transaction and are skipped when that transaction is uncommittable.
 
 ## Parameters and defaults
 
@@ -21,7 +23,7 @@ All fields are optional and are stored as supplied; the procedure does not autom
 
 ## Results and side effects
 
-No result set or explicit return-code contract. Non-Debug rows inside a transaction use `AsyncChannel-LogCount` and per-slot metadata/text session keys. The first 40 rows are retained; buffered Info and Payload are each truncated to 4,000 characters. Additional rows are dropped but counted for a warning on flush.
+No result set or explicit return-code contract. The session buffer retains the first 40 rows; buffered Info and Payload are each limited to 4,000 characters. Additional rows are dropped but counted for a warning on flush.
 
 ## Transactions, permissions, and limits
 

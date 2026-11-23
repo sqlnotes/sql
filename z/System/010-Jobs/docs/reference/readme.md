@@ -2,7 +2,7 @@
 
 [Subsystem](../readme.md) | [System](../../../docs/readme.md)
 
-Exact SQL identifiers link to behavior and source. Native system dependencies are described in [architecture](../architecture.md).
+Use the creation procedures to define jobs and schedules, the lifecycle procedures to operate on existing service jobs, and the conversion functions to inspect schedule definitions before applying them. Each reference explains its inputs and results and links to the SQL source. See [usage](../usage.md) for a complete workflow and [architecture](../architecture.md) for how Jobs connects to SQL Server Agent.
 
 | Object | Documentation | Definition |
 | --- | --- | --- |

@@ -4,6 +4,8 @@
 
 ## Preview login and permission scripts
 
+The first query scripts `ExampleLogin` under the new name `ExampleLoginCopy`. The second scripts `ExampleUser`'s database permissions and role memberships for `ExampleUserCopy`. Both return SQL text; neither creates a principal or grants a permission.
+
 ```sql
 select LoginName, LoginType, SQL
 from z.fn_BuildQueryCopyLogin(N'ExampleLogin', N'ExampleLoginCopy');

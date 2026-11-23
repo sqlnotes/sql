@@ -4,7 +4,9 @@
 
 ## Purpose and behavior
 
-Send already serialized Unicode JSON fragments as `/SchemaZ/AsyncChannel/Message` on a channel conversation. Obtain a conversation through `z.usp_AsyncChannelGetConversationHandle` when the supplied handle is NULL.
+Sends already serialized JSON fragments to a deployed AsyncChannel for processing in another session. Use it when you have JSON text already; use the channel's generated interface or Enqueue procedure when you want typed values serialized for you. Delivery follows commit, and the call does not wait for the application processor to finish. Inactive and unknown-channel behavior is described under results below.
+
+Messages use `/SchemaZ/AsyncChannel/Message`. Omit the conversation handle to let the shared conversation helper create or reuse one for this channel and session.
 
 ## Parameters and defaults
 

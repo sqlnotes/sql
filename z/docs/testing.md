@@ -2,13 +2,15 @@
 
 [Installer guide](readme.md)
 
+Use a preview to review the planned files before an installation, then query deployment history to check what ran and where an update failed. These checks describe installation progress; verify the feature you intend to use separately.
+
 ## Preview
 
 ```powershell
 ./z/Deploy.ps1 -ServerName localhost -DatabaseName SchemaZ_Example -ShowPlan
 ```
 
-This validates traversal without a SQL connection. Because installed versions are not read, it does not predict every skip for an existing database. Review stage, owner, path and version in returned steps.
+The command returns ordered steps showing each file's stage, owner, path and version. It does not connect to SQL Server. Because it cannot read installed versions, an actual update may skip files included in this preview.
 
 ## Inspect installed state
 
@@ -33,6 +35,6 @@ A successful deployment log demonstrates script execution, not complete correctn
 
 ## Test-only mode
 
-`RunTests` walks reserved tests folders and executes their SQL in Test batches without content hashes or subsystem version/date advancement. It still connects and bootstraps metadata and can execute arbitrary test SQL.
+Use `-RunTests` to run a separately maintained SQL test tree. It runs SQL in reserved `tests` folders and records the results as Test batches, without changing installed subsystem versions or dates. This mode still connects to the database, prepares deployment metadata and executes the supplied SQL.
 
 The published tree does not ship a regression suite. Point RootPath at a separately maintained test tree if using this facility, preview first, and use a disposable target. Test mode does not automatically create/clean a disposable database or undo test statements.

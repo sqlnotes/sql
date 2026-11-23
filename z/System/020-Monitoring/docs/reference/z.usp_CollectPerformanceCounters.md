@@ -2,8 +2,9 @@
 
 [Object index](readme.md) | [Source](../../modules/1070%20Procedures/z.usp_CollectPerformanceCounters.sql) | [Table](../../baseline/2020%20Tables/z.PerformanceCounters.sql)
 
-Collects `z.v_PerformanceCountersDefault` into `z.PerformanceCounters` until the
-requested duration expires. Both parameters are positive integer seconds:
+Records SQL Server performance-counter history for later queries and charts. It samples the selection in `z.v_PerformanceCountersDefault`, saves the results in `z.PerformanceCounters`, and calculates rates and averages for counter types that need successive readings.
+
+Choose `@Interval` for seconds between samples and `@Duration` for how long the call should run. Both parameters are positive integer seconds:
 `@Interval = 1`, `@Duration = 2147483647`. NULL, zero and negative inputs use these defaults. Execution is synchronous; the default
 duration is approximately 68 years. Installation does not start collection or
 create a job.

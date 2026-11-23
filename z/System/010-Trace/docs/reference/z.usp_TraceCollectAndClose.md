@@ -2,7 +2,9 @@
 
 [Trace](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_TraceCollectAndClose.sql)
 
-Collect running physical traces created by this session/login, optionally selected by name or native ID. Prepare destination tables and only selected output columns, poll each trace with sp_trace_getdata records = 1, and process every decoded event in buffer order. Traces keep running between reads with no scheduled stop time.
+Collects events from this connection's running traces into their receiving tables, then closes the selected traces. Use it after configuring and starting capture. Missing receiving tables are created with the selected output columns; the tables and recorded data remain after collection ends.
+
+Use one dedicated connection without Multiple Active Result Sets (MARS), and run outside an existing transaction. Collection is best effort: a successful return does not guarantee that every captured event arrived.
 
 ```text
 @MaxDurationInSec int = 2147483647,
@@ -12,10 +14,17 @@ Collect running physical traces created by this session/login, optionally select
 @TraceID int = null
 ```
 
-The first three parameter positions are retained. Use named selectors. Duration must be nonnegative; transaction duration and any supplied event limit must be positive. NULL disables the event limit. Ambient transactions are rejected. The total duration is soft and does not set native stoptime; zero selects and closes without polling.
+| Parameter | Meaning |
+| --- | --- |
+| `@MaxDurationInSec` | How long to collect before closing the traces. The default is effectively continuous collection; zero closes selected traces without reading events. Must be nonnegative. |
+| `@TransactionDurationInSec` | Approximate window between commits of received events; defaults to 5 seconds and must be positive. |
+| `@MaxEventsPerTransaction` | Optional positive event limit that can commit a batch sooner. NULL leaves batching time-based. |
+| `@TraceName`, `@TraceID` | Optional selectors for this connection's traces. Omit both to collect all its running traces. Use named arguments; the first three parameter positions are retained. |
 
-Each complete event resets its fields, restores selected EventClass from its header, and receives a TraceSequence. Its insert and callback share one transaction. Callbacks accept @TraceSequence, @TraceID and @EventName; all overrides event-specific registration. They must not change transactions. Transactions span buffers, native reads and idle waits. By default, commit pending work after 5 seconds; @TransactionDurationInSec adjusts this window and an optional @MaxEventsPerTransaction can commit earlier. The deadline is checked before each native read, after each event and before an idle wait. Idle polling requests a 4 ms wait. Native reads, callbacks and scheduling can delay the deadline; locks remain held until commit. Normal collection completion flushes pending work. Datetimes decode from numeric parts. Existing destination columns are not retyped or fully validated beyond the required base columns.
+Each recorded event receives a `TraceSequence`. Its insert and callback commit or roll back together. Callbacks accept named `@TraceSequence`, `@TraceID` and `@EventName`; an `all` callback takes precedence over event-specific callbacks. They must not commit or roll back the collector's transaction.
 
-A selected trace stopped or closed elsewhere normally leaves polling, while other selected traces continue. If a concurrent native read error leaves the pending transaction uncommittable, it is rolled back and the original error is preserved. Normal completion closes the original selected trace IDs and creator session/login and removes their configuration, retaining output tables/data. Failures roll back the current batch, print trace/operation context, attempt cleanup and rethrow the original error. Native consumption is not transactional; prior commits survive. Cancellation may require abandoned cleanup after disconnect.
+The duration and commit windows are approximate. Native reads, callbacks, waiting and scheduling can delay them, and locks remain held until commit. Pending rows are committed on normal completion. Existing destination event columns are not retyped or fully validated beyond the required base columns.
 
-Use one dedicated non-MARS connection. SQL Trace, metadata, destination DDL/DML and callback privileges are required. Bounded reads have known reception loss; successful return is not a completeness guarantee. See [architecture](../architecture.md) and [cleanup](z.usp_TraceCleanup.md).
+If a selected trace is stopped or closed elsewhere, collection normally continues for the other traces. An actual collection failure rolls back the current batch, reports trace/operation context, attempts cleanup and rethrows the original error. Earlier commits remain. Events already consumed from SQL Trace cannot be read back by rolling back the database transaction. Cancellation may require [abandoned cleanup](z.usp_TraceCleanup.md) after disconnect.
+
+The procedure stores events rather than returning them as a defined result set. The caller needs SQL Trace and metadata access, permission to create/write receiving tables, and permission to execute callbacks. See [architecture](../architecture.md) for delivery and transaction limits.

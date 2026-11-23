@@ -2,9 +2,13 @@
 
 [Object index](readme.md)
 
+Use these views to inspect columns, indexes, constraints and partitions in the current database. They give SQL Server metadata consistent names and useful SQL fragments for reporting and script generation. The sequence supports the timestamped identifiers used by other Schema Z features.
+
 ## z.SeqGeneralID
 
-[Source](../../baseline/1010%20Sequences/z.SeqGeneralID.sql). Int sequence: start/min 1, increment 1, max 268435455, cycle, cache 268435455.
+Supplies the sequence part of a Schema Z bigint identifier. Get a value with `next value for z.SeqGeneralID`, then pass it to the identifier helper below.
+
+[Source](../../baseline/1010%20Sequences/z.SeqGeneralID.sql). Values start at 1 and increase by 1 up to 268435455, then cycle. The sequence caches values for allocation.
 
 Use its value with a datetime in [z.fn_GenerateZSequenceID](functions.md#zfn_generatezsequenceid) to create a datetime-encoded `bigint` ID: seconds since 1900 form the higher bits, and the sequence supplies the low 28 bits. [z.fn_DecodeZSequenceID](functions.md#zfn_decodezsequenceid) retrieves the datetime and sequence components. See the [generate and decode example](../usage.md#generate-and-decode-an-identifier).
 
@@ -16,7 +20,7 @@ All views are read-only projections over SQL Server catalogs; they do not create
 
 | Object and source | Row meaning and important outputs |
 | --- | --- |
-| [z.v_Objects](../../modules/1020%20Views/z.v_Objects.sql) | One column per catalog object. ObjectID, SchemaName, ObjectName, ObjectType, ColumnID/ColumnName, PrimaryKeyOrder, type/length/nullability/collation, ReadOnly, identity/computed/rowversion flags, computed definition and identity seed/increment/current value |
+| [z.v_Objects](../../modules/1020%20Views/z.v_Objects.sql) | One row per column of a catalog object. Use SchemaName/ObjectName/ColumnName to identify it; the remaining fields describe types, primary-key position, identity, computed and rowversion properties. |
 | [z.v_Indexes](../../modules/1020%20Views/z.v_Indexes.sql) | One nonheap index on a user table/view. ObjectID/IndexID, names/expected name, IndexType, primary/unique flags, ordered key definition, included/filter definitions, storage/partition key, compression and index options/XML parent |
 | [z.v_DefaultConstraints](../../modules/1020%20Views/z.v_DefaultConstraints.sql) | One default: ObjectID, SchemaName, DefaultName/ExpectedDefaultName, ParentObjectID/ParentColumnID, parent names, Definition, IsSystemNamed |
 | [z.v_CheckConstraints](../../modules/1020%20Views/z.v_CheckConstraints.sql) | One check: ObjectID, SchemaName, CheckConstraintName, ParentObjectID/ParentObjectName/ParentColumnName, Definition, IsDisabled, IsSystemNamed, IsNotTrusted |

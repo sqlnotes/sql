@@ -2,7 +2,11 @@
 
 [Subsystem](readme.md) | [Object reference](reference/readme.md)
 
+Use one dedicated connection to create a trace, select the activity to capture, start it, and collect events into a table. Keep that connection open for the whole workflow. The examples below use the current database as the destination.
+
 ## Inspect traces
+
+`z.v_Trace` shows registered traces and their status. `z.v_TraceOwned` limits the list to traces created by your current connection.
 
 ```sql
 select TraceID, Name, Status, CreatorSessionID, CreatorLoginTime, ReceivingTable
@@ -12,7 +16,7 @@ select * from z.v_TraceOwned;
 
 ## Bounded custom trace
 
-Run configuration and collection on one dedicated connection. Each definition creates a separate native trace, with no scheduled stop. This example explicitly ends collection after 30 seconds and closes that trace.
+This example captures completed SQL batches, including their text, start time, duration and session ID. It excludes the connection running the trace. Collection ends after approximately 30 seconds and closes the trace; received rows remain in the default table `z.Trace_DeveloperTrace`. The duration is a processing deadline, not a strict time limit if native reads or callbacks block.
 
 ```sql
 declare @TraceID int;

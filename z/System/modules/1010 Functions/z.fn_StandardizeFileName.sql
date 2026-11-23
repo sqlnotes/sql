@@ -7,8 +7,8 @@ Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/docs/reference
 
 Replaces filename-unsafe characters and spaces with underscores, preserving Unicode and case.
 */
-create or alter function z.fn_StandardizeFileName(@FileName nvarchar(4000))
-returns nvarchar(4000)
+create or alter function z.fn_StandardizeFileName(@FileName nvarchar(max))
+returns nvarchar(max)
 as
 begin
 	if @FileName is null return null;

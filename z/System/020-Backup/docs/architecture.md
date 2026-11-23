@@ -2,6 +2,8 @@
 
 [Subsystem](readme.md) | [Object index](reference/readme.md)
 
+Backup uses SQL Server's native backup and restore commands. The module selects databases or backup media, supplies file names and options, and provides previews and history views around those operations. Retention is a separate operation so taking a backup does not also delete older files.
+
 ## Installation and dependencies
 
 The subsystem installs in System's alphabetical child order. Shared System modules precede feature children; System post scripts follow them. See [System documentation](../../docs/readme.md).

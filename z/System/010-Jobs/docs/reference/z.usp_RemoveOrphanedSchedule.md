@@ -4,7 +4,9 @@
 
 ## Purpose and behavior
 
-In a transaction protected by the current database's exclusive job/schedule application lock, list schedules via sp_help_schedule and delete job_count=0 rows whose names match z.fn_GetScheduleNamePrefix literally. Wildcards in database names have no special meaning. Legacy global names and other databases' schedules are excluded. AllOrphanedSchedules=1 raises error 51000 before work; global cleanup cannot be coordinated by a database-local lock. Lock acquisition waits at most 15 seconds; failure raises 51001. Commit releases protection only when the actual outer transaction ends; catch rolls back any open transaction and rethrows.
+Deletes schedules owned by the current database that are no longer attached to any SQL Agent job. Use it after removing jobs or changing their schedules to clean up unused definitions in `msdb`.
+
+Schedules belonging to other databases and legacy global schedules are retained. The database prefix is matched literally, so punctuation or wildcard characters in a database name do not widen the cleanup scope. `@AllOrphanedSchedules` is retained for compatibility: omit it or pass 0 (NULL also uses scoped cleanup); passing 1 raises error 51000.
 
 ## Parameters and defaults
 
@@ -13,6 +15,8 @@ In a transaction protected by the current database's exclusive job/schedule appl
 ```
 
 ## Results, permissions, and limits
+
+Job and schedule changes are serialized within the database. Lock acquisition waits up to 15 seconds; failure raises 51001. Protection lasts until the outer transaction ends. An error rolls back any open transaction, including a caller's transaction, and is rethrown.
 
 No defined result set. Requires msdb schedule-deletion authority. Cleanup is limited to the current database prefix. The legacy parameter remains for signature compatibility; NULL and 0 use scoped cleanup, and 1 is rejected.
 

@@ -4,7 +4,9 @@
 
 ## Purpose and behavior
 
-Acquire the current database's exclusive transaction-owned job/schedule application lock, then resolve the current database-prefixed job by Name and remove it when found. Missing job is a no-op. Pass delete_unused_schedule=0 so job removal cannot delete legacy or shared schedules; current-database orphan cleanup is a separate operation. The lock waits at most 15 seconds; failure raises 51001. Commit retains protection until the actual outer transaction ends; errors roll back any open transaction and rethrow.
+Deletes a service job belonging to the current database while retaining its schedules. Pass the service name in `@Name`, without the `z_(DatabaseName)_` prefix. Removing a job that is already absent succeeds without doing anything.
+
+Use [z.usp_RemoveOrphanedSchedule](z.usp_RemoveOrphanedSchedule.md) afterward if you also want to remove this database's schedules that no jobs use. Shared and legacy schedules are not deleted as part of job removal.
 
 ## Parameters and defaults
 
@@ -13,6 +15,8 @@ Acquire the current database's exclusive transaction-owned job/schedule applicat
 ```
 
 ## Results, permissions, and limits
+
+Job and schedule changes are serialized within the database. Lock acquisition waits up to 15 seconds; failure raises 51001. Protection lasts until the outer transaction ends. An error rolls back any open transaction, including a caller's transaction, and is rethrown.
 
 No defined result set. Requires applicable msdb Agent permissions. Schedule rows are retained; use z.usp_RemoveOrphanedSchedule for database-scoped cleanup.
 

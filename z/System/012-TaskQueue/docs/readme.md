@@ -2,6 +2,10 @@
 
 TaskQueue runs stored procedures in ordered groups. Tasks at the same `SortOrder` can run concurrently. A higher group waits for every task in the preceding groups to satisfy its completion condition. SQL Server Agent supplies the workers. The calling application decides whether the recorded outcomes meet its own success criteria.
 
+Use it when you need a persistent list of work, a limit on parallel execution, retry rules and a record of each task's outcome. A task is one call to a procedure you supply. For example, several item-processing tasks can run together, followed by a summary task after they succeed.
+
+TaskQueue uses the [Jobs module](../../010-Jobs/docs/readme.md) to launch workers and System semaphores to coordinate them. Install it in the database that will hold the batch definitions and history. The executor procedure must accept the `@Parameters` argument described below.
+
 ## Define and execute a batch
 
 This example assumes `dbo.usp_ProcessItem` exists in the coordination database and accepts `@Parameters nvarchar(max)`. Use a unique batch name for each new batch. The transaction publishes the definition as one unit. Launch after commit on a connection with implicit transactions off.
@@ -36,6 +40,24 @@ where BatchID = @BatchID
 order by SortOrder, TaskID;
 ```
 
+The example creates two tasks at the same sort level and permits two workers, so the tasks can run together. `@BatchID output` gives you the ID needed to inspect their results. The last query is the important success check: a Completed batch means the launcher finished, not that every task succeeded. Read each task's `Status` and `LastErrorMessage` before treating the work as successful.
+
+## Main inputs and results
+
+| Input | Meaning |
+| --- | --- |
+| `@BatchName` | A unique name for a new batch. Existing batches can be selected by ID or name. |
+| `@BatchID` | The batch identifier. Creation can generate one and return it through `OUTPUT`. |
+| `@MaxConcurrentWorkers` | Maximum number of tasks allowed to execute at once in the batch. Execution requires a positive value. |
+| `@TaskName`, `@TaskID` | A display name and identifier for one task. Omit the task ID to assign the next available ID. |
+| `@ExecutorProcedure` | The procedure to call for the task. Use a schema-qualified name. |
+| `@Parameters` | Text passed unchanged to that procedure's named `@Parameters` argument. Your procedure interprets it. |
+| `@SortOrder` | The task's group. Equal values permit parallel work; higher values wait for earlier groups. Omitted values assign successive groups. |
+| `@MaxRetries`, `@RetryIntervalSecond` | Additional attempts after the initial attempt, and the delay between attempts. Defaults are zero retries and 60 seconds. |
+| `@CompletionCondition` | What result permits later groups to proceed: Succeeded, Failed or Finished. See [task table](#task-table). |
+
+Executors signal failure by raising a SQL error. Return codes do not fail an attempt, and result sets are not stored as task results. TaskQueue records statuses, attempt counts and error details in its tables; your executor stores any business output it needs to retain.
+
 ## Batch lifecycle
 
 | Procedure | Input state | Result |
@@ -60,6 +82,8 @@ Raise a SQL error to fail an attempt. The worker catches the error, rolls back a
 
 ## Execute a batch with Agent workers
 
+`z.usp_TaskQueueExecuteBatch` starts worker jobs for one batch and waits for those jobs to finish or leave tracking. Use this as the normal entry point after defining the batch. It manages the launch; your application still checks the task results.
+
 The launcher requires a running, visible local SQL Server Agent, a positive `MaxConcurrentWorkers`, no active transaction and implicit transactions off. This also applies to an empty batch. Callers need Agent job-management permissions and visibility into worker jobs and T-SQL sessions. Each job runs as its owner. [Jobs permissions and visibility](../../010-Jobs/docs/reference/supporting-objects.md#zfn_issqljobrunning)
 
 The launcher resolves one batch and captures `StartedAtUTC` during admission. Admission and unscheduled job definitions commit together, followed by a short delay before polling begins. Job names include the coordination database, BatchID, ExecutionID and worker number. A concurrent launcher cannot admit the same Running batch. An existing matching **name** is reused as configured, so its command must run the correct worker and its deletion mode must be “on completion.”
@@ -74,9 +98,11 @@ When the launcher finishes tracking jobs, it sets Completed and records `Finishe
 
 `z.usp_TaskQueueExecuteBatchWorker` runs one task at a time in one selected Running batch. Use a dedicated connection outside a transaction, with implicit transactions off and no MARS or interleaved commands. A direct worker caller owns the Running transition and finalization. Calling a worker on a Ready batch returns without processing tasks.
 
-On each pass, the worker takes the batch-change lock and checks that the batch is Running with a positive worker limit. It recovers unowned Running rows, finds the first unsatisfied sort level and selects a due task there. If that level can progress but no task is due, the worker commits and waits 300 milliseconds before checking again. When a task is due, the worker tries the batch-capacity semaphore before the task semaphore. A capacity timeout causes a commit and a one-second wait before rechecking the batch. Other negative capacity return codes end the call. A failed task semaphore acquisition causes a commit, an error and an attempt to release held slots. The worker stops when the batch leaves Running or the first unsatisfied level has no work that can progress. It also stops when all levels are satisfied.
+The worker chooses due tasks from the earliest group whose completion conditions are not yet satisfied. It waits when a task is delayed or all worker slots are busy. It stops when the batch is no longer Running, all groups are satisfied, or the current group cannot make progress. A worker returning therefore does not imply that every task succeeded.
 
-A claim records an attempt, session identity and new claim token. The worker commits the claim before invoking the executor, and the token prevents stale completion writes. To finish, the worker locks the batch, records the outcome and attempts both session semaphore releases before committing. The release helper prints caught exceptions and returns a failure status. The worker proceeds with the commit regardless of those return codes.
+Only one worker can claim a particular attempt. The claim is saved before the executor is called, and completion is tied to that claim so an old worker cannot overwrite a newer attempt. After execution, the worker saves the outcome and tries to release its execution slots. Caught cleanup exceptions are printed; release failures do not undo the saved task outcome.
+
+For wait diagnostics, due-task polling uses 300 milliseconds and capacity polling uses one second. A negative capacity status other than timeout ends the worker; a task-lock acquisition failure raises an error after cleanup is attempted. The [worker source](../modules/1070%20Procedures/z.usp_TaskQueueExecuteBatchWorker.sql) contains the lock and claim details.
 
 Recovery marks unlocked Running attempts Failed, keeps the recorded attempt count, and applies the normal retry interval and limit. It uses the task lock rather than elapsed time or a missing DMV row. A disconnected executor may already have committed effects. Design retried tasks to tolerate repetition. An interrupted but still-connected session can retain locks. Disconnect it before recovery or reuse. A worker recovers only Running batches. An orphaned Running task in a Stopped batch requires reconciliation before Resume or Restart.
 
@@ -117,6 +143,8 @@ An unmet condition blocks higher levels while other eligible tasks at the same l
 `z.v_TaskQueuePendingTasks` shows Pending and retryable Failed rows of Running batches with attempts available. It exposes the stored availability time, sort level and worker limit. It includes delayed tasks, later levels and tasks waiting on capacity. Read the view to inspect outstanding work. Only a worker claims it under the batch lock.
 
 ## Audit log
+
+Use `z.TaskQueueLog` to trace what happened to a batch or task: when it was created, claimed, completed, retried or changed. Filter by `BatchID` and `ExecutionID` for one run, or by `ActionID` for one operation. The entries below explain which fields to use when diagnosing a failure.
 
 `z.TRI_TaskQueueBatch` and `z.TRI_TaskQueueTasks` write each changed row to [`z.TaskQueueLog`](../baseline/2020%20Tables/z.TaskQueueLog.sql) in the same transaction. NULL TaskID denotes a batch entry. For row changes, BeforeJson and AfterJson contain operational values including the executor payload and nulls, excluding the derived CompletionState. A restart records the batch's previous execution and the reset tasks' new execution under the same ActionID.
 

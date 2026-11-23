@@ -2,6 +2,8 @@
 
 [Guide](readme.md) · [Reference and source](reference/readme.md)
 
+Use the maintenance preview and the reported engine error to identify the affected function and tables. A failed operation does not undo earlier operations that already committed.
+
 ## Invalid policies
 
 Use positive period intervals, nonnegative forward counts and `PartitionsToKeep >= -1`. Value -1 disables expiration; zero retains the current-period cutoff behavior. Minute, Hourly, Daily, Weekly, Monthly and Yearly are supported. Weekly starts Monday in UTC independently of DATEFIRST. Date keys cannot represent subday boundaries, so Hourly/Minute policies are rejected for that key type. Keep date spans within the supported key type and arithmetic range.

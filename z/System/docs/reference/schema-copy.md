@@ -2,13 +2,25 @@
 
 [Object index](readme.md)
 
+Use `z.usp_CopyTableSchema` to create an empty table with the columns, supported indexes and defaults of an existing table. It is useful when preparing a destination for a partition switch or recreating a table structure. It copies definitions, not data. Preview with `@ShowPlan = 1` before applying the generated statements.
+
 ## Interfaces
 
 `z.usp_CopyTableSchema` generates and executes the schema-copy statements. With `@ShowPlan = 1`, it instead returns `Ordinal int`, `PartName varchar(30)` and `Definition nvarchar(max)` rows in execution order without executing generated SQL. [Procedure declaration](procedures.md#zusp_copytableschema).
 
 ## Inputs
 
-The procedure requires source/target names (`nvarchar(256)`). Use two-part names in the current database. Optional defaults: storage null; drop-existing target 0; copy identity/table/indexes/XML/defaults each 1; after-table SQL null; compression null; print 0; partition number 1; show plan 0. An explicit null partition number also selects partition 1. A nonpartitioned source accepts only partition 1.
+Supply `@FullSourceTableName` and `@FullTargetTableName` as schema-qualified names in the current database, for example `dbo.Source` and `dbo.Archive`. The [declaration](procedures.md#zusp_copytableschema) lists exact types and defaults.
+
+| Parameter or group | How to use it |
+| --- | --- |
+| `@PartitionNumber` | Select the source partition whose placement and compression should be copied. Omitted or NULL means partition 1; a nonpartitioned source accepts only 1. |
+| `@ShowPlan` | Set to 1 to return ordered script rows without executing them. |
+| `@DropTargetTableIfExists` | Set to 1 only when the existing target may be dropped and replaced. The default protects it. |
+| `@CopyIdentity`, `@CopyTableSchema`, `@CopyIndexes`, `@CopyXMLIndexes`, `@CopyDefault` | Choose which definitions to copy. All default to 1. Disabling table creation requires an existing target. |
+| `@FileGroupOrPartitionScheme`, `@DataCompression` | Leave NULL to inherit the selected source storage and compression, or supply explicit overrides. |
+| `@ScriptAfterTableCreation` | Optional trusted SQL to run after creating the table, before indexes and defaults. |
+| `@PrintCode` | Print generated SQL while executing it. Use `@ShowPlan` for a preview that makes no changes. |
 
 Storage null inherits each heap/index filegroup separately. For a partitioned source, the filegroup is the destination mapped to that index's selected partition. Compression null similarly inherits each selected heap/index partition's compression, including NONE, ROW, PAGE, COLUMNSTORE and COLUMNSTORE_ARCHIVE where applicable. Empty partitions do not need allocated pages for storage resolution.
 

@@ -4,7 +4,9 @@
 
 ## Purpose and behavior
 
-Validate a complete readable schedule definition without writing metadata. Returns nvarchar(4000): NULL for valid input, otherwise a parameter-specific error message. The creation procedures throw this message as error 51000 before changing jobs, categories or schedules. The native converter returns no rows for invalid input.
+Checks whether a readable schedule definition is valid before you create a job or schedule. It makes no changes. A NULL result means the input is valid; otherwise the `nvarchar(4000)` result explains which parameter needs attention.
+
+Use [the shared schedule parameters](../usage.md#schedule-vocabulary) to describe the recurrence, days and times. The creation procedures use the same validation and raise its message as error 51000. [z.fn_ToSQLAgentSchedule](z.fn_ToSQLAgentSchedule.md) previews valid input as native Agent fields and returns no rows for invalid input.
 
 ## Parameters and defaults
 

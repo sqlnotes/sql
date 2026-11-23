@@ -4,7 +4,7 @@
 
 ## Purpose and behavior
 
-Release the Session-owned processing permit for an acquired activator pool through `z.usp_ReleaseSemaphore`. The shared helper obtains the held slot from session context; callers supply only the pool ID returned by acquisition.
+Releases the processing place reserved by `z.usp_AsyncChannelActivatorPoolAcquire`, allowing another session to use that pool's capacity. Call it on the same SQL connection after processing finishes, supplying the pool ID returned by acquisition. The shared semaphore helper tracks the held reservation; callers do not need a slot number.
 
 ## Parameters and defaults
 

@@ -4,7 +4,7 @@
 
 ## Purpose and behavior
 
-Remove a registered channel's generated infrastructure and registration while preserving application-authored objects. Resolve names from `z.v_AsyncChannel`; an unknown channel ID is a no-op.
+Removes a registered channel and the infrastructure generated for it while keeping the application's interface view, processing procedure and data tables. Use it to retire a channel, after deciding what to do with outstanding work. Removal forcibly cleans up its conversations and can discard queued work; it does not wait for a graceful drain. An unknown channel ID does nothing.
 
 ## Parameters and defaults
 

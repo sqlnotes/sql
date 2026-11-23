@@ -4,7 +4,7 @@
 
 ## Purpose and parameters
 
-Formats catalog type metadata for the signature comparisons in [z.v_AsyncChannel](z.v_AsyncChannel.md).
+Turns catalog type information into readable SQL type text, such as `nvarchar(100)` or `decimal(18,2)`. [z.v_AsyncChannel](z.v_AsyncChannel.md) uses this helper to compare the interface, serializer and processing signatures. It is a metadata formatter, not a channel deployment operation.
 
 ```text
 @UserTypeID int
@@ -13,7 +13,7 @@ Formats catalog type metadata for the signature comparisons in [z.v_AsyncChannel
 @Scale tinyint
 ```
 
-All parameters are required; no defaults are declared. MaxLength follows catalog byte-length semantics, including `-1` for MAX types.
+All parameters are required; no defaults are declared. `@UserTypeID` identifies the type in `sys.types`. `@MaxLength` is its catalog length in bytes, including `-1` for MAX types. `@Precision` and `@Scale` supply the type's numeric precision and scale or fractional-time scale where applicable.
 
 ## Result
 

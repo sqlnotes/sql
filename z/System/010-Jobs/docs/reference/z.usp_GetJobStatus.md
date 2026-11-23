@@ -4,7 +4,7 @@
 
 ## Purpose and parameters
 
-Return SQL Agent job information by calling `msdb.dbo.sp_help_job`.
+Shows whether SQL Server Agent jobs are enabled, what they are currently doing, and the outcome of their last run. Use it for one job or all jobs visible to the caller; it does not change them.
 
 ```sql
 @JobID uniqueidentifier = null,
@@ -32,11 +32,7 @@ Return the native job-summary result set unchanged. Relevant columns include:
 | `current_retry_attempt` | Current retry count |
 | `last_run_outcome` | Previous run's outcome, separate from current state |
 
-For a selected job, `@job_aspect = 'JOB'` omits the additional step, schedule
-and target result sets. For all jobs, the native default aspect already returns
-only job summaries; an explicit JOB aspect is invalid without a job selector.
-No result columns are renamed or converted. Native return codes and errors
-propagate. The procedure does not modify jobs or elevate permissions.
+The procedure returns job summaries only, without separate step, schedule or target result sets. Columns and status codes are the native Agent values. Native return codes and errors propagate, and the procedure does not grant additional permissions.
 See [Microsoft's sp_help_job reference](https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-help-job-transact-sql)
 for the full schema, status codes and required msdb roles.
 

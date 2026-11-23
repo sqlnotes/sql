@@ -4,7 +4,9 @@
 
 ## Purpose and behavior
 
-Resolve the current database-prefixed job by Name and call msdb Agent start operation when found. Missing job is a no-op. No explicit transaction or catch; native errors propagate.
+Asks SQL Server Agent to start a service job belonging to the current database. Pass the service name in `@Name`, without the `z_(DatabaseName)_` prefix. If the job does not exist, the call finishes without doing anything.
+
+A successful call means the start request was accepted, not that the job has started or completed. Use [z.usp_GetJobStatus](z.usp_GetJobStatus.md) to inspect its state and outcome. Native Agent errors are returned to the caller.
 
 ## Parameters and defaults
 

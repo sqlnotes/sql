@@ -17,8 +17,7 @@ begin
 	set nocount, xact_abort on;
 	if z.fn_IsSQLAgentRunning() <> 1
 		throw 50000, 'SQL Server Agent is not running or is not visible to this caller.', 1;
-	if @@trancount <> 0
-		or @@options & 2 = 2
+	if @@trancount <> 0 or @@options & 2 = 2
 		throw 50000, 'Batch execution requires no transaction and implicit transactions off.', 1;
 	declare	@MaxConcurrentWorkers int, @WorkerNumber int = 1, @ExecutionID uniqueidentifier,
 			@WorkerNamePrefix nvarchar(255), @Name nvarchar(255), @Command nvarchar(max), @JobID uniqueidentifier,

@@ -4,7 +4,9 @@
 
 ## Purpose and behavior
 
-Read the running system_health ring_buffer target, pass its XML to z.fn_ExtractSystemHealthEvent(@TargetData), exclude seven noisy event names, and insert keys absent from z.SystemHealthEvent. The decoder supplies UTC EventDateUTC and MD5 EventHash. An absent/stopped session or missing target yields no rows. It has no explicit transaction or catch. This replaces z.usp_CheckSystemHealthTrace; update external jobs and callers to the new name. Monitoring's [post cleanup](../../post/DeprecatedObject.sql) removes the retired procedure.
+Keeps selected events from SQL Server's `system_health` ring buffer in `z.SystemHealthEvent` for later investigation. Run it periodically before older buffer contents are overwritten. It keeps the original event XML and UTC event time, skips the noisy event types listed below, and leaves previously stored events intact.
+
+The collector reads an already-running `system_health` session; it does not create, start or change it. A missing/stopped session or missing ring-buffer target produces no new rows. This replaces `z.usp_CheckSystemHealthTrace`; update external jobs and callers to the new name. Monitoring's [post cleanup](../../post/DeprecatedObject.sql) removes the retired procedure.
 
 Within each input snapshot, the collector keeps one row per
 (EventDateUTC, EventName, EventHash) before checking the stored keys. Repeated
@@ -26,7 +28,7 @@ None.
 
 ## Results, permissions, and limits
 
-No defined result set. Existing stored rows are retained; ring-buffer data only is collected.
+Returns no rows; query `z.SystemHealthEvent` for collected events. Only events still present in the ring buffer can be collected. It starts no transaction of its own, and insert errors propagate.
 
 ## Dependencies
 

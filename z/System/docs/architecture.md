@@ -2,6 +2,8 @@
 
 [Guide](readme.md) · [Reference](reference/readme.md)
 
+System supplies the common utilities used by the feature modules. Use this page to understand how those modules fit together, what installation sets up, and which operations can affect a caller's transaction. For individual tasks and examples, start with [Using System](usage.md).
+
 ## Schema and deployment boundaries
 
 All children create SQL objects in `z`. Partition functions/schemes are database-level; SQL Agent jobs live in `msdb`. Folder ownership controls independent installer histories, not separate SQL schemas. [Installer metadata](../../docs/reference.md) is bootstrapped separately.
@@ -10,7 +12,7 @@ System baseline creates `z.SeqGeneralID` and the shared bigint/datetime partitio
 
 ## Initialization and orchestration
 
-`z.usp_DataInitializationMaster` discovers initialization procedures by name, sorted alphabetically in the chosen schema (default `z`; null includes all schemas). It supplies no encompassing transaction.
+`z.usp_DataInitializationMaster` uses `z.usp_ExecuteProcedures` to run procedures whose names start with `usp_DataInitialization`, excluding Helper and Master, one at a time in schema and name order (default schema `z`; null includes all schemas). Each initialization procedure manages its own transactions. Errors are collected while the remaining procedures run, then reported at the end. Use a single initializer when each procedure should run once; overlapping calls can repeat procedures that another call has already finished.
 
 Naming enforcement uses explicit schema/table selectors in `z.usp_ForceNamingConvention`. Root post passes `@SchemaNames = N'["z"]'`; no schema registry is maintained.
 

@@ -4,7 +4,7 @@
 
 ## Purpose and output
 
-Returns one row per configured [activator pool](z.AsyncChannelActivatorPool.md), with advisory current-database semaphore counts.
+Shows configured processing limits, channel counts and currently held places for each [activator pool](z.AsyncChannelActivatorPool.md). Use it to compare shared capacity with present usage. Counts are an advisory snapshot of the current database's locks, not a record of completed processing or a complete count of waiting activators.
 
 | Columns | Meaning |
 | --- | --- |

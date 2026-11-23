@@ -4,7 +4,9 @@
 
 ## Purpose and scope
 
-Inventory backup files directly inside one database's FULL, DIFF and LOG directories. By default, use the filename convention to plan cleanup without reading backup headers. Set `UseBackupHeader = 1` to use native backup metadata for irregular or legacy filenames. No `msdb` history determines cleanup.
+Removes old backup files from one database's FULL, DIFF and LOG folders while preserving the files selected by its retention rules. Start with `@ShowPlan = 1` to review what would be kept or deleted. This is a separate maintenance operation; taking a backup does not run cleanup automatically.
+
+By default it recognizes managed backup filenames without opening backup headers. Set `@UseBackupHeader = 1` when filenames are irregular or you need the metadata-based dependency checks described below. Cleanup works from the supplied folders, not `msdb` history.
 
 The database-level folder must be an absolute Windows local/UNC path or an absolute Linux path. Mount Linux network shares before calling. Supply the parent of the three backup-type folders, not the overall backup destination root.
 

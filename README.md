@@ -1,8 +1,9 @@
 # Schema Z
 
-Schema Z is a SQL Server library of shared SQL utilities and administration
-features. SQL objects use the `z` schema. Numbered subsystem folders establish
-deployment order and independent deployment histories.
+Schema Z helps you maintain SQL Server databases: schedule jobs, manage
+partitions, collect diagnostics, back up and restore databases, and run work in
+parallel. It also provides shared SQL helpers for text, dates, metadata and
+coordination. Install it in a database and call its objects through schema `z`.
 
 Start with the [System developer guide](z/System/docs/readme.md). It links to
 shared utilities, object references, and the eight feature subsystems:

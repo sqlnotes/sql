@@ -4,9 +4,9 @@
 
 ## Target and behavior
 
-An `instead of insert` trigger on [z.AsyncChannelMessage_Interface](z.AsyncChannelMessage_Interface.md). Empty inserted sets return immediately. A local fast-forward cursor visits rows ordered by AsyncChannelID and DataSequence.
+Sends each JSON fragment inserted into [z.AsyncChannelMessage_Interface](z.AsyncChannelMessage_Interface.md) as a separate channel message. Applications use the interface INSERT; they do not call this trigger directly. Rows are processed by channel and DataSequence, without being stored in the interface view.
 
-On each channel change it clears the cached handle and calls `z.usp_AsyncChannelGetConversationHandle`. When a handle is returned, it calls `z.usp_AsyncChannelSend` once per row, preserving the output handle for subsequent rows of that channel. Input rows are not stored in the interface view.
+It uses the shared conversation and send helpers to deliver the fragments to their configured channel. Choose the [batched interface](z.AsyncChannelMessageBatched_Interface.md) instead when several fragments should share a message.
 
 ## Input and results
 

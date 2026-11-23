@@ -4,7 +4,7 @@
 
 ## Purpose and output
 
-Expands each [channel registration](z.AsyncChannel.md) into resolved object names, catalog identities, optional pool information and structural validation reasons. It reads metadata and performs no generation or writes.
+Shows whether each registered channel has the expected objects and compatible signatures. Use it before generation or when diagnosing a channel that cannot send or process messages. Results include resolved object names, optional pool information, `IsValid` and readable `InvalidReason` details. Querying the view does not create or change a channel.
 
 The output includes all channel settings; ActivatorPoolName and ActivatorPoolMaxConcurrency; SchemaName; and the following object-name/catalog pairs:
 

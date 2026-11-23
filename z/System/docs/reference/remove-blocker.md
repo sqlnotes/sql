@@ -2,6 +2,8 @@
 
 [Object index](readme.md) · [Source](../../890-SystemBeforePost/1010%20Procedures/z.usp_RemoveBlocker.sql)
 
+Requests a background SQL Agent job that terminates user sessions blocking the connection that called it. Use it only for an administrative operation where ending those sessions is intended: their work can be rolled back. The helper returns without waiting for the worker to run or finish, so the calling connection can continue its work while the job watches for blockers.
+
 ## Interface
 
 ```sql
@@ -12,7 +14,9 @@ No parameters or explicit result set. Requires no open transaction and running S
 
 ## Behavior and generated objects
 
-Builds global temporary procedure `##usp_RemoveBlocker_<CallerSPID>`, then creates/starts a service job using that name when no matching job exists. The temporary procedure repeatedly inspects requests blocking the caller and issues `kill <BlockingSessionID>` for user sessions. It waits until the caller has no active request for approximately two seconds, then drops itself. The created job requests automatic deletion after execution (SQL Agent delete_level=3).
+The background worker watches for user sessions blocking the caller and attempts to terminate them. It stops after the caller has had no active request for approximately two seconds. The job is configured to delete itself on completion.
+
+For troubleshooting, the generated global temporary procedure and service job use the name `##usp_RemoveBlocker_<CallerSPID>`. The procedure normally drops itself when it finishes.
 
 The helper does not wait for the job to finish, offer a dry run or limit killing to a configured database. It targets a blocker of the invoking session. Exceptions from KILL inside the generated worker are swallowed.
 

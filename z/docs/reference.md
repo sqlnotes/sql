@@ -2,24 +2,28 @@
 
 [Installer guide](readme.md) · [Source](../Deploy.sql)
 
+Deployment metadata answers three questions: which subsystem versions are installed, which files have already succeeded unchanged, and what happened during each update. Use the tables to inspect that history. The procedures are the installer's interface for recording progress; applications normally call `Deploy.ps1` rather than these procedures directly.
+
 ## Tables
 
 Bootstrap creates missing current-schema tables inside a transaction; it does not migrate old schemas. All dates are UTC datetime values. Foreign keys retain owner/batch/hash relationships. Installer login needs schema/DDL and metadata access; there are no automatically granted application roles.
 
-| Object | Columns and relationships |
-| --- | --- |
-| z.Systems | SystemID uniqueidentifier PK; CodeBase nvarchar(4000) not null; Version varchar(100) not null; Date datetime not null. Check requires GUID from MD5(trim(lower(CodeBase))). |
-| z.SystemUpdateBatch | BatchID bigint identity PK; SystemID FK; SystemVersion varchar(100); HasError bit default 0; StartDate datetime default UTC; nullable EndDate. Owner/version distinguish deployment and Test batches. |
-| z.SystemScriptHash | ScriptHashID bigint identity PK; SystemID FK; FileHash varbinary(32) not null with length check; FileName/FileContent nvarchar(max) not null; CreationDate UTC; IsCurrent default 1; HasSucceeded default 0. Unique owner/hash index. |
-| z.SystemUpdateBatchLog | Composite PK BatchID/BatchLogID (bigint identity log ID); owner FK; nullable FileHash (32-byte check and composite owner/hash FK); nullable ErrorMessage nvarchar(max); StartDate UTC; nullable EndDate; batch FK. Tests are unhashed. |
+| Object | What it tells you | Important fields |
+| --- | --- | --- |
+| `z.Systems` | The installed version of each subsystem. | `SystemID` identifies the owner, `CodeBase` is its folder path, and `Version`/`Date` describe the last successful completion. |
+| `z.SystemUpdateBatch` | One deployment or Test batch and whether it finished with an error. | `BatchID`, `SystemID`, `SystemVersion`, `HasError`, `StartDate`, `EndDate`. An unfinished batch has no end date. |
+| `z.SystemScriptHash` | The contents known for a subsystem and whether they have succeeded. | `FileHash` is the 32-byte content hash; `FileName`/`FileContent` hold the recorded source. `IsCurrent` and `HasSucceeded` control normal skip decisions. |
+| `z.SystemUpdateBatchLog` | When an individual file ran and any error it produced. | `BatchID`/`BatchLogID` identify the entry; `FileHash` connects it to the recorded file, and `ErrorMessage`/`StartDate`/`EndDate` describe its outcome. Tests have no file hash. |
 
-Nonnullable columns are required except where defaults or identities are shown. Hash/log large-value storage is set out of row. History is not automatically time-expired; pruning deactivates hashes rather than deleting old records. Filename/content live in hash rows, not repeated in each log.
+Join by subsystem, batch and hash identifiers to follow an update from owner to file result. Filename/content live in hash rows rather than being repeated in every log. History does not expire automatically; pruning marks obsolete hashes inactive while retaining prior records. The [source](../Deploy.sql) defines exact column types, constraints and indexes.
 
 ## Procedure contracts
 
 Metadata procedures are intended for the installer. Calling them individually does not acquire the deployment lock automatically. Write procedures use nocount/xact_abort and local transactions where shown in source; rollback can affect a caller transaction. Access is not a general user-facing administrative API.
 
 ### z.usp_CreateDatabaseUpdateLog
+
+Starts or finishes a file's deployment-log entry. The installer also uses it to create a batch when needed, and receives identifiers for later completion calls.
 
 [Source](../Deploy.sql)
 
@@ -37,9 +41,13 @@ create or alter procedure z.usp_CreateDatabaseUpdateLog
 )
 ```
 
-Creates a batch when BatchID=-1, creates file log when BatchLogID=-1, otherwise finishes that log. Returns BatchID and BatchLogID both as output parameters and result columns. Validates owner/batch/hash, forbids Test hashes, registers/reactivates hash before execution, marks success on completed log with no error, latches batch HasError. New hash requires sanitized filename/content. Atomic local transaction with updlock/holdlock.
+Pass `@BatchID = -1` to create a batch and `@BatchLogID = -1` to start a file log; otherwise the call finishes the identified log. `BatchID` and `BatchLogID` are returned both through output parameters and result columns. Supply the owner/version and, for product scripts, the hash and sanitized source. Test batches must not have hashes.
+
+A completed log with no error marks the content successful. Supplying an error marks the batch as having an error. Owner, batch and hash relationships are checked; a new hash requires filename/content. These metadata changes are transactional.
 
 ### z.usp_AcquireDeploymentLock
+
+Reserves this database for one cooperating installer connection at a time. A second installer fails promptly rather than waiting for the first one.
 
 [Source](../Deploy.sql)
 
@@ -47,9 +55,11 @@ Creates a batch when BatchID=-1, creates file log when BatchLogID=-1, otherwise 
 create or alter procedure z.usp_AcquireDeploymentLock
 ```
 
-Takes no arguments and returns no result set. Uses `sys.sp_getapplock` with resource `z.Deploy`, Exclusive mode, Session ownership and a timeout of `0`. A null or negative native result raises error `51000`.
+There are no arguments or returned rows. The lock belongs to the connection and uses resource `z.Deploy`; acquisition failure raises error 51000. Release it on that connection with `z.usp_ReleaseDeploymentLock` or close the connection.
 
 ### z.usp_ReleaseDeploymentLock
+
+Ends the current connection's installer reservation so another installation can proceed.
 
 [Source](../Deploy.sql)
 
@@ -57,9 +67,11 @@ Takes no arguments and returns no result set. Uses `sys.sp_getapplock` with reso
 create or alter procedure z.usp_ReleaseDeploymentLock
 ```
 
-Takes no arguments and returns no result set. Releases the session-owned `z.Deploy` application lock until it is gone or a native call returns a negative status. Caught cleanup exceptions are suppressed.
+There are no arguments or returned rows. The procedure tries to remove the connection's `z.Deploy` lock and suppresses caught cleanup exceptions. A native release failure can end cleanup before the lock is gone; disconnection also releases a session-owned lock.
 
 ### z.usp_GetDeploymentSystems
+
+Lists installed subsystem versions, or looks up the owner for one deployment path. The installer uses this to choose eligible baselines and migrations.
 
 [Source](../Deploy.sql)
 
@@ -70,9 +82,11 @@ create or alter procedure z.usp_GetDeploymentSystems
 )
 ```
 
-Returns SystemID, CodeBase, Version for all rows or normalized CodeBase lookup. Rejects empty/overlong input and identity collision. Read-only, no explicit transaction.
+Omit `@CodeBase` to return all owners, or supply the deployment path to look up one. Results contain `SystemID`, `CodeBase` and `Version`. Empty or overlong inputs and identity collisions raise an error. The procedure changes no data.
 
 ### z.usp_BeginDeployment
+
+Opens a deployment batch for a subsystem and target version. It records that an update is starting; it does not yet advance the installed version.
 
 [Source](../Deploy.sql)
 
@@ -84,9 +98,11 @@ create or alter procedure z.usp_BeginDeployment
 )
 ```
 
-Normalizes CodeBase, checks collision, inserts missing system at 0.0.0, creates batch for requested version. Returns BatchID/SystemID. Atomic with updlock/holdlock; does not itself update installed version.
+Supply `@CodeBase` as the subsystem path and `@Version` as the intended version. A new owner starts at `0.0.0`. The call returns `BatchID` and `SystemID` for subsequent logging and completion. Owner creation and batch creation are transactional; identity collisions raise an error.
 
 ### z.usp_GetDeploymentHashes
+
+Returns the current file hashes known for a subsystem so the installer can skip unchanged successful content.
 
 [Source](../Deploy.sql)
 
@@ -97,9 +113,11 @@ create or alter procedure z.usp_GetDeploymentHashes
 )
 ```
 
-Returns FileHash, HasSucceeded for current hashes belonging to registered SystemID. Unregistered owner throws. Read-only.
+Pass a registered `@SystemID`. Each row contains `FileHash` and `HasSucceeded`; an unknown owner raises an error. The call is read-only.
 
 ### z.usp_RemoveDeploymentHash
+
+Retires an obsolete file hash from current skip decisions while keeping its history.
 
 [Source](../Deploy.sql)
 
@@ -111,9 +129,11 @@ create or alter procedure z.usp_RemoveDeploymentHash
 )
 ```
 
-Validates owner/32-byte hash, marks stale record IsCurrent=0. Successful baseline/version hashes remain current; failed hashes can retire. Does not delete histories or return a result set.
+Supply the owner and 32-byte hash. Eligible stale content becomes inactive, but successful baseline/version hashes remain current; failed hashes can be retired. Invalid inputs raise an error. No history is deleted and no result set is returned.
 
 ### z.usp_CompleteDeployment
+
+Records successful completion of a subsystem update and advances its installed version. A Test batch closes without changing the installed version or date.
 
 [Source](../Deploy.sql)
 
@@ -126,9 +146,11 @@ create or alter procedure z.usp_CompleteDeployment
 )
 ```
 
-Atomically closes a matching, nonfailed, open owner/version batch, then updates system version/date except Test. Failed/mismatched/completed batches throw. No result set.
+Pass the owner, version and open batch ID from the update. They must match a batch that has not failed or already completed. Completion and the version/date update are transactional. Invalid state raises an error; there is no result set.
 
 ### z.usp_FailDeployment
+
+Marks a batch as failed and records its end time. It describes the update's outcome; it does not undo SQL already applied by product scripts.
 
 [Source](../Deploy.sql)
 
@@ -139,4 +161,4 @@ create or alter procedure z.usp_FailDeployment
 )
 ```
 
-Marks batch HasError=1 and EndDate UTC in a transaction; missing batch throws. Does not roll back product scripts or rewind completed subsystem versions. No result set.
+Pass `@BatchID` to set `HasError` and the UTC end time. A missing batch raises an error. Earlier script changes and completed subsystem versions remain in place. The metadata update is transactional and returns no rows.

@@ -4,8 +4,9 @@
 
 ## Purpose and behavior
 
-Collect z.v_CPUMemoryStats into z.CPUMemoryStats with at most one row per second.
-Date is truncated to the beginning of its second, retaining local server time.
+Preserves SQL Server's recent CPU and memory readings in `z.CPUMemoryStats` so they remain available after the native ring buffer changes. It reads `z.v_CPUMemoryStats` and stores at most one reading for each local server second. Repeated collection refreshes an existing second with the latest available reading rather than adding duplicate history.
+
+Date is rounded down to the beginning of its second, retaining local server time.
 Within each second in the current source read, the row with the latest original
 Date supplies the CPU/memory measurements. Equally latest timestamps can supply
 either row. A matching stored second is refreshed with that reading; an unseen

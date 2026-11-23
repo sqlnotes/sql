@@ -4,6 +4,8 @@
 
 ## Examples
 
+Use the first query to see which jobs belong to this database and whether they are enabled or currently executing. The second query previews the SQL Agent schedule fields for work that repeats every 15 minutes between 08:00 and 17:00; it does not create a job or schedule.
+
 ```sql
 select JobName, ServiceName, IsActive, IsExecuting
 from z.v_ServiceJobs
@@ -76,6 +78,18 @@ This creates the guard followed by three user steps. With only Command and Comma
 The former bit value 1 meant completion; use 3 to retain that behavior. Guard rejection currently ends the job reporting success, so modes 1 and 3 also apply to a guarded skip.
 
 ## Schedule vocabulary
+
+These parameters are shared by the schedule conversion functions and the job/schedule creation procedures:
+
+| Parameter | What to supply |
+| --- | --- |
+| `@Frequency` | When the schedule repeats: Daily, Weekly, Monthly or Specific; Agent Start and Idle follow Agent events. |
+| `@Interval` | Number of days, weeks or months between occurrences of a recurring schedule. |
+| `@ByDay` | Days or dates to include: weekdays for Weekly, day numbers or relative days for Monthly, and date/time values for Specific. Separate multiple entries with commas. |
+| `@IntradayFrequency` | How work repeats within a scheduled day: Hourly, Minute, Second or Specific. |
+| `@IntradayInterval` | Number of hours, minutes or seconds between runs when repeating within the day. |
+| `@ByTime` | Times or time ranges within the day, in `HH:mm[:ss]` format. Separate multiple entries with commas. |
+| `@StartDate`, `@EndDate` | First and last allowed dates for recurring schedules. Omit the start date to use SQL Server's local date; an omitted end date has no practical expiry. Specific schedules use the dates in `@ByDay` instead. |
 
 Use Daily, Weekly, Monthly, Specific, Agent Start or Idle. Interval is the day/week/month recurrence count. ByDay is comma-separated weekday names for Weekly, month numbers 1..31 or relative phrases such as First Monday for Monthly, and date-time values for Specific. IntradayFrequency is Hourly, Minute, Second or Specific. ByTime accepts comma-separated HH:mm[:ss] times or time ranges; repeating schedules use ranges, Specific intraday uses times. A lone repeating start time is expanded through one second before that time, potentially representing an overnight/full-day window; inspect native output rather than assuming cross-midnight support. Explicit reversed ranges are rejected. SQL Agent remains the final validator.
 
