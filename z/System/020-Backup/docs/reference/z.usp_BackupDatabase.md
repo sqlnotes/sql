@@ -140,7 +140,8 @@ Use preconfigured SQL Server credentials and storage permissions. Azure block-bl
 
 ## Execution and retention
 
-Run outside a transaction. For a bounded pool across selected databases, use
+Call with `IMPLICIT_TRANSACTIONS OFF` and no active transaction. Transaction
+validation runs with `XACT_ABORT ON`. For a bounded pool across selected databases, use
 [z.usp_BackupDatabasesParallel](z.usp_BackupDatabasesParallel.md). Independent
 sequential calls do not share assignments. Filesystem backups need SQL Server service-account destination access. The main procedure requires no application-lock or extended-property write permissions.
 

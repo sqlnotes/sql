@@ -22,16 +22,12 @@ create or alter procedure z.usp_CreatePartitionForDateRange
 as
 begin
 	set nocount on;
-	if @ShowPlan is null
-	begin
-		set xact_abort off;
-		throw 50000, N'ShowPlan must be specified.', 1;
-	end
 	if @ShowPlan = 1
 	begin
 		declare	@PreviewImplicit bit = iif((@@options & 2) = 2, 1, 0),
 				@PreviewXactAbort bit = iif((@@options & 16384) = 16384, 1, 0), @PreviewError nvarchar(2048);
 		set implicit_transactions off;
+		-- Return planning errors as rows while keeping supported caller transactions committable.
 		set xact_abort off;
 		begin try
 			select	Ordinal, Date, SQL
@@ -49,12 +45,11 @@ begin
 		if @PreviewXactAbort = 1 set xact_abort on;
 		return;
 	end
-	if @@trancount > 0 or (@@options & 2) = 2
-	begin
-		set xact_abort off;
-		throw 50000, N'Partition maintenance requires no caller transaction and implicit_transactions off.', 1;
-	end
 	set xact_abort on;
+	if @ShowPlan is null
+		throw 50000, N'ShowPlan must be specified.', 1;
+	if @@trancount > 0 or (@@options & 2) = 2
+		throw 50000, N'Partition maintenance requires no caller transaction and implicit_transactions off.', 1;
 	declare @SQL nvarchar(max), @FunctionName sysname, @Resource nvarchar(255), @LockResult int, @LockHeld bit = 0;
 	select	@FunctionName = f.name
 	from sys.partition_functions f

@@ -8,7 +8,7 @@ Trace connects SQL Server's event capture to database tables and optional stored
 
 Each `z.Trace` registration describes one SQL Server trace; `TraceID` is its server-assigned ID. Create prepares it stopped. Configure events, output columns and filters before the first Start attempt. Once applying those selections begins, changing them requires Close/Create. Stop pauses capture and Start resumes the same configuration. Callbacks and destination metadata can be changed while stopped. Traces have no scheduled stop time and are not automatically replaced on restart.
 
-Configuration, create, start, stop, close, collection and abandoned cleanup reject existing caller transactions. Native SQL Trace actions cannot be rolled back with metadata.
+Run configuration, create, start, stop, close, collection and abandoned cleanup outside a transaction. These procedures reject an active caller transaction with `XACT_ABORT ON`, making it uncommittable. Native SQL Trace actions cannot be rolled back with metadata.
 
 Each trace has its own receiving table and callbacks. SQL Server evaluates its filters: predicates on one column follow their configured `and`/`or` operators, while different columns combine with `AND`. Filters are not one global boolean expression ordered across all columns. Native SQL Trace comparison and collation rules apply.
 

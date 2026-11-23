@@ -17,11 +17,8 @@ create or alter procedure z.usp_CleanupDatabaseBackups
 )
 as
 begin
-	set nocount on;
-	set xact_abort off;
-	-- Filesystem operations are not transactional; never roll back a caller's work.
+	set nocount, xact_abort on;
 	if @@trancount <> 0 throw 50000, 'Backup cleanup cannot run inside a transaction.', 1;
-	set xact_abort on;
 	if @RetentionHours is null return;
 	if @RetentionHours <= 0 throw 50000, '@RetentionHours must be positive or NULL (disabled).', 1;
 	if datalength(@DatabaseBackupFolder) > 8000

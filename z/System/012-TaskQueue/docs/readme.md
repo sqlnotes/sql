@@ -78,7 +78,7 @@ Create, Add and Start participate in the caller's transaction and leave its tran
 
 Each executor receives a single named `@Parameters nvarchar(max)` argument. The worker passes the stored value unchanged, including NULL and whitespace. The executor owns interpretation and validation. SQL Server resolves the stored procedure name at execution time. Use a schema-qualified name to select a specific procedure, with database or server qualifiers as needed. Remote calls need linked-server RPC and permissions. For a global temporary executor (`##...`), keep its creating connection open and database-qualify references inside it.
 
-Raise a SQL error to fail an attempt. The worker catches the error, rolls back any open executor transaction, records the error and next retry time, and continues under the normal scheduling rules. A procedure return code is ignored. A successful attempt clears the prior error. Executors run with worker privileges. Limit who can write tasks accordingly. Executor result sets can reach a direct worker caller. The queue stores only status and diagnostics.
+The worker invokes executors with `XACT_ABORT ON`. Raise a SQL error to fail an attempt. The worker catches the error, rolls back any open executor transaction, records the error and next retry time, and continues under the normal scheduling rules. A procedure return code is ignored. A successful attempt clears the prior error. Executors run with worker privileges. Limit who can write tasks accordingly. Executor result sets can reach a direct worker caller. The queue stores only status and diagnostics.
 
 ## Execute a batch with Agent workers
 

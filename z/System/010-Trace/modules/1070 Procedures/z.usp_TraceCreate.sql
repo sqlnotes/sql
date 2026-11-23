@@ -19,7 +19,6 @@ begin
 	set nocount, xact_abort on;
 	if @@trancount > 0
 	begin
-		set xact_abort off;
 		throw 50000, N'Trace creation requires no existing transaction.', 1;
 	end;
 	declare	@SchemaName sysname, @TableName sysname, @QualifiedTable nvarchar(517), @ReturnCode int,

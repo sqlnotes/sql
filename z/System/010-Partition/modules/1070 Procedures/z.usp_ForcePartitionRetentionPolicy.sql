@@ -15,11 +15,13 @@ create or alter procedure z.usp_ForcePartitionRetentionPolicy
 as
 begin
 	set nocount on;
-	-- Disable XACT_ABORT before rejection to preserve caller transaction committability.
-	if isnull(@ShowPlan, 0) = 0 and (@@trancount > 0 or @@options & 2 = 2)
+	if isnull(@ShowPlan, 0) = 0
 	begin
-		set xact_abort off;
-		throw 50000, N'Partition maintenance cannot execute in a caller-owned or implicit transaction.', 1;
+		set xact_abort on;
+		if @@trancount > 0 or @@options & 2 = 2
+			throw 50000, N'Partition maintenance cannot execute in a caller-owned or implicit transaction.', 1;
+		if @ShowPlan is null
+			throw 50000, N'ShowPlan must be specified.', 1;
 	end
 	declare	@ImplicitTransactions bit = iif(@@options & 2 = 2, 1, 0), @XactAbort bit = iif(@@options & 16384 = 16384, 1, 0),
 			@FunctionName nvarchar(128), @ActualName nvarchar(128), @Period varchar(20), @Interval int,
@@ -27,18 +29,12 @@ begin
 			@SQL nvarchar(max), @Action varchar(30), @LockResource nvarchar(255), @LockResult int,
 			@Locked bit = 0, @Failures nvarchar(max) = N'', @Error nvarchar(2048),
 			@Source nvarchar(517), @Target nvarchar(517), @Number int, @ObjectID int, @PreviousFanout int, @CurrentFanout int;
-	if @ShowPlan is null
-	begin
-		set xact_abort off;
-		throw 50000, N'ShowPlan must be specified.', 1;
-	end
-	-- Preview may run inside a transaction, but must not start an implicit one.
 	if @ShowPlan = 1
 	begin
 		set implicit_transactions off;
+		-- Return planning errors as rows while keeping supported caller transactions committable.
 		set xact_abort off;
 	end
-	else set xact_abort on;
 	create table #PartitionPlan (Ordinal int, Name varchar(300), SQL nvarchar(max), Action varchar(30), TableName nvarchar(517), PartitionNumber int);
 	create table #PartitionPreview (PartitionFunctionName nvarchar(128), Ordinal int, Action varchar(30), TableName nvarchar(517), PartitionNumber int, SQL nvarchar(max));
 	create table #PartitionCopyPreview (Ordinal int, PartName varchar(30), Definition nvarchar(max));

@@ -10,7 +10,7 @@ Starts a SQL Agent worker that repeatedly terminates user sessions blocking the 
 create or alter procedure z.usp_RemoveBlocker
 as
 begin
-	set nocount on
+	set nocount, xact_abort on;
 	if @@trancount > 0
 	begin
 		throw 50000, 'z.usp_RemoveBlocker must not be executed within a transaction.', 1;

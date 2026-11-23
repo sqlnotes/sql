@@ -16,7 +16,6 @@ begin
 	set nocount, xact_abort on;
 	if @@trancount <> 0
 	begin
-		set xact_abort off;
 		throw 50000, 'RestoreDatabase cannot run inside a user transaction.', 1;
 	end
 	if object_id('tempdb..#RestorePlan') is null or object_id('tempdb..#RestoreTargetState') is null or object_id('tempdb..#RestoreFileMap') is null

@@ -17,13 +17,11 @@ create or alter procedure z.usp_TraceCollectAndClose
 )
 as
 begin
-	set nocount on;
+	set nocount, xact_abort on;
 	if @@trancount > 0
 	begin
-		set xact_abort off;
 		throw 50000, N'Trace collection requires no existing transaction.', 1;
 	end;
-	set xact_abort on;
 	set textsize 2147483647;
 	set cursor_close_on_commit off;
 	if @MaxDurationInSec is null or @MaxDurationInSec < 0 or @TransactionDurationInSec is null or @TransactionDurationInSec < 1

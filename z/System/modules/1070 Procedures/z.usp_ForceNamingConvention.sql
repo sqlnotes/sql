@@ -19,7 +19,8 @@ create or alter procedure z.usp_ForceNamingConvention
 as
 begin
 	set nocount on;
-	-- Renames are intentionally non-atomic; never roll back a caller's transaction.
+	-- Callers can rename in their own transaction and recover from individual rename errors.
+	-- IgnoreError can continue with later renames after a recoverable error.
 	set xact_abort off;
 	declare	@ObjectName nvarchar(1200), @NewName nvarchar(128), @ObjectType varchar(13), @ObjectID int,
 			@Entry nvarchar(max), @SchemaName sysname, @Name sysname, @Position int, @Dots int,

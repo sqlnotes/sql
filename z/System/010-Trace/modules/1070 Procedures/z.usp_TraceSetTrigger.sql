@@ -19,7 +19,6 @@ begin
 	set nocount, xact_abort on;
 	if @@trancount > 0
 	begin
-		set xact_abort off;
 		throw 50000, N'Trace configuration requires no existing transaction.', 1;
 	end;
 	begin try

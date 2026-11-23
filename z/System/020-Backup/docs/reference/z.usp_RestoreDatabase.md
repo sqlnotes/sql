@@ -164,8 +164,10 @@ If native redo metadata is unavailable for a standby database, compatible retain
 history supplies the fallback position. Undo-file naming does not require history.
 An already-current standby performs no finalization.
 
-Execute outside a user transaction. System databases, snapshots and the database
-hosting the procedure cannot be restore targets. DropConnections defaults to 1.
+Run restore and preview outside a user transaction. Rejection with
+`XACT_ABORT ON` makes an active caller transaction uncommittable. System
+databases, snapshots and the database hosting the procedure cannot be restore
+targets. DropConnections defaults to 1.
 Before restoring an existing ONLINE destination with pending commands, run
 `ALTER DATABASE ... SET SINGLE_USER WITH ROLLBACK IMMEDIATE` to disconnect its
 users and roll back their open transactions. Set DropConnections = 0 to skip this

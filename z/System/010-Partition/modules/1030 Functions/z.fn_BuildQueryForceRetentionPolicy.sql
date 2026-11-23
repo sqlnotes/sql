@@ -36,12 +36,9 @@ begin
 	declare @SwitchChecks table(ObjectID int, Holder varchar(5), BeforeSwitch nvarchar(max), AfterSwitch nvarchar(max), primary key(ObjectID, Holder));
 	-- Error 8604 aborts the DDL transaction even with XACT_ABORT OFF. Replay the
 	-- whole atomic action only for a newly identified, unswitchable CHECK owner.
-	declare @BeginAction nvarchar(max) = N'if @@trancount > 0 or @@options & 2 = 2
-begin
-	set xact_abort off;
+	declare @BeginAction nvarchar(max) = N'set xact_abort on;
+if @@trancount > 0 or @@options & 2 = 2
 	throw 50000, N''Partition maintenance requires no caller or implicit transaction.'', 1;
-end
-set xact_abort on;
 declare @SwitchTable int, @LiveName nvarchar(517), @Disable nvarchar(max), @Restore nvarchar(max);
 declare @Revalidate table(ObjectID int primary key);
 while 1 = 1

@@ -64,7 +64,7 @@ The function returns `Ordinal`, `SQL` and `Date`; procedure preview returns `Ord
 
 With ShowPlan = 1, the procedure only reads metadata and returns the builder SQL. It does not execute generated errors, next-used statements or splits, start a transaction or acquire the maintenance application lock. Preview supports INSERT EXEC capture and caller transactions; it preserves implicit_transactions and xact_abort settings. Runtime planning errors return an error SQL row with Ordinal 0 and Date NULL. A NULL ShowPlan parameter is rejected.
 
-With ShowPlan = 0, the procedure resolves the function, acquires the same per-function session application lock as automatic maintenance, generates SQL under that lock and executes it by Ordinal in its own transaction. Caller transactions and implicit_transactions on are rejected without rolling back caller work. Metadata/function/scheme DDL permissions are required.
+With ShowPlan = 0, the procedure resolves the function, acquires the same per-function session application lock as automatic maintenance, generates SQL under that lock and executes it by Ordinal in its own transaction. Execute with no caller transaction and with IMPLICIT_TRANSACTIONS OFF. The execution guard raises an error with XACT_ABORT ON, which makes an active caller transaction uncommittable when the caller catches the error. Metadata/function/scheme DDL permissions are required.
 
 Weekly is supported and starts Monday independently of DATEFIRST; intervals must be positive. Invalid interval/type inputs produce executable error rows rather than throwing during function selection. Keep date/count products within SQL Server arithmetic and key-type limits.
 

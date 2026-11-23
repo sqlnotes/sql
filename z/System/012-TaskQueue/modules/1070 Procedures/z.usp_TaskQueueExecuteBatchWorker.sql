@@ -15,8 +15,7 @@ create or alter procedure z.usp_TaskQueueExecuteBatchWorker
 )
 as
 begin
-	set nocount on;
-	set xact_abort off;
+	set nocount, xact_abort on;
 	if @@trancount <> 0
 		throw 50000, 'TaskQueue workers must run outside a transaction.', 1;
 	if @@options & 2 = 2
@@ -169,9 +168,11 @@ begin
 			if @@rowcount <> 1
 				throw 50000, 'Task completion ownership no longer matches.', 1;
 
-			-- Keep the batch gate through both releases and preserve the outcome on a cleanup error.
+			-- A caught semaphore release error must leave the outcome transaction committable.
+			set xact_abort off;
 			exec z.usp_ReleaseSemaphore @SemaphoreName = @TaskSemaphore, @SuppressException = 1;
 			exec z.usp_ReleaseSemaphore @SemaphoreName = @BatchSemaphore, @SuppressException = 1;
+			set xact_abort on;
 			commit;
 		end;
 		exec z.usp_TaskQueueSetAction;

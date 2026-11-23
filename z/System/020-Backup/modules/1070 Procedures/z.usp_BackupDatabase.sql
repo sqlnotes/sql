@@ -21,13 +21,11 @@ create or alter procedure z.usp_BackupDatabase
 )
 as
 begin
-	set nocount on;
+	set nocount, xact_abort on;
 	if @@trancount > 0 or @@options & 2 = 2
 	begin
-		set xact_abort off;
 		throw 50000, 'Backup cannot run inside a transaction or implicit transactions.', 1;
 	end
-	set xact_abort on;
 
 	declare	@BackupPath nvarchar(max), @SQL nvarchar(max), @DatabaseName nvarchar(128), @StandardizedDatabaseName nvarchar(128), @FolderSeparator varchar(1),
 			@BackupFileName nvarchar(max), @Platform nvarchar(256), @DirectorySql nvarchar(max), @DirectoryAttempt int,

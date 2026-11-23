@@ -46,7 +46,7 @@ create or alter procedure z.usp_ForcePartitionRetentionPolicy
 
 No arguments applies all policy rows. A function selector requires a matching policy. ShowPlan returns `PartitionFunctionName`, `Ordinal`, `Action`, `TableName`, `PartitionNumber`, `SQL` in function/ordinal order. Preview performs metadata checks without executing copies or DDL; source schema-copy capability is validated additionally during execution. Preview can be captured with INSERT EXEC and does not start an implicit transaction.
 
-Execution requires no caller transaction and `implicit_transactions off`. Only one maintenance call can work on a function at a time. Each recovery or expired boundary is one transaction across every affected table. If an action fails or makes no progress, that function stops; other functions can still complete, followed by a combined error report. Earlier committed actions remain committed.
+Execute the procedure or its generated action SQL with no caller transaction and with `IMPLICIT_TRANSACTIONS OFF`. The execution guard raises an error with `XACT_ABORT ON`, which makes an active caller transaction uncommittable when the caller catches the error. Only one maintenance call can work on a function at a time. Each recovery or expired boundary is one transaction across every affected table. If an action fails or makes no progress, that function stops; other functions can still complete, followed by a combined error report. Earlier committed actions remain committed.
 
 ## Recovery, expiration and compression
 
