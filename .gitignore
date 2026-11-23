@@ -1,8 +1,12 @@
 .vs/
+*.sln
+*.slnx
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
+*.dbmdl
+*.jfm
 
 # Local System folders.
 /z/System/900-*/
