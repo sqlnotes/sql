@@ -15,6 +15,11 @@ create or alter procedure z.usp_DataInitializationMaster
 as
 begin
 	set nocount, xact_abort on;
-	exec z.usp_ExecuteProcedures @SchemaName = @SchemaName, @NamePattern = N'usp!_DataInitialization%',
-		@ExcludedProcedureNames = N'usp_DataInitializationHelper,usp_DataInitializationMaster';
+	if charindex(N',', @SchemaName collate Latin1_General_100_BIN2) > 0
+		throw 50000, 'A schema name supplied to z.usp_DataInitializationMaster cannot contain a comma.', 1;
+	declare @SchemaPattern nvarchar(384);
+	select	@SchemaPattern = replace(replace(replace(replace(replace(@SchemaName collate Latin1_General_100_BIN2,
+				N'!', N'!!'), N'[', N'!['), N'%', N'!%'), N'_', N'!_'), N' ', N'[ ]');
+	exec z.usp_ExecuteProcedures @SchemaNames = @SchemaPattern, @ProcedureNames = N'usp!_DataInitialization%',
+		@ExcludedProcedureNames = N'usp!_DataInitializationHelper,usp!_DataInitializationMaster';
 end;
