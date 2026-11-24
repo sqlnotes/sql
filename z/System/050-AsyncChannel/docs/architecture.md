@@ -91,15 +91,15 @@ flowchart LR
     Wait -. "Retry acquisition" .-> Pool
 ```
 
-Pools use the shared System semaphore helpers with Session ownership. A missing, inactive or zero-capacity pool applies no limit. An acquisition returns 0 on success and -1 with cleared outputs on an ordinary acquisition failure; the returned pool ID identifies a reservation that must be released. See the [acquire reference](reference/z.usp_AsyncChannelActivatorPoolAcquire.md) for bypasses and exceptions.
+Pools use the shared System semaphore helpers with Session ownership. A missing, inactive or zero-capacity pool applies no limit. An acquisition returns 0 on success and -1 with cleared outputs on an ordinary acquisition failure. The returned pool ID and slot identify the reservation to release. See the [acquire reference](reference/z.usp_AsyncChannelActivatorPoolAcquire.md) for bypasses and exceptions.
 
 `TimeoutSeconds = -1` waits indefinitely. Finite waits are converted to milliseconds and capped at 2147483647. Transaction completion does not release a processing place: the generated activator attempts release after processing commits or fails. Release exceptions can propagate.
 
-Repeated acquisition in the same session returns the already-held place; it does not reserve another one. The outer operation owns release. Do not synchronously call another generated activator sharing that pool from a processor, because the nested activator's release would free the outer reservation. A custom nested path must leave release to the outer operation.
+Repeated acquisition in the same session returns the held slot while the configured capacity includes it. If that active pool shrinks to a positive capacity below the held slot, acquisition raises error `50000`. Release the original pool ID and slot before acquiring again. The outer operation owns release. Do not synchronously call another generated activator sharing that pool from a processor, because the nested activator's release would free the outer reservation. A custom nested path must leave release to the outer operation.
 
 Generated activators using the earlier slot parameters require regeneration with `z.usp_AsyncChannelDeploy @ForceDeployment = 1`. This preserves authored interface and processing objects.
 
-The pool view reads current-database Session-owned application locks and counts granted exclusive slot resources (`<slot>-ADPool/<ID>`). `SessionsWaiting` counts sessions holding a legacy intent-exclusive marker with no granted slot. The current semaphore helper acquires slot locks only, so a waiting session using it does not contribute to `SessionsWaiting`. [Pool view reference](reference/z.v_AsyncChannelActivatorPool.md)
+The pool view reads current-database Session-owned application locks and counts granted exclusive slot resources (`<slot>-ADPool/<ID>`). `SessionsWaiting` counts sessions holding a legacy intent-exclusive marker with no granted slot. A waiting session using the current semaphore helper contributes zero to `SessionsWaiting`. [Pool view reference](reference/z.v_AsyncChannelActivatorPool.md)
 
 ## Logging
 

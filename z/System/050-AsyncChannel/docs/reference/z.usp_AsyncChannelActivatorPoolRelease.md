@@ -4,23 +4,24 @@
 
 ## Purpose and behavior
 
-Releases the processing place reserved by `z.usp_AsyncChannelActivatorPoolAcquire`, allowing another session to use that pool's capacity. Call it on the same SQL connection after processing finishes, supplying the pool ID returned by acquisition. The shared semaphore helper tracks the held reservation; callers do not need a slot number.
+Releases the processing place reserved by `z.usp_AsyncChannelActivatorPoolAcquire`, allowing another session to use that pool's capacity. Call it on the same SQL connection after processing finishes, supplying the pool ID and slot returned by acquisition.
 
 ## Parameters and defaults
 
 ```text
 @ActivatorPoolID int
+@Slot int
 ```
 
-NULL is accepted as a no-op, allowing an unlimited/bypassed acquisition to use the same cleanup path. There is no default value.
+Both parameters are required. A NULL pool ID or slot is a successful no-op, so a bypassed acquisition can use the same cleanup call.
 
 ## Results and return codes
 
-No result set. For a non-NULL pool ID, return the shared release helper's integer result. A NULL argument returns normally without invoking the helper. Missing or already-released permits are successful no-ops. The helper uses the recorded owner, returns any negative native release status, and propagates exceptions under the default `@SuppressException = 0`.
+No result set. The procedure returns the shared release helper's integer result for the supplied Session-owned slot. Missing or already-released permits return `0`. The helper returns a native negative release status and propagates exceptions under the default `@SuppressException = 0`.
 
 ## Transactions, permissions, and limits
 
-Release must run in the acquiring SQL session. Use the ID returned at acquisition, even if channel configuration has since changed. Transaction completion alone does not release this Session-owned permit. A single release also ends a same-session repeated acquisition because acquisition does not add lock references. Nested processing must preserve the outer operation's release boundary.
+Release must run in the acquiring SQL session. Use the pool ID and slot returned at acquisition even if channel configuration has since changed. Transaction completion alone does not release this Session-owned permit. If a repeated acquisition returned the same held slot, release it once. Nested processing must preserve the outer operation's release boundary.
 
 Requires the underlying shared helper's applicable execution permission context.
 

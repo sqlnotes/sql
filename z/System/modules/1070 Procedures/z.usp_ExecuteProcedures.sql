@@ -42,7 +42,7 @@ begin
 			if @Result > 0
 			begin
 				exec @ProcedureName;
-				exec @Result = z.usp_ReleaseSemaphore @SemaphoreName = @SemaphoreName, @SuppressException = 1;
+				exec @Result = z.usp_ReleaseSemaphore @SemaphoreName = @SemaphoreName, @SuppressException = 1, @LockOwner = 'Session';
 			end
 		end try
 		begin catch
@@ -51,7 +51,7 @@ begin
 								+ z.fn_GetFullErrorMessage() + nchar(13) + nchar(10);
 			if @@trancount > 0
 				rollback;
-			exec z.usp_ReleaseSemaphore @SemaphoreName = @SemaphoreName, @SuppressException = 1;
+			exec z.usp_ReleaseSemaphore @SemaphoreName = @SemaphoreName, @SuppressException = 1, @LockOwner = 'Session';
 		end catch;
 		fetch next from cProcedures into @ProcedureName, @ObjectID;
 	end;

@@ -224,7 +224,7 @@ as
 				-- Channel activators win deadlocks; interrupted peers (pollers, ad-hoc work) can retry,
 				-- while a rolled-back receive would poison-retry and risk losing the batch.
 				f.t1 + N'set deadlock_priority high;' + f.nl + f.nl +
-				f.t1 + N'declare @AsyncChannelID int = ' + cast(v.AsyncChannelID as nvarchar(10)) + N', @MaxIdle int, @MaxExecution int, @MaxMessages int, @DebugMode bit, @Level varchar(20), @Info nvarchar(100), @ErrMsg nvarchar(4000), @Payload nvarchar(max), @Handle uniqueidentifier, @MsgTypeID int, @LastActivity datetime2(3) = sysutcdatetime(), @Started datetime2(3) = sysutcdatetime(), @ActivatorPoolID int, @PoolResult int, @ReceiveTimeout int;' + f.nl +
+				f.t1 + N'declare @AsyncChannelID int = ' + cast(v.AsyncChannelID as nvarchar(10)) + N', @MaxIdle int, @MaxExecution int, @MaxMessages int, @DebugMode bit, @Level varchar(20), @Info nvarchar(100), @ErrMsg nvarchar(4000), @Payload nvarchar(max), @Handle uniqueidentifier, @MsgTypeID int, @LastActivity datetime2(3) = sysutcdatetime(), @Started datetime2(3) = sysutcdatetime(), @ActivatorPoolID int, @PoolSlot int, @PoolResult int, @ReceiveTimeout int;' + f.nl +
 				f.t1 + N'select @MaxIdle = MaxIdleDurationSeconds, @MaxExecution = MaxExecutionSeconds, @MaxMessages = MaxMessagesPerReceive, @DebugMode = DebugMode from z.AsyncChannel where AsyncChannelID = @AsyncChannelID;' + f.nl + f.t1 + N'select @ReceiveTimeout = iif(@MaxIdle = 0, 0, 500);' + f.nl +
 				f.t1 + N'exec sys.sp_set_session_context @key = N''AsyncChannel-AsyncChannelID'', @value = @AsyncChannelID;' + f.nl +
 				f.t1 + N'exec sys.sp_set_session_context @key = N''AsyncChannel-DebugMode'', @value = @DebugMode;' + f.nl +
@@ -286,7 +286,7 @@ as
 				-- Processing runs for payload rows and for DialogTimer rows (a timer is a wake-up for the Processing procedure).
 				f.t4 + N'if exists (select 1 from @Msgs where IsPayload = 1 or MessageTypeID = @TimerTypeID)' + f.nl +
 				f.t4 + N'begin' + f.nl +
-				f.t5 + N'exec @PoolResult = z.usp_AsyncChannelActivatorPoolAcquire @AsyncChannelID = @AsyncChannelID, @ActivatorPoolID = @ActivatorPoolID output;' + f.nl +
+				f.t5 + N'exec @PoolResult = z.usp_AsyncChannelActivatorPoolAcquire @AsyncChannelID = @AsyncChannelID, @ActivatorPoolID = @ActivatorPoolID output, @Slot = @PoolSlot output;' + f.nl +
 				f.t5 + N'if @PoolResult < 0' + f.nl +
 				f.t5 + N'begin' + f.nl +
 				f.t6 + N'rollback;' + f.nl +
@@ -301,8 +301,8 @@ as
 				f.t5 + N'end' + f.nl +
 				f.t4 + N'end' + f.nl +
 				f.t4 + N'commit;' + f.nl +
-				f.t4 + N'exec z.usp_AsyncChannelActivatorPoolRelease @ActivatorPoolID = @ActivatorPoolID;' + f.nl +
-				f.t4 + N'select @ActivatorPoolID = null;' + f.nl +
+				f.t4 + N'exec z.usp_AsyncChannelActivatorPoolRelease @ActivatorPoolID = @ActivatorPoolID, @Slot = @PoolSlot;' + f.nl +
+				f.t4 + N'select @ActivatorPoolID = null, @PoolSlot = null;' + f.nl +
 				-- MaxExecutionSeconds bounds one call: a Manual pull under the ETL's transaction and an activated reader both return after it.
 				f.t4 + N'if @MaxExecution > 0 and datediff_big(millisecond, @Started, sysutcdatetime()) >= convert(bigint, @MaxExecution) * 1000' + f.nl +
 				f.t5 + N'break;' + f.nl +
@@ -311,7 +311,7 @@ as
 				f.t2 + N'begin catch' + f.nl +
 				f.t3 + N'if @@trancount > 0' + f.nl +
 				f.t4 + N'rollback;' + f.nl +
-				f.t3 + N'exec z.usp_AsyncChannelActivatorPoolRelease @ActivatorPoolID = @ActivatorPoolID;' + f.nl +
+				f.t3 + N'exec z.usp_AsyncChannelActivatorPoolRelease @ActivatorPoolID = @ActivatorPoolID, @Slot = @PoolSlot;' + f.nl +
 				f.t3 + N'set @ErrMsg = z.fn_GetFullErrorMessage();' + f.nl +
 				f.t3 + N'set @Payload = (select string_agg(Payload, nchar(10)) from @Msgs where IsPayload = 1);' + f.nl +
 				f.t3 + N'begin try' + f.nl +

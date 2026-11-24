@@ -19,8 +19,8 @@ as
 			select	SlotsInUse = sum(s.SlotCount), SessionsWaiting = sum(iif(s.MainHeld = 1 and s.SlotCount = 0, 1, 0))
 			from
 			(
-				-- The shared semaphore grants IX on ADPool/<ID> and X on <slot>-ADPool/<ID>.
-				-- Waiting is inferred from a held IX marker without a granted slot, not a native WAIT row.
+				-- Current reservations hold X on <slot>-ADPool/<ID> and S on z.Semaphore:ADPool/<ID>.
+				-- SessionsWaiting counts a legacy IX marker on ADPool/<ID> without a granted slot.
 				select	l.request_session_id,
 						SlotCount = count(distinct case when l.request_mode = 'X' and l.request_status = 'GRANT' then l.resource_description end),
 						MainHeld = max(iif(l.request_mode = 'IX' and l.request_status = 'GRANT', 1, 0))

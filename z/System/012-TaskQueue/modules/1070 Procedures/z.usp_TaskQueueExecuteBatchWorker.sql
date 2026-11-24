@@ -22,7 +22,7 @@ begin
 		throw 50000, 'TaskQueue workers require implicit transactions to be disabled.', 1;
 	declare	@WorkerLoginTime datetime, @SortOrder bigint, @CanProgress bit,
 			@TaskID int, @ExecutorProcedure nvarchar(300), @Parameters nvarchar(max), @ClaimToken uniqueidentifier,
-			@TaskSemaphore nvarchar(200), @Slot int, @BatchSemaphore nvarchar(200), @MaxConcurrentWorkers int,
+			@TaskSemaphore nvarchar(200), @TaskSlot int, @BatchSemaphore nvarchar(200), @BatchSlot int, @MaxConcurrentWorkers int,
 			@ErrorNumber int, @ErrorMessage nvarchar(4000), @Now datetime2(7),
 			@RetryIntervalSecond int, @CleanupFailed bit = 0,
 			@ActionID uniqueidentifier, @ExecutionID uniqueidentifier;
@@ -37,7 +37,7 @@ begin
 	begin try
 		while 1 = 1
 		begin
-			select	@TaskID = null, @ExecutionID = null, @Slot = 0,
+			select	@TaskID = null, @ExecutionID = null, @TaskSlot = 0, @BatchSlot = 0,
 					@ErrorNumber = null, @ErrorMessage = null;
 			begin tran;
 			exec z.usp_TaskQueueLockBatchForChange @BatchID = @BatchID;
@@ -106,21 +106,21 @@ begin
 				continue;
 			end;
 
-			exec @Slot = z.usp_AcquireSemaphore @SemaphoreName = @BatchSemaphore, @TotalCount = @MaxConcurrentWorkers,
+			exec @BatchSlot = z.usp_AcquireSemaphore @SemaphoreName = @BatchSemaphore, @TotalCount = @MaxConcurrentWorkers,
 				@LockOwner = 'Session', @LockTimeout = 0;
-			if @Slot <= 0
+			if @BatchSlot <= 0
 			begin
 				commit;
-				if @Slot <> -1
+				if @BatchSlot <> -1
 					break; -- when -999, internal or parameter validation error
 				waitfor delay '00:00:01';
 				continue;
 			end;
 
 			select	@TaskSemaphore = z.fn_TaskQueueGetTaskSemaphore(@BatchID, @TaskID);
-			exec @Slot = z.usp_AcquireSemaphore @SemaphoreName = @TaskSemaphore, @TotalCount = 1,
+			exec @TaskSlot = z.usp_AcquireSemaphore @SemaphoreName = @TaskSemaphore, @TotalCount = 1,
 				@LockOwner = 'Session', @LockTimeout = 0;
-			if @Slot <= 0
+			if @TaskSlot <= 0
 			begin
 				commit;
 				throw 50000, 'Task could not be locked.', 1;
@@ -170,8 +170,8 @@ begin
 
 			-- A caught semaphore release error must leave the outcome transaction committable.
 			set xact_abort off;
-			exec z.usp_ReleaseSemaphore @SemaphoreName = @TaskSemaphore, @SuppressException = 1;
-			exec z.usp_ReleaseSemaphore @SemaphoreName = @BatchSemaphore, @SuppressException = 1;
+			exec z.usp_ReleaseSemaphore @SemaphoreName = @TaskSemaphore, @SuppressException = 1, @Slot = @TaskSlot, @LockOwner = 'Session';
+			exec z.usp_ReleaseSemaphore @SemaphoreName = @BatchSemaphore, @SuppressException = 1, @Slot = @BatchSlot, @LockOwner = 'Session';
 			set xact_abort on;
 			commit;
 		end;
@@ -180,6 +180,8 @@ begin
 	begin catch
 		if @@trancount > 0
 			rollback;
+		exec z.usp_ReleaseSemaphore @SemaphoreName = @TaskSemaphore, @SuppressException = 1, @Slot = @TaskSlot, @LockOwner = 'Session';
+		exec z.usp_ReleaseSemaphore @SemaphoreName = @BatchSemaphore, @SuppressException = 1, @Slot = @BatchSlot, @LockOwner = 'Session';
 		begin try
 			if @ExecutionID is null
 			begin
@@ -197,9 +199,12 @@ begin
 		begin catch
 			print concat(N'Could not log worker error for TaskQueue batch ', @BatchID, N'. ', error_message());
 		end catch;
-		exec z.usp_TaskQueueSetAction;
-		exec z.usp_ReleaseSemaphore @SemaphoreName = @TaskSemaphore, @SuppressException = 1;
-		exec z.usp_ReleaseSemaphore @SemaphoreName = @BatchSemaphore, @SuppressException = 1;
+		begin try
+			exec z.usp_TaskQueueSetAction;
+		end try
+		begin catch
+			print concat(N'Could not clear audit context for TaskQueue batch ', @BatchID, N'. ', error_message());
+		end catch;
 		throw;
 	end catch;
 end;

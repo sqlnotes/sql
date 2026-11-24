@@ -81,11 +81,11 @@ begin
 		close cQueries;
 		deallocate cQueries;
 		commit;
-		exec z.usp_ReleaseSemaphore @SemaphoreName = @Resource;
+		exec z.usp_ReleaseSemaphore @SemaphoreName = @Resource, @LockOwner = 'Session';
 	end try
 	begin catch
 		if @@trancount > 0 rollback;
-		if @LockHeld = 1 exec z.usp_ReleaseSemaphore @SemaphoreName = @Resource;
+		if @LockHeld = 1 exec z.usp_ReleaseSemaphore @SemaphoreName = @Resource, @LockOwner = 'Session';
 		throw;
 	end catch
 end

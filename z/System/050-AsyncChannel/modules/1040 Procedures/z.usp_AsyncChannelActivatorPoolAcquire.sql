@@ -10,14 +10,15 @@ Acquires a Session-owned shared semaphore processing slot.
 create or alter procedure z.usp_AsyncChannelActivatorPoolAcquire
 (
 	@AsyncChannelID int,
-	@ActivatorPoolID int output
+	@ActivatorPoolID int output,
+	@Slot int output
 )
 as
 begin
 	set nocount on
 	declare	@CandidatePoolID int, @MaxConcurrency int, @TimeoutSeconds int, @IsActive bit, @PoolName nvarchar(128),
 			@Result int, @SemaphoreName nvarchar(200), @Info nvarchar(max), @TimeoutMS int
-	select	@ActivatorPoolID = null
+	select	@ActivatorPoolID = null, @Slot = null
 	select	@CandidatePoolID = p.ActivatorPoolID, @PoolName = p.Name, @MaxConcurrency = p.MaxConcurrency,
 			@TimeoutSeconds = p.TimeoutSeconds, @IsActive = p.IsActive
 	from z.AsyncChannel c
@@ -33,7 +34,7 @@ begin
 									  @LockOwner = 'Session', @LockTimeout = @TimeoutMS
 	if @Result > 0
 	begin
-		select	@ActivatorPoolID = @CandidatePoolID
+		select	@ActivatorPoolID = @CandidatePoolID, @Slot = @Result
 		return 0
 	end
 	select	@Info = N'activator pool ' + @PoolName + N': semaphore acquisition failed (result ' + cast(@Result as nvarchar(11))

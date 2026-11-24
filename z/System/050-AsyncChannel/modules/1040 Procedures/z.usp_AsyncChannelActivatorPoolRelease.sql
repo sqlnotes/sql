@@ -9,7 +9,8 @@ Releases one matching shared semaphore acquisition.
 */
 create or alter procedure z.usp_AsyncChannelActivatorPoolRelease
 (
-	@ActivatorPoolID int
+	@ActivatorPoolID int,
+	@Slot int
 )
 as
 begin
@@ -18,6 +19,6 @@ begin
 	if @ActivatorPoolID is null
 		return
 	select	@SemaphoreName = N'ADPool/' + cast(@ActivatorPoolID as nvarchar(11))
-	exec @Result = z.usp_ReleaseSemaphore @SemaphoreName = @SemaphoreName
+	exec @Result = z.usp_ReleaseSemaphore @SemaphoreName = @SemaphoreName, @Slot = @Slot, @LockOwner = 'Session'
 	return @Result
 end

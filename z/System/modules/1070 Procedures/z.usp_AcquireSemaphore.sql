@@ -17,9 +17,9 @@ create or alter procedure z.usp_AcquireSemaphore
 as
 begin
 	set nocount on;
-	declare	@ResourceInternal nvarchar(255), @ExistingOwner varchar(32), @ExistingSlot int,
-			@Slot int = 1, @Result int, @Started datetime2(3) = sysutcdatetime(),
-			@OwnerByte binary(1), @Entry varbinary(5), @Key sysname;
+	declare	@Marker nvarchar(255) = N'z.Semaphore:' + @SemaphoreName, @ResourceInternal nvarchar(255),
+			@OtherOwner varchar(32), @HeldOwner varchar(32),
+			@Slot int = 1, @FirstSlot int = 1, @LastSlot int = @TotalCount, @Result int, @Started datetime2(3) = sysutcdatetime();
 
 	if nullif(trim(@SemaphoreName), N'') is null or @TotalCount is null or @TotalCount < 1
 		throw 50000, 'A semaphore requires a nonempty name and positive capacity.', 1;
@@ -28,68 +28,64 @@ begin
 	if @LockTimeout is null or @LockTimeout < -1
 		throw 50000, 'Semaphore timeout must be -1 or nonnegative.', 1;
 	select	@LockOwner = case when @LockOwner = 'Transaction' then 'Transaction' else 'Session' end;
+	select	@OtherOwner = case when @LockOwner = 'Session' then 'Transaction' else 'Session' end;
 	if @LockOwner = 'Transaction' and @@trancount = 0
 		throw 50000, 'A transaction-owned semaphore requires an active transaction.', 1;
 
-	-- Context entry is owner(1: 0x01=Transaction, 0x00=Session) + slot(4).
-	select	@Key = N'Semaphore-' + convert(nvarchar(11), db_id()) + N'-' + convert(varchar(64), hashbytes('SHA2_256', convert(varbinary(max), @SemaphoreName)), 2),
-			@OwnerByte = case when @LockOwner = 'Transaction' then 0x01 else 0x00 end;
-	select	@Entry = convert(varbinary(5), session_context(@Key));
+	if applock_mode('public', @Marker, @LockOwner) = 'Shared'
+		select	@HeldOwner = @LockOwner;
+	else if (@OtherOwner = 'Session' or @@trancount > 0)
+		and applock_mode('public', @Marker, @OtherOwner) = 'Shared'
+		select	@HeldOwner = @OtherOwner;
 
-	if datalength(@Entry) = 5
+	if @HeldOwner is not null
 	begin
-		select	@ExistingOwner = case when substring(@Entry, 1, 1) = 0x01 then 'Transaction' else 'Session' end,
-				@ExistingSlot = convert(int, substring(@Entry, 2, 4));
-		if @ExistingSlot > 0 and (@ExistingOwner = 'Session' or @@trancount > 0)
+		while 1 = 1
 		begin
-			select	@ResourceInternal = cast(@ExistingSlot as nvarchar(10)) + N'-' + @SemaphoreName;
-			if applock_mode('public', @ResourceInternal, @ExistingOwner) <> 'NoLock'
+			select	@ResourceInternal = convert(nvarchar(10), @Slot) + N'-' + @SemaphoreName;
+			if applock_mode('public', @ResourceInternal, @HeldOwner) = 'Exclusive'
 			begin
-				if @ExistingOwner <> @LockOwner
-				begin
-					print 'You have already acquired this semaphore with another owner.';
-					return -2;
-				end;
-				return @ExistingSlot;
+				if @HeldOwner = @LockOwner
+					return @Slot;
+				-- Both owners of one connection use the same numbered slot.
+				select	@FirstSlot = @Slot, @LastSlot = @Slot;
+				break;
 			end;
+			if @Slot = @TotalCount
+				throw 50000, 'The connection has a semaphore marker but no slot in the offered capacity. Release the original slot before reacquiring.', 1;
+			select	@Slot += 1;
 		end;
-		exec sys.sp_set_session_context @key = @Key, @value = null;
+	end;
+
+	while 1 = 1
+	begin
+		select	@ResourceInternal = convert(nvarchar(10), @Slot) + N'-' + @SemaphoreName;
+		exec @Result = sys.sp_getapplock @Resource = @ResourceInternal, @LockMode = 'Exclusive', @LockOwner = @LockOwner, @LockTimeout = 0;
+		if @Result >= 0
+			break;
+		if @Result <> -1
+			return @Result;
+
+		if @Slot < @LastSlot
+		begin
+			select	@Slot += 1;
+			continue;
+		end;
+		if @LockTimeout >= 0 and datediff_big(millisecond, @Started, sysutcdatetime()) >= @LockTimeout
+			return @Result;
+		waitfor delay '00:00:00.004';
+		select	@Slot = @FirstSlot;
 	end;
 
 	begin try
-		select	@Slot = 1, @Result = -1, @ResourceInternal = null;
-		while 1 = 1
-		begin
-			select	@ResourceInternal = cast(@Slot as nvarchar(10)) + N'-' + @SemaphoreName,
-					@Entry = @OwnerByte + convert(binary(4), @Slot);
-			-- Record slot before acquiring so cancellation right after grant still leaves a releasable entry.
-			exec sys.sp_set_session_context @key = @Key, @value = @Entry;
-			exec @Result = sys.sp_getapplock @Resource = @ResourceInternal, @LockMode = 'Exclusive', @LockOwner = @LockOwner, @LockTimeout = 0;
-			if @Result >= 0
-				return @Slot;
-			if @Result <> -1
-				break;
-
-			if @Slot < @TotalCount
-			begin
-				select	@Slot = @Slot + 1;
-				continue;
-			end;
-
-			if @LockTimeout >= 0 and datediff_big(millisecond, @Started, sysutcdatetime()) >= @LockTimeout
-				break;
-
-			waitfor delay '00:00:00.004';
-			select	@Slot = 1;
-		end;
-		exec sys.sp_set_session_context @key = @Key, @value = null;
-		return @Result;
+		exec @Result = sys.sp_getapplock @Resource = @Marker, @LockMode = 'Shared', @LockOwner = @LockOwner, @LockTimeout = 0;
 	end try
 	begin catch
-		if @ResourceInternal is not null and (@LockOwner = 'Session' or @@trancount > 0)
-			and applock_mode('public', @ResourceInternal, @LockOwner) <> 'NoLock'
-			exec sys.sp_releaseapplock @Resource = @ResourceInternal, @LockOwner = @LockOwner;
-		exec sys.sp_set_session_context @key = @Key, @value = null;
+		exec z.usp_ReleaseSemaphore @SemaphoreName = @SemaphoreName, @SuppressException = 1, @Slot = @Slot, @LockOwner = @LockOwner;
 		throw;
-	end catch
+	end catch;
+	if @Result >= 0
+		return @Slot;
+	exec z.usp_ReleaseSemaphore @SemaphoreName = @SemaphoreName, @SuppressException = 1, @Slot = @Slot, @LockOwner = @LockOwner;
+	return @Result;
 end

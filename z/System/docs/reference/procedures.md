@@ -22,7 +22,7 @@ create or alter procedure z.usp_AcquireSemaphore
 
 Set `@TotalCount` to the allowed number of holders. `@LockOwner` chooses whether a transaction or the connection holds the permission. `@LockTimeout` is the wait in milliseconds: 0 tries once and -1 waits indefinitely.
 
-Capture the procedure return value and do the protected work only when it is positive. It identifies the acquired slot. `-1` means timeout; `-2` means the same session holds the semaphore under the other owner; other negative values report native acquisition failures. Reacquiring under the same owner returns the existing slot, so the outer operation remains responsible for release. The procedure does not open a transaction or return rows. [Ownership and examples](coordination.md#semaphores)
+Capture the procedure return value and do the protected work only when it is positive. It identifies the acquired slot. `-1` means timeout. Other negative values report native acquisition failures. Session and Transaction owners on one connection use the same slot. Reacquiring under the same owner returns the existing slot without adding a lock reference. Acquiring under the other owner adds a separate hold to that slot. If the requested capacity excludes the held slot, acquire throws error 50000. The procedure does not open a transaction or return rows. [Ownership and examples](coordination.md#semaphores)
 
 ## z.usp_CopyTableSchema
 
@@ -266,11 +266,13 @@ Releases the permission previously reserved by `z.usp_AcquireSemaphore`, allowin
 create or alter procedure z.usp_ReleaseSemaphore
 (
 	@SemaphoreName nvarchar(200),
-	@SuppressException bit = 0
+	@SuppressException bit = 0,
+	@Slot int = 1,
+	@LockOwner varchar(32) = 'Transaction'
 )
 ```
 
-Releases the slot for the recorded owner in the current database and session and clears its context entry on successful cleanup. NULL, blank, missing and already-released names return `0`. A native negative release status is returned to the caller. Caught exceptions are rethrown by default. With `@SuppressException = 1`, the procedure prints the exception and returns `-999`. The procedure preserves the caller's transaction and returns no result set. [Ownership and cleanup](coordination.md#semaphores)
+Releases the specified native slot and its Shared marker for `@LockOwner`, which defaults to `Transaction`. Use `@LockOwner = 'Session'` for a Session permit. Omit `@Slot` for slot 1. For a semaphore with multiple slots, pass the positive slot returned by acquire. NULL or blank names, nonpositive or NULL slots, and slots unowned by the requested scope return `0`. A native negative release status is returned to the caller. Caught exceptions are rethrown by default. With `@SuppressException = 1`, the procedure prints the exception and returns `-999`. The procedure leaves the caller's transaction open and returns no result set. [Ownership and cleanup](coordination.md#semaphores)
 
 ## z.usp_RemoveSchemaZ
 

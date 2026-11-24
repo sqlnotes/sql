@@ -316,12 +316,12 @@ begin
 			close cDeletions;
 			deallocate cDeletions;
 		end
-		exec z.usp_ReleaseSemaphore @SemaphoreName = @LockName;
+		exec z.usp_ReleaseSemaphore @SemaphoreName = @LockName, @LockOwner = 'Session';
 		select	@LockHeld = 0;
 		if @ShowPlan = 1 select Path, BackupType, BackupFinishDate, Action, Reason from #Files order by Path;
 	end try
 	begin catch
-		if @LockHeld = 1 exec z.usp_ReleaseSemaphore @SemaphoreName = @LockName;
+		if @LockHeld = 1 exec z.usp_ReleaseSemaphore @SemaphoreName = @LockName, @LockOwner = 'Session';
 		throw;
 	end catch;
 end

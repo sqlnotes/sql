@@ -138,7 +138,7 @@ begin
 		end catch
 		if @Locked = 1
 		begin
-			exec @LockResult = z.usp_ReleaseSemaphore @SemaphoreName = @LockResource;
+			exec @LockResult = z.usp_ReleaseSemaphore @SemaphoreName = @LockResource, @LockOwner = 'Session';
 			select	@Locked = 0;
 		end
 		fetch next from cFiles into @FunctionName, @Period, @Interval, @Forward, @FileGroup, @Keep, @Retain;

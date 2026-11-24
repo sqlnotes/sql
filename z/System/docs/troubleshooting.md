@@ -18,7 +18,7 @@ Schema Z requires SQL Server 2019 (15.x) or later. Older versions cannot read so
 
 ## Semaphore wait
 
-Check that the name is nonempty, capacity is positive, and an active transaction exists for a Transaction-owned permit. A timeout of `0` scans the slots once. The default `-1` waits indefinitely. If error 15665 occurs, check how many distinct semaphore names the connection has used. Explicit release clears the entry for its name, and closing the connection clears its session context. [Semaphore ownership and cleanup](reference/coordination.md#semaphores)
+Check that the name is nonempty, capacity is positive, and an active transaction exists for a Transaction-owned permit. A timeout of 0 tries the slot range without waiting. The default -1 waits indefinitely. Pass the slot returned by acquire for a semaphore with multiple slots. Pass the same owner. Session release requires an explicit owner. [Semaphore ownership and cleanup](reference/coordination.md#semaphores)
 
 ## Generated SQL
 

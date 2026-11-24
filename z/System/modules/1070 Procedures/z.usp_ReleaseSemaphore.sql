@@ -5,45 +5,39 @@ Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/modules/1070%20Procedures/z.usp_ReleaseSemaphore.sql
 Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/docs/reference/procedures.md#zusp_releasesemaphore
 
-Releases an acquired semaphore slot using the session context and application locks.
+Releases the specified native semaphore slot held by the calling session or transaction.
 */
 create or alter procedure z.usp_ReleaseSemaphore
 (
 	@SemaphoreName nvarchar(200),
-	@SuppressException bit = 0
+	@SuppressException bit = 0,
+	@Slot int = 1,
+	@LockOwner varchar(32) = 'Transaction'
 )
 as
 begin
 	set nocount on;
-	if nullif(trim(@SemaphoreName), N'') is null return 0;
-	declare	@ResourceInternal nvarchar(255), @LockOwner varchar(32), @Slot int,
-			@Result int = 0, @Entry varbinary(5), @Key sysname;
-
-	select	@Key = N'Semaphore-' + convert(nvarchar(11), db_id()) + N'-' + convert(varchar(64), hashbytes('SHA2_256', convert(varbinary(max), @SemaphoreName)), 2);
+	if nullif(trim(@SemaphoreName), N'') is null or isnull(@Slot, 0) < 1
+		return 0;
+	if @LockOwner is null or @LockOwner not in ('Transaction', 'Session')
+		throw 50000, 'Semaphore lock owner must be Transaction or Session.', 1;
+	select	@LockOwner = case when @LockOwner = 'Transaction' then 'Transaction' else 'Session' end;
+	if @LockOwner = 'Transaction' and @@trancount = 0
+		return 0;
+	declare	@ResourceInternal nvarchar(255) = convert(nvarchar(10), @Slot) + N'-' + @SemaphoreName,
+			@Marker nvarchar(255) = N'z.Semaphore:' + @SemaphoreName, @Result int = 0;
 
 	begin try
-		-- Context entry is owner(1: 0x01=Transaction, 0x00=Session) + slot(4).
-		select	@Entry = convert(varbinary(5), session_context(@Key));
-		if @Entry is null or datalength(@Entry) <> 5
+		if applock_mode('public', @ResourceInternal, @LockOwner) = 'NoLock'
 			return 0;
-
-		select	@LockOwner =	case
-									when substring(@Entry, 1, 1) = 0x01 then 'Transaction'
-									else 'Session'
-								end,
-				@Slot = convert(int, substring(@Entry, 2, 4));
-
-		if @Slot > 0 and (@LockOwner = 'Session' or @@trancount > 0)
+		while applock_mode('public', @ResourceInternal, @LockOwner) <> 'NoLock'
 		begin
-			select	@ResourceInternal = cast(@Slot as nvarchar(10)) + N'-' + @SemaphoreName;
-			while applock_mode('public', @ResourceInternal, @LockOwner) <> 'NoLock'
-			begin
-				exec @Result = sys.sp_releaseapplock @Resource = @ResourceInternal, @LockOwner = @LockOwner;
-				if @Result < 0
-					return @Result;
-			end;
+			exec @Result = sys.sp_releaseapplock @Resource = @ResourceInternal, @LockOwner = @LockOwner;
+			if @Result < 0
+				return @Result;
 		end;
-		exec sys.sp_set_session_context @key = @Key, @value = null;
+		if applock_mode('public', @Marker, @LockOwner) = 'Shared'
+			exec @Result = sys.sp_releaseapplock @Resource = @Marker, @LockOwner = @LockOwner;
 		return @Result;
 	end try
 	begin catch
@@ -51,5 +45,5 @@ begin
 			throw;
 		print z.fn_GetFullErrorMessage();
 		return -999;
-	end catch
+	end catch;
 end
