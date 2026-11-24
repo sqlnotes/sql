@@ -22,69 +22,64 @@ create or alter procedure z.usp_CreatePartitionForDateRange
 as
 begin
 	set nocount on;
-	if @ShowPlan is null
-	begin
-		set xact_abort off;
-		throw 50000, N'ShowPlan must be specified.', 1;
-	end
 	if @ShowPlan = 1
 	begin
-		declare @PreviewImplicit bit = iif((@@options & 2) = 2, 1, 0),
+		declare	@PreviewImplicit bit = iif((@@options & 2) = 2, 1, 0),
 				@PreviewXactAbort bit = iif((@@options & 16384) = 16384, 1, 0), @PreviewError nvarchar(2048);
 		set implicit_transactions off;
+		-- Return planning errors as rows while keeping supported caller transactions committable.
 		set xact_abort off;
 		begin try
-			select Ordinal, Date, SQL
+			select	Ordinal, Date, SQL
 			from z.fn_BuildQueryCreatePartitionForDateRange(@ObjectName, @PartitionFunctionName, @PartitionRangeType,
 				@PartitionRangeTypeInterval, @DateFrom, @DateTo, @NumberOfPartitions, @FileGroup)
 			order by Ordinal;
 		end try
 		begin catch
-			select @PreviewError = error_message();
-			select 0 Ordinal, convert(datetime, null) Date,
-				convert(nvarchar(max), N'throw 50001, N''' + replace(@PreviewError, N'''', N'''''') + N''', 1;') SQL;
+			select	@PreviewError = error_message();
+			select	0 Ordinal, convert(datetime, null) Date,
+					convert(nvarchar(max), N'throw 50001, N''' + replace(@PreviewError, N'''', N'''''') + N''', 1;') SQL;
 		end catch
 		-- Restore after SELECT so preview cannot start a new implicit transaction.
 		if @PreviewImplicit = 1 set implicit_transactions on;
 		if @PreviewXactAbort = 1 set xact_abort on;
 		return;
 	end
-	if @@trancount > 0 or (@@options & 2) = 2
-	begin
-		set xact_abort off;
-		throw 50000, N'Partition maintenance requires no caller transaction and implicit_transactions off.', 1;
-	end
 	set xact_abort on;
+	if @ShowPlan is null
+		throw 50000, N'ShowPlan must be specified.', 1;
+	if @@trancount > 0 or (@@options & 2) = 2
+		throw 50000, N'Partition maintenance requires no caller transaction and implicit_transactions off.', 1;
 	declare @SQL nvarchar(max), @FunctionName sysname, @Resource nvarchar(255), @LockResult int, @LockHeld bit = 0;
-	select @FunctionName = f.name
+	select	@FunctionName = f.name
 	from sys.partition_functions f
 	where f.name = @PartitionFunctionName;
 	if @PartitionFunctionName is null
-		select @FunctionName = f.name
+		select	@FunctionName = f.name
 		from sys.indexes i
 			inner join sys.partition_schemes s on s.data_space_id = i.data_space_id
 			inner join sys.partition_functions f on f.function_id = s.function_id
 		where i.object_id = object_id(@ObjectName) and i.index_id in (0, 1);
 	if @FunctionName is null throw 50000, 'Could not find partition function.', 1;
-	select @Resource = N'SchemaZ.Partition:' + @FunctionName;
+	select	@Resource = N'SchemaZ.Partition:' + @FunctionName;
 	begin try
 		exec @LockResult = z.usp_AcquireSemaphore @SemaphoreName = @Resource, @TotalCount = 1, @LockOwner = 'Session', @LockTimeout = 0;
 		if @LockResult <= 0 throw 50000, 'Another session is managing this partition function.', 1;
-		select @LockHeld = 1;
-		declare c cursor local static for
-			select SQL
+		select	@LockHeld = 1;
+		declare cQueries cursor local static for
+			select	SQL
 			from z.fn_BuildQueryCreatePartitionForDateRange(null, @FunctionName, @PartitionRangeType, @PartitionRangeTypeInterval, @DateFrom, @DateTo, @NumberOfPartitions, @FileGroup)
 			order by Ordinal;
-		open c;
+		open cQueries;
 		begin tran;
-		fetch next from c into @SQL;
+		fetch next from cQueries into @SQL;
 		while @@fetch_status = 0
 		begin
-			exec sys.sp_executesql @SQL;
-			fetch next from c into @SQL;
+			exec(@SQL);
+			fetch next from cQueries into @SQL;
 		end
-		close c;
-		deallocate c;
+		close cQueries;
+		deallocate cQueries;
 		commit;
 		exec z.usp_ReleaseSemaphore @SemaphoreName = @Resource, @LockOwner = 'Session';
 	end try

@@ -2,7 +2,9 @@
 
 [Trace](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_TraceClose.sql)
 
-Stop and close selected registered native traces and remove their event/column/filter/callback configuration. Retain receiving tables and collected data. Explicit selectors may target another creator when SQL permissions allow; no selector means the current session/login. Already-closed traces are normal. Actions use the registered TraceID under its registration lock. Rejects ambient transactions.
+Finishes a trace and removes its capture configuration and callbacks. The receiving table and all collected rows remain available. Closing an already closed trace is a normal outcome.
+
+Select by `@TraceName` or `@TraceID`; explicit selectors can address another connection's trace when permissions allow. Omit both to close this connection's traces. Run outside an existing transaction.
 
 ```text
 @TraceName nvarchar(128) = null,

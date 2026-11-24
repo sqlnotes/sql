@@ -4,22 +4,23 @@
 
 ## Purpose and behavior
 
-Generate visible explicit server permissions for the named source and substitute the target in permission clauses; return membership statements with the limitations below. Supports SERVER, ENDPOINT, SERVER_PRINCIPAL and the source branch labelled AVAILABILITY GROUP; unsupported classes yield no SQL row.
+Produces scripts to copy a login's explicit server permissions and server-role memberships. It does not create the destination login or execute the returned statements.
+
+Supply the existing principal in `@SourceLogin`. Set `@TargetLogin` to put the copied permissions on another principal, or leave it NULL to keep the source name. A NULL source returns no rows. Supported permission classes are `SERVER`, `ENDPOINT`, `SERVER_PRINCIPAL` and `AVAILABILITY GROUP`.
 
 ## Parameters and defaults
 
 ```text
-@SourceLogin nvarchar(128) = null, @TargetLogin nvarchar(128) = null
+@SourceLogin nvarchar(128) = null, 
+@TargetLogin nvarchar(128) = null
 ```
-
-These are the source-declared types and defaults. Table-valued-function callers must supply arguments or the `default` keyword explicitly.
 
 ## Results, permissions, and limits
 
-Returns Ordinal int identity, Type varchar(100), SQL nvarchar(max); order explicitly by Ordinal. Read-only. Null source returns no rows. Membership uses database role catalog and source name. Catalog spelling/coverage must be checked for availability-group permissions.
+Returns `Ordinal int`, `Type varchar(100)` and `SQL nvarchar(max)`. `Type` describes the generated statement and `SQL` contains the text to review or apply. Read rows in `Ordinal` order. Catalog visibility limits which permissions and role memberships can be scripted.
 
 ## Dependencies
 
-Native dependencies: `sys.availability_groups`, `sys.availability_replicas`, `sys.database_role_members`, `sys.endpoints`, `sys.server_permissions`, `sys.server_principals`.
+Native dependencies: `sys.availability_groups`, `sys.availability_replicas`, `sys.endpoints`, `sys.server_permissions`, `sys.server_principals`, `sys.server_role_members`.
 
 See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for subsystem-wide constraints.

@@ -4,7 +4,9 @@
 
 ## Purpose and scope
 
-Inventory backup files directly inside one database's FULL, DIFF and LOG directories. By default, use the filename convention to plan cleanup without reading backup headers. Set `UseBackupHeader = 1` to use native backup metadata for irregular or legacy filenames. No `msdb` history determines cleanup.
+Removes old backup files from one database's FULL, DIFF and LOG folders while preserving the files selected by its retention rules. Start with `@ShowPlan = 1` to review what would be kept or deleted. This is a separate maintenance operation; taking a backup does not run cleanup automatically.
+
+By default it recognizes managed backup filenames without opening backup headers. Set `@UseBackupHeader = 1` when filenames are irregular or you need the metadata-based dependency checks described below. Cleanup works from the supplied folders, not `msdb` history.
 
 The database-level folder must be an absolute Windows local/UNC path or an absolute Linux path. Mount Linux network shares before calling. Supply the parent of the three backup-type folders, not the overall backup destination root.
 
@@ -36,9 +38,11 @@ DIFF/Server$Instance$Database_yyyyMMdd_HHmmssfffffff.diff
 LOG/Database_yyyyMMdd_HHmmss_ffffff.trn
 ```
 
-The default instance is included as MSSQLSERVER. Custom formats may omit it. Timestamp precision is retained
-as datetime2(7). Malformed names, other database hints and custom layouts outside
-the parser's recognized shapes are preserved; use header mode for those layouts.
+The default instance is included as MSSQLSERVER. Custom formats may omit it.
+Filename timestamps and the cutoff use UTC with datetime2(7) precision.
+Use header mode for inventories with older server-local filename timestamps.
+Malformed names, other database hints and custom layouts outside the parser's
+recognized shapes are preserved. Use header mode for those layouts.
 
 Keep the latest recognized full filename at or before the cutoff, all recognized backups at or after that timestamp, and the immediately preceding recognized log file. Without a recognized full anchor, preserve everything. Older recognized files can be deleted. Recheck inventory membership, sizes and modification times before deletion.
 
@@ -53,7 +57,9 @@ This mode trusts managed filenames. It does not inspect database identity, copy-
 
 ## Optional: header-based cleanup
 
-With `UseBackupHeader = 1`, inspect all relevant backup-shaped files, regardless of their naming, using native `RESTORE LABELONLY` and `RESTORE HEADERONLY`:
+With `UseBackupHeader = 1`, inspect all relevant backup-shaped files using native
+`RESTORE LABELONLY` and `RESTORE HEADERONLY`. This mode compares the header
+timestamps with a server-local cutoff.
 
 - Require understood, single-file, single-set, nonmirrored full, differential or log backups matching the current database lineage and recovery fork.
 - Keep the newest usable ordinary full backup completed at or before the cutoff. Without such an anchor, preserve the whole inventory.
@@ -65,6 +71,6 @@ Retention is conservative and may keep files longer than the requested hours. It
 
 ## Coordination and failures
 
-This helper uses an exclusive session application lock on the managed database folder to coordinate cleanup calls. The backup procedure does not hold that lock while writing. Schedule cleanup separately from active backups. A competing cleanup call reports a busy-lock failure without deleting files. Call outside a transaction. Filesystem actions cannot be rolled back. Treat managed folders as trusted storage: application locks coordinate participating calls in the same SQL Server database, not arbitrary filesystem writers or other servers.
+This helper uses an exclusive session application lock on the managed database folder to coordinate cleanup calls. The backup procedure does not hold that lock while writing. Schedule cleanup separately from active backups. A competing cleanup call reports a busy-lock failure without deleting files. Call outside a transaction. Rejection with `XACT_ABORT ON` makes an active caller transaction uncommittable. Filesystem actions cannot be rolled back. Treat managed folders as trusted storage: application locks coordinate participating calls in the same SQL Server database, not arbitrary filesystem writers or other servers.
 
 Requires database catalog access, directory enumeration and file deletion rights. Header mode additionally requires backup metadata permissions; SQL Server 2019 through 2025 header layouts are handled explicitly, and unsupported layouts must not produce deletion candidates. Filename mode does not execute header or label reads.

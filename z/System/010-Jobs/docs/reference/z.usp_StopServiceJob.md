@@ -4,15 +4,15 @@
 
 ## Purpose and behavior
 
-Resolve the current database-prefixed job ID through z.fn_GetServiceJobID, using the same truncated nvarchar(128) identity as creation, and call the msdb Agent stop operation when found. Stop only when z.v_ServiceJobs identifies a matching executing service. No explicit transaction or catch; native errors propagate.
+Asks SQL Server Agent to stop a service job belonging to the current database when that job is detected as executing. Pass the service name in `@Name`, without the `z_(DatabaseName)_` prefix. A missing job or one not detected as executing produces no stop request.
+
+The lookup uses the same 128-character job-name limit as creation. Execution detection comes from [z.v_ServiceJobs](supporting-objects.md#zv_servicejobs), so it has that view's session-visibility limits. Native Agent errors are returned to the caller.
 
 ## Parameters and defaults
 
 ```text
 @Name nvarchar(255)
 ```
-
-These are the source-declared types and defaults.
 
 ## Results, permissions, and limits
 

@@ -9,8 +9,7 @@ Exposes default-constraint definitions, parent columns and expected conventional
 */
 create or alter view z.v_DefaultConstraints
 as
-	select 
-			d.object_id as ObjectID,
+	select	d.object_id as ObjectID,
 			object_schema_name(d.object_id) SchemaName,
 			d.name as DefaultName,
 			z.fn_GetExpectedName('Default', object_schema_name(d.object_id), object_name(d.parent_object_id), col_name(d.parent_object_id, d.parent_column_id), null, null) ExpectedDefaultName,

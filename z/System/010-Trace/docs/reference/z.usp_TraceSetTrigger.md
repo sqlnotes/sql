@@ -2,7 +2,9 @@
 
 [Trace](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_TraceSetTrigger.sql)
 
-Register a stored-procedure callback for all or one selected event on a stopped trace. EventName all overrides event-specific callbacks. The procedure must be in the current database and accept named @TraceSequence, @TraceID and @EventName. It runs after the insert in the same transaction and must not commit/rollback that transaction.
+Runs a stored procedure after a received event is recorded, for example to take a diagnostic snapshot. Despite the name, this registers a callback rather than creating a DML trigger. Configure it while the trace is stopped.
+
+`@ProcedureName` identifies the callback in the current database. `@EventName` chooses one event, or `all` for every event; an `all` registration takes precedence over event-specific callbacks. The procedure must accept named `@TraceSequence`, `@TraceID` and `@EventName` arguments. It shares the event's transaction and must not commit or roll it back.
 
 ```text
 @TraceName nvarchar(128) = null,

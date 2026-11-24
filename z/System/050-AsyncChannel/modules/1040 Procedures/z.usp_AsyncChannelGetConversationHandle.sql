@@ -17,11 +17,11 @@ as
 begin
 	set nocount on
 
-	declare @Readers tinyint, @IsActive bit, @DebugMode bit, @LockResult int,
+	declare	@Readers tinyint, @IsActive bit, @DebugMode bit, @LockResult int,
 			@SavedGroupBucket smallint, @ConversationGroup uniqueidentifier,
 			@SessionID smallint = @@spid, @GroupBucket smallint, @TargetService sysname,
 			@LockResource nvarchar(128) = cast(@AsyncChannelID as nvarchar(128)) + '-z.usp_AsyncChannelGetConversationHandle'
-	select @ConversationHandle = null, @MaxRowsPerMessage = null
+	select	@ConversationHandle = null, @MaxRowsPerMessage = null
 	if @AsyncChannelID is null
 		return
 	begin try
@@ -44,8 +44,8 @@ begin
 
 	if @SavedGroupBucket <> @GroupBucket
 	begin
-		select @TargetService = ServiceName from z.v_AsyncChannel where AsyncChannelID = @AsyncChannelID
-		select @ConversationGroup = hashbytes('MD5', cast(cast(@GroupBucket as nvarchar(20)) + '-' +  @TargetService as varbinary(max)))
+		select	@TargetService = ServiceName from z.v_AsyncChannel where AsyncChannelID = @AsyncChannelID
+		select	@ConversationGroup = hashbytes('MD5', cast(cast(@GroupBucket as nvarchar(20)) + '-' +  @TargetService as varbinary(max)))
 		if @ConversationHandle is not null
 		begin
 			end conversation @ConversationHandle;

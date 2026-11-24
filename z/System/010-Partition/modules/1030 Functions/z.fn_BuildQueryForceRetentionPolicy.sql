@@ -21,21 +21,45 @@ create or alter function z.fn_BuildQueryForcePartitionRetentionPolicy
 returns @Ret table(Ordinal int identity(1, 1), Name varchar(300), SQL nvarchar(max), Action varchar(30), TableName nvarchar(517), PartitionNumber int)
 as
 begin
-	declare @FunctionID int, @Fanout int, @Right bit, @DataType nvarchar(128), @BaseType sysname,
+	declare	@FunctionID int, @Fanout int, @Right bit, @DataType nvarchar(128), @BaseType sysname,
 			@ThisPeriod datetime, @NextPeriod datetime, @FirstPeriodToKeep datetime, @Error nvarchar(2048),
 			@Maximum sql_variant, @MaximumDate datetime2(7), @MaximumID bigint, @LowerLiteral nvarchar(300), @UpperLiteral nvarchar(300),
 			@FirstNewDate datetime, @SQL nvarchar(max), @OutSQL nvarchar(max) = N'', @InSQL nvarchar(max) = N'',
 			@Source nvarchar(517), @Target nvarchar(517), @Column sysname, @ObjectID int, @Predicate nvarchar(max),
-			@BoundaryID int, @Boundary sql_variant, @BoundaryDate datetime2(7), @Suffix nvarchar(30), @Checks nvarchar(max),
+			@BoundaryID int, @Boundary sql_variant, @BoundaryDate datetime2(7), @Suffix nvarchar(30), @BeforeSwitch nvarchar(max), @AfterSwitch nvarchar(max),
 			@MergeTarget nvarchar(517), @MergeOutSQL nvarchar(max), @MergeInSQL nvarchar(max), @RestoreSQL nvarchar(max),
 			@PreviousBoundary sql_variant, @NextBoundary sql_variant, @CompressionPartition int;
 	declare @Tables table(ObjectID int primary key, Source nvarchar(517), SchemaName sysname, TableName sysname, ColumnName sysname);
 	declare @Splits table(Ordinal int, SQL nvarchar(max), Date datetime);
 	declare @RetainedSuffixes table(Suffix nvarchar(30) primary key);
 
-	select @FunctionID = function_id, @Fanout = fanout, @Right = boundary_value_on_right from sys.partition_functions where name = @PartitionFunctionName;
-	select @BaseType = type_name(system_type_id), @DataType = type_name(system_type_id) +
-		case when type_name(system_type_id) = 'datetime2' then N'(' + convert(nvarchar(10), scale) + N')' else N'' end
+	declare @SwitchChecks table(ObjectID int, Holder varchar(5), BeforeSwitch nvarchar(max), AfterSwitch nvarchar(max), primary key(ObjectID, Holder));
+	-- Error 8604 aborts the DDL transaction even with XACT_ABORT OFF. Replay the
+	-- whole atomic action only for a newly identified, unswitchable CHECK owner.
+	declare @BeginAction nvarchar(max) = N'set xact_abort on;
+if @@trancount > 0 or @@options & 2 = 2
+	throw 50000, N''Partition maintenance requires no caller or implicit transaction.'', 1;
+declare @SwitchTable int, @LiveName nvarchar(517), @Disable nvarchar(max), @Restore nvarchar(max);
+declare @Revalidate table(ObjectID int primary key);
+while 1 = 1
+begin
+	begin try
+		begin tran;
+',
+			@EndAction nvarchar(max) = N'		commit;
+		break;
+	end try
+	begin catch
+		if @@trancount > 0 rollback;
+		if error_number() <> 8604 or @SwitchTable is null or exists(select 1 from @Revalidate where ObjectID = @SwitchTable) throw;
+		insert @Revalidate values(@SwitchTable);
+		select @SwitchTable = null;
+	end catch;
+end;';
+
+	select	@FunctionID = function_id, @Fanout = fanout, @Right = boundary_value_on_right from sys.partition_functions where name = @PartitionFunctionName;
+	select	@BaseType = type_name(system_type_id), @DataType = type_name(system_type_id) +
+			case when type_name(system_type_id) = 'datetime2' then N'(' + convert(nvarchar(10), scale) + N')' else N'' end
 		from sys.partition_parameters where function_id = @FunctionID;
 	if @FunctionID is null select @Error = N'Could not find partition function.';
 	else if @PartitionRangeType is null or @PartitionRangeType not in ('Minute', 'Hourly', 'Daily', 'Weekly', 'Monthly', 'Yearly') select @Error = N'Unsupported partition period.';
@@ -45,70 +69,113 @@ begin
 	else if @ArchivedSwappedPartitions is null select @Error = N'ArchivedSwappedPartitions must be specified.';
 	else if @BaseType not in ('bigint', 'date', 'datetime', 'datetime2', 'smalldatetime') select @Error = N'Unsupported partition key data type.';
 	else if @BaseType = 'date' and @PartitionRangeType in ('Minute', 'Hourly') select @Error = N'Date partition keys require Daily or coarser periods.';
-	select @NextPartitionFileGroup = case when @NextPartitionFileGroup is null or @NextPartitionFileGroup in (N'Default', N'[Default]')
-		then (select name from sys.filegroups where is_default = 1 and type = 'FG') else @NextPartitionFileGroup end;
+	select	@NextPartitionFileGroup = case when @NextPartitionFileGroup is null or @NextPartitionFileGroup in (N'Default', N'[Default]')
+			then (select name from sys.filegroups where is_default = 1 and type = 'FG') else @NextPartitionFileGroup end;
 	if @Error is null and not exists(select * from sys.filegroups where name = @NextPartitionFileGroup and type = 'FG' and is_read_only = 0)
-		select @Error = N'NextPartitionFileGroup must name a writable row filegroup.';
+		select	@Error = N'NextPartitionFileGroup must name a writable row filegroup.';
 	-- Index-only consumers on a differently partitioned base cannot be switched safely.
 	if @Error is null and exists
 	(
-		select * from sys.indexes i join sys.partition_schemes s on s.data_space_id = i.data_space_id
+		select	* from sys.indexes i inner join sys.partition_schemes s on s.data_space_id = i.data_space_id
 		where s.function_id = @FunctionID and not exists
-		(select * from sys.indexes b join sys.partition_schemes bs on bs.data_space_id = b.data_space_id
+		(select * from sys.indexes b inner join sys.partition_schemes bs on bs.data_space_id = b.data_space_id
 			where b.object_id = i.object_id and b.index_id in (0, 1) and bs.function_id = @FunctionID)
 	)
-		select @Error = N'Partition function has a consumer whose base table uses a different function.';
+		select	@Error = N'Partition function has a consumer whose base table uses a different function.';
 	insert into @Tables
-		select i.object_id, quotename(object_schema_name(i.object_id)) + N'.' + quotename(object_name(i.object_id)),
-			   object_schema_name(i.object_id), object_name(i.object_id), col_name(i.object_id, c.column_id)
-		from sys.indexes i join sys.partition_schemes s on s.data_space_id = i.data_space_id
-			join sys.index_columns c on c.object_id = i.object_id and c.index_id = i.index_id and c.partition_ordinal = 1
+		select	i.object_id, quotename(object_schema_name(i.object_id)) + N'.' + quotename(object_name(i.object_id)),
+				object_schema_name(i.object_id), object_name(i.object_id), col_name(i.object_id, c.column_id)
+		from sys.indexes i inner join sys.partition_schemes s on s.data_space_id = i.data_space_id
+			inner join sys.index_columns c on c.object_id = i.object_id and c.index_id = i.index_id and c.partition_ordinal = 1
 		where s.function_id = @FunctionID and i.index_id in (0, 1);
 	if @Error is null and exists
 	(
-		select * from @Tables t join sys.indexes i on i.object_id = t.ObjectID left join sys.partition_schemes s on s.data_space_id = i.data_space_id
+		select	* from @Tables t inner join sys.indexes i on i.object_id = t.ObjectID left join sys.partition_schemes s on s.data_space_id = i.data_space_id
 		where i.type in (0, 1, 2, 5, 6) and (s.function_id is null or s.function_id <> @FunctionID or not exists
 			(select * from sys.index_columns c where c.object_id = i.object_id and c.index_id = i.index_id and c.partition_ordinal = 1 and col_name(c.object_id, c.column_id) = t.ColumnName))
 	)
-		select @Error = N'All table indexes must align on the managed partition function and column.';
+		select	@Error = N'All table indexes must align on the managed partition function and column.';
 	if @Error is not null
 	begin
 		insert into @Ret(Name, SQL, Action) values('Error', N'throw 50001, ' + quotename(@Error, '''') + N', 1;', 'Error');
 		return;
 	end
-	select @Today = isnull(@Today, getutcdate()), @ThisPeriod = z.fn_GetPeriodStart(isnull(@Today, getutcdate()), @PartitionRangeType, @PartitionRangeTypeInterval, default);
-	select @NextPeriod = case @PartitionRangeType
-		when 'Minute' then dateadd(minute, @PartitionRangeTypeInterval, @ThisPeriod)
-		when 'Hourly' then dateadd(hour, @PartitionRangeTypeInterval, @ThisPeriod)
-		when 'Daily' then dateadd(day, @PartitionRangeTypeInterval, @ThisPeriod)
-		when 'Weekly' then dateadd(week, @PartitionRangeTypeInterval, @ThisPeriod)
-		when 'Monthly' then dateadd(month, @PartitionRangeTypeInterval, @ThisPeriod)
-		when 'Yearly' then dateadd(year, @PartitionRangeTypeInterval, @ThisPeriod) end;
+	-- Normally, matching trusted holder checks prove that the rows can switch
+	-- back. If the engine cannot compare a check, keep the original constraint
+	-- objects and restore their exact trust state under the same schema lock.
+	;with a as
+	(
+		select	t.ObjectID, t.Source, h.Kind,
+				case when max(convert(int, c.is_not_trusted)) = 1 then N'1 = 1'
+					else N'exists(select 1 from @Revalidate where ObjectID = @SwitchTable)' end Revalidate,
+				string_agg(convert(nvarchar(max), N'alter table ' + quotename(t.SchemaName) + N'.' + quotename(t.TableName + N'_Partition_' + h.Kind + N'Hold')
+					+ N' with check add constraint ' + quotename(N'CK_Partition' + h.Kind + N'_' + convert(nvarchar(20), c.object_id))
+					+ N' check ' + c.definition collate database_default + N';'), nchar(10)) within group(order by c.object_id) HolderChecks
+		from @Tables t
+			inner join sys.check_constraints c on c.parent_object_id = t.ObjectID and c.is_disabled = 0
+			cross join (values('Split'), ('Merge')) h(Kind)
+		group by t.ObjectID, t.Source, h.Kind
+	)
+	insert @SwitchChecks
+		select	a.ObjectID, a.Kind,
+				N'select @LiveName = N''' + replace(a.Source, N'''', N'''''') + N''';
+select @SwitchTable = object_id(@LiveName), @Restore = null;
+if ' + a.Revalidate + N'
+begin
+	-- Read the state under the table schema lock, including for a saved plan.
+	select @Disable = N''alter table '' + @LiveName + N'' nocheck constraint '' + names.Enabled,
+		@Restore = concat(N''alter table '' + @LiveName + N'' with check check constraint '' + names.Trusted + N'';'',
+			N''alter table '' + @LiveName + N'' with nocheck check constraint '' + names.Untrusted + N'';'')
+	from (
+		select string_agg(convert(nvarchar(max), quotename(name)), N'','') within group(order by object_id) Enabled,
+			string_agg(convert(nvarchar(max), case when is_not_trusted = 0 then quotename(name) end), N'','') within group(order by object_id) Trusted,
+			string_agg(convert(nvarchar(max), case when is_not_trusted = 1 then quotename(name) end), N'','') within group(order by object_id) Untrusted
+		from sys.check_constraints where parent_object_id = @SwitchTable and is_disabled = 0
+	) names;
+	if @Disable is not null exec(@Disable);
+end
+else
+begin
+' + a.HolderChecks + N'
+end;
+',
+				N'if @Restore is not null exec(@Restore);
+select @SwitchTable = null;
+'
+		from a;
+	select	@Today = isnull(@Today, getutcdate()), @ThisPeriod = z.fn_GetPeriodStart(isnull(@Today, getutcdate()), @PartitionRangeType, @PartitionRangeTypeInterval, default);
+	select	@NextPeriod = case @PartitionRangeType
+			when 'Minute' then dateadd(minute, @PartitionRangeTypeInterval, @ThisPeriod)
+			when 'Hourly' then dateadd(hour, @PartitionRangeTypeInterval, @ThisPeriod)
+			when 'Daily' then dateadd(day, @PartitionRangeTypeInterval, @ThisPeriod)
+			when 'Weekly' then dateadd(week, @PartitionRangeTypeInterval, @ThisPeriod)
+			when 'Monthly' then dateadd(month, @PartitionRangeTypeInterval, @ThisPeriod)
+			when 'Yearly' then dateadd(year, @PartitionRangeTypeInterval, @ThisPeriod) end;
 	if @PartitionsToKeep >= 0
-		select @FirstPeriodToKeep = case @PartitionRangeType
-			when 'Minute' then dateadd(minute, -@PartitionsToKeep * @PartitionRangeTypeInterval, @ThisPeriod)
-			when 'Hourly' then dateadd(hour, -@PartitionsToKeep * @PartitionRangeTypeInterval, @ThisPeriod)
-			when 'Daily' then dateadd(day, -@PartitionsToKeep * @PartitionRangeTypeInterval, @ThisPeriod)
-			when 'Weekly' then dateadd(week, -@PartitionsToKeep * @PartitionRangeTypeInterval, @ThisPeriod)
-			when 'Monthly' then dateadd(month, -@PartitionsToKeep * @PartitionRangeTypeInterval, @ThisPeriod)
-			when 'Yearly' then dateadd(year, -@PartitionsToKeep * @PartitionRangeTypeInterval, @ThisPeriod) end;
-	select @Maximum = value from sys.partition_range_values where function_id = @FunctionID and boundary_id = @Fanout - 1;
+		select	@FirstPeriodToKeep = case @PartitionRangeType
+				when 'Minute' then dateadd(minute, -@PartitionsToKeep * @PartitionRangeTypeInterval, @ThisPeriod)
+				when 'Hourly' then dateadd(hour, -@PartitionsToKeep * @PartitionRangeTypeInterval, @ThisPeriod)
+				when 'Daily' then dateadd(day, -@PartitionsToKeep * @PartitionRangeTypeInterval, @ThisPeriod)
+				when 'Weekly' then dateadd(week, -@PartitionsToKeep * @PartitionRangeTypeInterval, @ThisPeriod)
+				when 'Monthly' then dateadd(month, -@PartitionsToKeep * @PartitionRangeTypeInterval, @ThisPeriod)
+				when 'Yearly' then dateadd(year, -@PartitionsToKeep * @PartitionRangeTypeInterval, @ThisPeriod) end;
+	select	@Maximum = value from sys.partition_range_values where function_id = @FunctionID and boundary_id = @Fanout - 1;
 	if @BaseType = 'bigint' select @MaximumID = convert(bigint, @Maximum);
 	else select @MaximumDate = convert(datetime2(7), @Maximum);
 	if @ForwardedPartitionCount > 0
 		insert into @Splits
-			select f.Ordinal, f.SQL, f.Date
+			select	f.Ordinal, f.SQL, f.Date
 			from z.fn_BuildQueryCreatePartitionForDateRange(null, @PartitionFunctionName, @PartitionRangeType,
 				@PartitionRangeTypeInterval, @NextPeriod, null, @ForwardedPartitionCount - 1, @NextPartitionFileGroup) f
 			where f.Date is null or @Maximum is null or (@BaseType = 'bigint' and z.fn_GenerateZSequenceID(f.Date, 0) > @MaximumID)
 				or (@BaseType <> 'bigint' and convert(datetime2(7), f.Date) > @MaximumDate);
-	select @FirstNewDate = min(Date) from @Splits;
+	select	@FirstNewDate = min(Date) from @Splits;
 	-- LEFT creates the left segment on NEXT USED: retain each scheme's original tail placement.
 	if @Right = 0 and @FirstNewDate is not null
 		update q set SQL = N'alter partition scheme ' + quotename(s.name) + N' next used ' + quotename(f.name) + N';'
-		from @Splits q join sys.partition_schemes s on s.function_id = @FunctionID
-			join sys.destination_data_spaces d on d.partition_scheme_id = s.data_space_id and d.destination_id = @Fanout
-			join sys.filegroups f on f.data_space_id = d.data_space_id
+		from @Splits q inner join sys.partition_schemes s on s.function_id = @FunctionID
+			inner join sys.destination_data_spaces d on d.partition_scheme_id = s.data_space_id and d.destination_id = @Fanout
+			inner join sys.filegroups f on f.data_space_id = d.data_space_id
 		where q.Date = @FirstNewDate and q.SQL = N'alter partition scheme ' + quotename(s.name) + N' next used ' + quotename(@NextPartitionFileGroup) + N';';
 	if exists(select * from @Splits where Date is null)
 	begin
@@ -119,184 +186,160 @@ begin
 	begin
 		if exists(select * from @Tables where len(TableName + N'_Partition_SplitHold') > 128 or len(Source) > 256
 			or len(quotename(SchemaName) + N'.' + quotename(TableName + N'_Partition_SplitHold')) > 256)
-			select @Error = N'Partition holding table name exceeds the supported identifier length.';
+			select	@Error = N'Partition holding table name exceeds the supported identifier length.';
 		else if exists(select * from @Tables where object_id(quotename(SchemaName) + N'.' + quotename(TableName + N'_Partition_SplitHold')) is not null)
-			select @Error = N'Partition holding table already exists. Remove it explicitly before maintenance.';
+			select	@Error = N'Partition holding table already exists. Remove it explicitly before maintenance.';
 		if @Error is not null
 		begin
 			insert into @Ret(Name, SQL, Action) values('Error', N'throw 50001, ' + quotename(@Error, '''') + N', 1;', 'Error');
 			return;
 		end
-		select @UpperLiteral = case when @BaseType = 'bigint' then convert(nvarchar(100), z.fn_GenerateZSequenceID(@FirstNewDate, 0))
-			else N'convert(' + @DataType + N',convert(datetime2(7),' + quotename(convert(nvarchar(40), convert(datetime2(7), @FirstNewDate), 126), '''') + N',126))' end,
-			   @LowerLiteral = case when @Maximum is null then null when @BaseType = 'bigint' then convert(nvarchar(100), @Maximum)
-			else N'convert(' + @DataType + N',convert(datetime2(7),' + quotename(convert(nvarchar(40), convert(datetime2(7), @Maximum), 126), '''') + N',126))' end;
-		declare c cursor local static for select ObjectID, Source, quotename(SchemaName) + N'.' + quotename(TableName + N'_Partition_SplitHold'), ColumnName from @Tables order by Source;
-		open c;
-		fetch next from c into @ObjectID, @Source, @Target, @Column;
+		select	@UpperLiteral = case when @BaseType = 'bigint' then convert(nvarchar(100), z.fn_GenerateZSequenceID(@FirstNewDate, 0))
+				else N'convert(' + @DataType + N',convert(datetime2(7),' + quotename(convert(nvarchar(40), convert(datetime2(7), @FirstNewDate), 126), '''') + N',126))' end,
+				@LowerLiteral = case when @Maximum is null then null when @BaseType = 'bigint' then convert(nvarchar(100), @Maximum)
+				else N'convert(' + @DataType + N',convert(datetime2(7),' + quotename(convert(nvarchar(40), convert(datetime2(7), @Maximum), 126), '''') + N',126))' end;
+		declare cSplitTables cursor local static for select ObjectID, Source, quotename(SchemaName) + N'.' + quotename(TableName + N'_Partition_SplitHold'), ColumnName from @Tables order by Source;
+		open cSplitTables;
+		fetch next from cSplitTables into @ObjectID, @Source, @Target, @Column;
 		while @@fetch_status = 0
 		begin
-			select @Predicate = case when @LowerLiteral is not null
-				then quotename(@Column) + N' is not null and ' + quotename(@Column) + iif(@Right = 1, N' >= ', N' > ') + @LowerLiteral + N' and '
-				when @Fanout > 1 and @Right = 0 then quotename(@Column) + N' is not null and ' else N'' end +
-				quotename(@Column) + iif(@Right = 1, N' < ', N' <= ') + @UpperLiteral;
+			select	@Predicate = case when @LowerLiteral is not null
+					then quotename(@Column) + N' is not null and ' + quotename(@Column) + iif(@Right = 1, N' >= ', N' > ') + @LowerLiteral + N' and '
+					when @Fanout > 1 and @Right = 0 then quotename(@Column) + N' is not null and ' else N'' end +
+					quotename(@Column) + iif(@Right = 1, N' < ', N' <= ') + @UpperLiteral;
 			if @LowerLiteral is null and (@Fanout = 1 or @Right = 1) select @Predicate = N'(' + @Predicate + N') or ' + quotename(@Column) + N' is null';
-			select @OutSQL += N'if object_id(' + (N'N''' + replace(@Target, N'''', N'''''') + N'''') + N') is not null throw 50001, N''Partition holding table already exists.'', 1;
+			select	@OutSQL += N'if object_id(' + (N'N''' + replace(@Target, N'''', N'''''') + N'''') + N') is not null throw 50001, N''Partition holding table already exists.'', 1;
 exec z.usp_CopyTableSchema @FullSourceTableName = ' + (N'N''' + replace(@Source, N'''', N'''''') + N'''') + N', @FullTargetTableName = ' + (N'N''' + replace(@Target, N'''', N'''''') + N'''') + N', @PartitionNumber = ' + convert(nvarchar(20), @Fanout) + N', @DropTargetTableIfExists = 0, @CopyIdentity = 1;
 alter table ' + @Source + N' switch partition ' + convert(nvarchar(20), @Fanout) + N' to ' + @Target + N';
 ';
-			-- Source checks must also be trusted on the holder before switching back.
-			select @Checks = string_agg(convert(nvarchar(max), N'alter table ' + @Target + N' with check add constraint ' +
-				quotename(N'CK_PartitionHold_' + convert(nvarchar(20), @ObjectID) + N'_' + convert(nvarchar(20), object_id)) + N' check ' + definition collate database_default + N';'), nchar(13) + nchar(10)) within group(order by object_id)
-				from sys.check_constraints where parent_object_id = @ObjectID and is_disabled = 0;
-			select @InSQL += isnull(@Checks + nchar(13) + nchar(10), N'') +
-				N'alter table ' + @Target + N' with check add constraint ' + quotename(N'CK_PartitionHoldRange_' + convert(nvarchar(20), @ObjectID)) + N' check (' + @Predicate + N');
-alter table ' + @Target + N' switch to ' + @Source + N' partition ' + convert(nvarchar(20), @Fanout) + N';
+			select	@BeforeSwitch = N'', @AfterSwitch = N'';
+			select	@BeforeSwitch = BeforeSwitch, @AfterSwitch = AfterSwitch from @SwitchChecks where ObjectID = @ObjectID and Holder = 'Split';
+			select	@InSQL += N'if exists(select 1 from ' + @Target + N')
+begin
+alter table ' + @Target + N' with check add constraint ' + quotename(N'CK_PartitionHoldRange_' + convert(nvarchar(20), @ObjectID)) + N' check (' + @Predicate + N');
+' + @BeforeSwitch + N'alter table ' + @Target + N' switch to ' + @Source + N' partition ' + convert(nvarchar(20), @Fanout) + N';
+' + @AfterSwitch + N'end;
 drop table ' + @Target + N';
 ';
-			fetch next from c into @ObjectID, @Source, @Target, @Column;
+			fetch next from cSplitTables into @ObjectID, @Source, @Target, @Column;
 		end
-		close c;
-		deallocate c;
+		close cSplitTables;
+		deallocate cSplitTables;
 		-- Each boundary script declares @ID; execute in separate scopes inside the same transaction.
-		select @SQL = string_agg(convert(nvarchar(max), N'exec sys.sp_executesql N''' + replace(SQL, N'''', N'''''') + N''';'), nchar(13) + nchar(10)) within group(order by Ordinal) from @Splits;
-		insert into @Ret(Name, SQL, Action, PartitionNumber) values('Extend future boundaries', N'if @@trancount > 0 or @@options & 2 = 2
-begin
-	set xact_abort off;
-	throw 50000, N''Partition maintenance requires no caller or implicit transaction.'', 1;
-end
-set xact_abort on;
-begin try
-	begin tran;
-' + @OutSQL + @SQL + nchar(13) + nchar(10) + @InSQL + N'commit;
-end try
-begin catch
-	if @@trancount > 0 rollback;
-	throw;
-end catch;', 'ExtendBoundaries', @Fanout);
+		select	@SQL = string_agg(convert(nvarchar(max), N'exec(N''' + replace(SQL, N'''', N'''''') + N''');'), nchar(13) + nchar(10)) within group(order by Ordinal) from @Splits;
+		insert into @Ret(Name, SQL, Action, PartitionNumber) values('Extend future boundaries', @BeginAction + @OutSQL + @SQL + nchar(13) + nchar(10) + @InSQL + @EndAction, 'ExtendBoundaries', @Fanout);
 	end
-	select @CompressionPartition = max(r.boundary_id) + 1 from sys.partition_range_values r
+	select	@CompressionPartition = max(r.boundary_id) + 1 from sys.partition_range_values r
 		outer apply z.fn_SqlVariantToDateTime(case when @BaseType = 'bigint' then r.value else convert(sql_variant, null) end) d
 		where r.function_id = @FunctionID and @PartitionsToKeep >= 0 and
 			case when @BaseType = 'bigint' then convert(datetime2(7), d.Value) else convert(datetime2(7), case when @BaseType <> 'bigint' then r.value end) end <= @FirstPeriodToKeep;
-	declare b cursor local static for
-		select r.boundary_id, r.value, case when @BaseType = 'bigint' then convert(datetime2(7), d.Value) else convert(datetime2(7), case when @BaseType <> 'bigint' then r.value end) end
+	declare cBatches cursor local static for
+		select	r.boundary_id, r.value, case when @BaseType = 'bigint' then convert(datetime2(7), d.Value) else convert(datetime2(7), case when @BaseType <> 'bigint' then r.value end) end
 		from sys.partition_range_values r outer apply z.fn_SqlVariantToDateTime(case when @BaseType = 'bigint' then r.value else convert(sql_variant, null) end) d
 		where r.function_id = @FunctionID and @PartitionsToKeep >= 0 and
 			case when @BaseType = 'bigint' then convert(datetime2(7), d.Value) else convert(datetime2(7), case when @BaseType <> 'bigint' then r.value end) end <= @FirstPeriodToKeep
 		order by r.boundary_id desc;
-	open b;
-	fetch next from b into @BoundaryID, @Boundary, @BoundaryDate;
+	open cBatches;
+	fetch next from cBatches into @BoundaryID, @Boundary, @BoundaryDate;
 	while @@fetch_status = 0
 	begin
-		select @Suffix = convert(nvarchar(8), @BoundaryDate, 112) + case when @PartitionRangeType in ('Minute', 'Hourly') then N'_' + replace(convert(nvarchar(5), @BoundaryDate, 108), N':', N'') else N'' end,
-			   @OutSQL = N'', @InSQL = N'', @MergeOutSQL = N'', @MergeInSQL = N'';
+		select	@Suffix = convert(nvarchar(8), @BoundaryDate, 112) + case when @PartitionRangeType in ('Minute', 'Hourly') then N'_' + replace(convert(nvarchar(5), @BoundaryDate, 108), N':', N'') else N'' end,
+				@OutSQL = N'', @InSQL = N'', @MergeOutSQL = N'', @MergeInSQL = N'';
 		if exists(select * from @Tables where len(TableName + N'_Partition_' + @Suffix) > 128 or len(Source) > 256
 			or len(quotename(SchemaName) + N'.' + quotename(TableName + N'_Partition_' + @Suffix)) > 256)
-			select @Error = N'Expired partition target name exceeds the supported identifier length.';
+			select	@Error = N'Expired partition target name exceeds the supported identifier length.';
 		else if exists(select * from @Tables where object_id(quotename(SchemaName) + N'.' + quotename(TableName + N'_Partition_' + @Suffix)) is not null)
-			select @Error = N'Expired partition target already exists. Remove it explicitly before maintenance.';
+			select	@Error = N'Expired partition target already exists. Remove it explicitly before maintenance.';
 		else if @ArchivedSwappedPartitions = 1 and exists(select * from @Tables) and exists(select * from @RetainedSuffixes where Suffix = @Suffix)
-			select @Error = N'Expired boundaries produce duplicate retained table names at the configured period precision.';
+			select	@Error = N'Expired boundaries produce duplicate retained table names at the configured period precision.';
 		if @ArchivedSwappedPartitions = 1 and @Error is null and exists(select * from @Tables) insert into @RetainedSuffixes values(@Suffix);
 		if @Right = 1 and @Error is null
 		begin
 			if exists(select * from @Tables where len(TableName + N'_Partition_MergeHold') > 128
 				or len(quotename(SchemaName) + N'.' + quotename(TableName + N'_Partition_MergeHold')) > 256)
-				select @Error = N'Partition merge holding name exceeds the supported identifier length.';
+				select	@Error = N'Partition merge holding name exceeds the supported identifier length.';
 			else if exists(select * from @Tables where object_id(quotename(SchemaName) + N'.' + quotename(TableName + N'_Partition_MergeHold')) is not null)
-				select @Error = N'Partition merge holding table already exists. Remove it explicitly before maintenance.';
+				select	@Error = N'Partition merge holding table already exists. Remove it explicitly before maintenance.';
 			else if exists
 			(
-				select * from @Tables t join sys.indexes i on i.object_id = t.ObjectID
-					join sys.partition_schemes s on s.data_space_id = i.data_space_id
-					join sys.destination_data_spaces l on l.partition_scheme_id = s.data_space_id and l.destination_id = @BoundaryID
-					join sys.destination_data_spaces r on r.partition_scheme_id = s.data_space_id and r.destination_id = @BoundaryID + 1
+				select	* from @Tables t inner join sys.indexes i on i.object_id = t.ObjectID
+					inner join sys.partition_schemes s on s.data_space_id = i.data_space_id
+					inner join sys.destination_data_spaces l on l.partition_scheme_id = s.data_space_id and l.destination_id = @BoundaryID
+					inner join sys.destination_data_spaces r on r.partition_scheme_id = s.data_space_id and r.destination_id = @BoundaryID + 1
 				where l.data_space_id <> r.data_space_id
 			)
-				select @Error = N'RIGHT expiration requires adjacent partitions on the same filegroup for each index.';
+				select	@Error = N'RIGHT expiration requires adjacent partitions on the same filegroup for each index.';
 		end
 		if @Error is not null
 		begin
 			delete from @Ret;
 			insert into @Ret(Name, SQL, Action) values('Error', N'throw 50001, ' + quotename(@Error, '''') + N', 1;', 'Error');
-			close b;
-			deallocate b;
+			close cBatches;
+			deallocate cBatches;
 			return;
 		end
-		select @PreviousBoundary = null, @NextBoundary = null;
-		select @PreviousBoundary = value from sys.partition_range_values where function_id = @FunctionID and boundary_id = @BoundaryID - 1;
+		select	@PreviousBoundary = null, @NextBoundary = null;
+		select	@PreviousBoundary = value from sys.partition_range_values where function_id = @FunctionID and boundary_id = @BoundaryID - 1;
 		-- Higher expired boundaries are already merged when legacy callers execute this ordered queue.
-		select top (1) @NextBoundary = r.value from sys.partition_range_values r
+		select	top (1) @NextBoundary = r.value from sys.partition_range_values r
 			outer apply z.fn_SqlVariantToDateTime(case when @BaseType = 'bigint' then r.value else convert(sql_variant, null) end) d
 			where r.function_id = @FunctionID and r.boundary_id > @BoundaryID and
 				case when @BaseType = 'bigint' then convert(datetime2(7), d.Value) else convert(datetime2(7), case when @BaseType <> 'bigint' then r.value end) end > @FirstPeriodToKeep
 			order by r.boundary_id;
 		if @NextBoundary is null and @FirstNewDate is not null
-			select @NextBoundary = case when @BaseType = 'bigint' then convert(sql_variant, z.fn_GenerateZSequenceID(@FirstNewDate, 0)) else convert(sql_variant, @FirstNewDate) end;
-		select @LowerLiteral = case when @PreviousBoundary is null then null when @BaseType = 'bigint' then convert(nvarchar(100), @PreviousBoundary)
-			else N'convert(' + @DataType + N',convert(datetime2(7),' + quotename(convert(nvarchar(40), convert(datetime2(7), case when @BaseType <> 'bigint' then @PreviousBoundary end), 126), '''') + N',126))' end,
-			@UpperLiteral = case when @NextBoundary is null then null when @BaseType = 'bigint' then convert(nvarchar(100), @NextBoundary)
-			else N'convert(' + @DataType + N',convert(datetime2(7),' + quotename(convert(nvarchar(40), convert(datetime2(7), case when @BaseType <> 'bigint' then @NextBoundary end), 126), '''') + N',126))' end;
-		declare t cursor local static for select ObjectID, Source, quotename(SchemaName) + N'.' + quotename(TableName + N'_Partition_' + @Suffix), ColumnName from @Tables order by Source;
-		open t;
-		fetch next from t into @ObjectID, @Source, @Target, @Column;
+			select	@NextBoundary = case when @BaseType = 'bigint' then convert(sql_variant, z.fn_GenerateZSequenceID(@FirstNewDate, 0)) else convert(sql_variant, @FirstNewDate) end;
+		select	@LowerLiteral = case when @PreviousBoundary is null then null when @BaseType = 'bigint' then convert(nvarchar(100), @PreviousBoundary)
+				else N'convert(' + @DataType + N',convert(datetime2(7),' + quotename(convert(nvarchar(40), convert(datetime2(7), case when @BaseType <> 'bigint' then @PreviousBoundary end), 126), '''') + N',126))' end,
+				@UpperLiteral = case when @NextBoundary is null then null when @BaseType = 'bigint' then convert(nvarchar(100), @NextBoundary)
+				else N'convert(' + @DataType + N',convert(datetime2(7),' + quotename(convert(nvarchar(40), convert(datetime2(7), case when @BaseType <> 'bigint' then @NextBoundary end), 126), '''') + N',126))' end;
+		declare cTargetTables cursor local static for select ObjectID, Source, quotename(SchemaName) + N'.' + quotename(TableName + N'_Partition_' + @Suffix), ColumnName from @Tables order by Source;
+		open cTargetTables;
+		fetch next from cTargetTables into @ObjectID, @Source, @Target, @Column;
 		while @@fetch_status = 0
 		begin
-			select @OutSQL += N'if object_id(' + (N'N''' + replace(@Target, N'''', N'''''') + N'''') + N') is not null throw 50001, N''Expired partition target already exists.'', 1;
+			select	@OutSQL += N'if object_id(' + (N'N''' + replace(@Target, N'''', N'''''') + N'''') + N') is not null throw 50001, N''Expired partition target already exists.'', 1;
 exec z.usp_CopyTableSchema @FullSourceTableName = ' + (N'N''' + replace(@Source, N'''', N'''''') + N'''') + N', @FullTargetTableName = ' + (N'N''' + replace(@Target, N'''', N'''''') + N'''') + N', @PartitionNumber = ' + convert(nvarchar(20), @BoundaryID) + N', @DropTargetTableIfExists = 0, @CopyIdentity = 1;
 alter table ' + @Source + N' switch partition ' + convert(nvarchar(20), @BoundaryID) + N' to ' + @Target + N';
 ';
 			if @ArchivedSwappedPartitions = 0 select @InSQL += N'drop table ' + @Target + N';' + nchar(13) + nchar(10);
 			if @Right = 1
 			begin
-				select @MergeTarget = quotename(object_schema_name(@ObjectID)) + N'.' + quotename(object_name(@ObjectID) + N'_Partition_MergeHold');
-				select @MergeOutSQL += N'if object_id(' + (N'N''' + replace(@MergeTarget, N'''', N'''''') + N'''') + N') is not null throw 50001, N''Partition merge holding table already exists.'', 1;
+				select	@MergeTarget = quotename(object_schema_name(@ObjectID)) + N'.' + quotename(object_name(@ObjectID) + N'_Partition_MergeHold');
+				select	@MergeOutSQL += N'if object_id(' + (N'N''' + replace(@MergeTarget, N'''', N'''''') + N'''') + N') is not null throw 50001, N''Partition merge holding table already exists.'', 1;
 exec z.usp_CopyTableSchema @FullSourceTableName = ' + (N'N''' + replace(@Source, N'''', N'''''') + N'''') + N', @FullTargetTableName = ' + (N'N''' + replace(@MergeTarget, N'''', N'''''') + N'''') + N', @PartitionNumber = ' + convert(nvarchar(20), @BoundaryID + 1) + N', @DropTargetTableIfExists = 0, @CopyIdentity = 1;
 alter table ' + @Source + N' switch partition ' + convert(nvarchar(20), @BoundaryID + 1) + N' to ' + @MergeTarget + N';
 ';
-				select @RestoreSQL = string_agg(convert(nvarchar(max), case when i.index_id = 0 then N'alter table ' + @Source
-					else N'alter index ' + quotename(i.name) collate database_default + N' on ' + @Source end + N' rebuild partition = ' + convert(nvarchar(20), @BoundaryID)
-					+ N' with (data_compression = ' + p.data_compression_desc collate database_default + N');'), nchar(13) + nchar(10)) within group(order by i.index_id)
-					from sys.indexes i join sys.partitions p on p.object_id = i.object_id and p.index_id = i.index_id
+				select	@RestoreSQL = string_agg(convert(nvarchar(max), case when i.index_id = 0 then N'alter table ' + @Source
+						else N'alter index ' + quotename(i.name) collate database_default + N' on ' + @Source end + N' rebuild partition = ' + convert(nvarchar(20), @BoundaryID)
+						+ N' with (data_compression = ' + p.data_compression_desc collate database_default + N');'), nchar(13) + nchar(10)) within group(order by i.index_id)
+					from sys.indexes i inner join sys.partitions p on p.object_id = i.object_id and p.index_id = i.index_id
 					where i.object_id = @ObjectID and p.partition_number = @CompressionPartition and i.type in (0, 1, 2, 5, 6);
-				select @Checks = string_agg(convert(nvarchar(max), N'alter table ' + @MergeTarget + N' with check add constraint ' +
-					quotename(N'CK_PartitionMerge_' + convert(nvarchar(20), @ObjectID) + N'_' + convert(nvarchar(20), object_id)) + N' check ' + definition collate database_default + N';'), nchar(13) + nchar(10)) within group(order by object_id)
-					from sys.check_constraints where parent_object_id = @ObjectID and is_disabled = 0;
-				select @Predicate = case when @LowerLiteral is null then N'1 = 1' else quotename(@Column) + N' is not null and ' + quotename(@Column) + N' >= ' + @LowerLiteral end
-					+ case when @UpperLiteral is null then N'' else N' and ' + quotename(@Column) + N' < ' + @UpperLiteral end;
+				select	@BeforeSwitch = N'', @AfterSwitch = N'';
+				select	@BeforeSwitch = BeforeSwitch, @AfterSwitch = AfterSwitch from @SwitchChecks where ObjectID = @ObjectID and Holder = 'Merge';
+				select	@Predicate = case when @LowerLiteral is null then N'1 = 1' else quotename(@Column) + N' is not null and ' + quotename(@Column) + N' >= ' + @LowerLiteral end
+						+ case when @UpperLiteral is null then N'' else N' and ' + quotename(@Column) + N' < ' + @UpperLiteral end;
 				if @LowerLiteral is null select @Predicate = N'(' + @Predicate + N') or ' + quotename(@Column) + N' is null';
-				select @MergeInSQL += isnull(@RestoreSQL + nchar(13) + nchar(10), N'') + isnull(@Checks + nchar(13) + nchar(10), N'') +
-					N'alter table ' + @MergeTarget + N' with check add constraint ' + quotename(N'CK_PartitionMergeRange_' + convert(nvarchar(20), @ObjectID)) + N' check (' + @Predicate + N');
-alter table ' + @MergeTarget + N' switch to ' + @Source + N' partition ' + convert(nvarchar(20), @BoundaryID) + N';
+				select	@MergeInSQL += isnull(@RestoreSQL + nchar(13) + nchar(10), N'') + N'if exists(select 1 from ' + @MergeTarget + N')
+begin
+alter table ' + @MergeTarget + N' with check add constraint ' + quotename(N'CK_PartitionMergeRange_' + convert(nvarchar(20), @ObjectID)) + N' check (' + @Predicate + N');
+' + @BeforeSwitch + N'alter table ' + @MergeTarget + N' switch to ' + @Source + N' partition ' + convert(nvarchar(20), @BoundaryID) + N';
+' + @AfterSwitch + N'end;
 drop table ' + @MergeTarget + N';
 ';
 			end
-			fetch next from t into @ObjectID, @Source, @Target, @Column;
+			fetch next from cTargetTables into @ObjectID, @Source, @Target, @Column;
 		end
-		close t;
-		deallocate t;
-		select @UpperLiteral = case when @BaseType = 'bigint' then convert(nvarchar(100), @Boundary)
-			else N'convert(' + @DataType + N',convert(datetime2(7),' + quotename(convert(nvarchar(40), convert(datetime2(7), @Boundary), 126), '''') + N',126))' end;
-		insert into @Ret(Name, SQL, Action, PartitionNumber) values('Partition Swapout boundary ' + convert(varchar(40), @BoundaryDate, 126), N'if @@trancount > 0 or @@options & 2 = 2
-begin
-	set xact_abort off;
-	throw 50000, N''Partition maintenance requires no caller or implicit transaction.'', 1;
-end
-set xact_abort on;
-begin try
-	begin tran;
-' + @OutSQL + @MergeOutSQL + N'alter partition function ' + quotename(@PartitionFunctionName) + N'() merge range (' + @UpperLiteral + N');
-' + @MergeInSQL + @InSQL + N'commit;
-end try
-begin catch
-	if @@trancount > 0 rollback;
-	throw;
-end catch;', 'ExpireBoundary', @BoundaryID);
-		fetch next from b into @BoundaryID, @Boundary, @BoundaryDate;
+		close cTargetTables;
+		deallocate cTargetTables;
+		select	@UpperLiteral = case when @BaseType = 'bigint' then convert(nvarchar(100), @Boundary)
+				else N'convert(' + @DataType + N',convert(datetime2(7),' + quotename(convert(nvarchar(40), convert(datetime2(7), @Boundary), 126), '''') + N',126))' end;
+		insert into @Ret(Name, SQL, Action, PartitionNumber) values('Partition Swapout boundary ' + convert(varchar(40), @BoundaryDate, 126), @BeginAction
+			+ @OutSQL + @MergeOutSQL + N'alter partition function ' + quotename(@PartitionFunctionName) + N'() merge range (' + @UpperLiteral + N');'
+			+ nchar(13) + nchar(10) + @MergeInSQL + @InSQL + @EndAction, 'ExpireBoundary', @BoundaryID);
+		fetch next from cBatches into @BoundaryID, @Boundary, @BoundaryDate;
 	end
-	close b;
-	deallocate b;
+	close cBatches;
+	deallocate cBatches;
 	return;
 end
 go

@@ -16,21 +16,21 @@ create or alter procedure z.usp_RemapUserToLogin
 )
 as
 begin
-	set nocount on
-	declare @SQL nvarchar(max)
-	declare c cursor local for
-		select 'alter user ' + quotename(d.name) +' with login = ' + quotename(s.name) + ';'
+	set nocount, xact_abort on;
+	declare @SQL nvarchar(max);
+	declare cUsers cursor local static for
+		select	'alter user ' + quotename(d.name) + ' with login = ' + quotename(s.name) + ';'
 		from sys.database_principals d
-			 inner join sys.server_principals s on s.sid <> d.sid and d.type_desc = replace(s.type_desc, 'LOGIN', 'USER')
+			inner join sys.server_principals s on s.sid <> d.sid and d.type_desc = replace(s.type_desc, 'LOGIN', 'USER')
 		where d.authentication_type_desc in ('WINDOWS', 'INSTANCE')
-			and isnull(replace(d.name, @UserNameContains, isnull(@UserNameReplacedWith, @UserNameContains)), d.name) = isnull(replace(s.name, @LoginNameContains, @LoginNameReplacedWith), s.name)
-	open c
-	fetch next from c into @SQL
+			and isnull(replace(d.name, @UserNameContains, isnull(@UserNameReplacedWith, @UserNameContains)), d.name) = isnull(replace(s.name, @LoginNameContains, isnull(@LoginNameReplacedWith, @LoginNameContains)), s.name);
+	open cUsers;
+	fetch next from cUsers into @SQL;
 	while @@fetch_status = 0
 	begin
-		exec(@SQL)
-		fetch next from c into @SQL
+		exec(@SQL);
+		fetch next from cUsers into @SQL;
 	end
-	close c
-	deallocate c
+	close cUsers;
+	deallocate cUsers;
 end

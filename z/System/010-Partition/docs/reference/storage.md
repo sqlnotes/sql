@@ -2,9 +2,15 @@
 
 [Object index](readme.md)
 
+The shared partition functions define how date-based data is divided. `z.PartitionedTableDataRetention` supplies the policy that decides how far ahead to prepare partitions and when old data expires. A policy belongs to a function, so it can affect several tables together.
+
 ## PF_SchemaZPartitionGeneric and PS_SchemaZPartitionGeneric
 
-[Source](../../../baseline/2010%20Partitions/SchemaZPartitionGeneric.sql). Database-level `bigint`, `range left` function, initially no boundaries; scheme `all to ([Default])`. Existence guards do not reconcile a preexisting mismatched definition. These shared storage objects belong to the System baseline. Boundary maintenance uses System ID time encoding for the bigint function. The same file defines PF_SchemaZPartitionGenericDateTime (datetime) and PS_SchemaZPartitionGenericDateTime using `range right`, empty boundaries and the default filegroup. The datetime-encoded bigint function uses `range left`. Initialization seeds missing policies for both pairs without overwriting custom settings. Existing versioned System installations skip the baseline; run this guarded file separately to add the datetime pair.
+[Source](../../../baseline/2010%20Partitions/SchemaZPartitionGeneric.sql).
+
+Use `PF_SchemaZPartitionGeneric` and `PS_SchemaZPartitionGeneric` for datetime-encoded bigint System IDs. Use `PF_SchemaZPartitionGenericDateTime` and `PS_SchemaZPartitionGenericDateTime` for datetime keys. Both begin without boundaries and use the default filegroup. The bigint function uses `range left`; the datetime function uses `range right`.
+
+These objects belong to the System baseline. Deployment creates missing definitions when that baseline is eligible (System at 0.0.0 or its first version, 0.0.1), but does not repair an existing mismatched definition. Initialization adds missing policies for both pairs and preserves custom settings.
 
 ## z.PartitionedTableDataRetention
 

@@ -4,7 +4,7 @@
 
 ## Purpose and behavior
 
-Drain the current session's buffered AsyncChannel diagnostics into `z.AsyncChannelLog`. Return immediately when any transaction is open; flush explicitly after the caller's transaction has ended when necessary.
+Saves the current connection's buffered AsyncChannel diagnostics in `z.AsyncChannelLog`. Call it after committing or rolling back processing when you want its buffered messages to become persistent. It does nothing while a transaction is still open.
 
 ## Parameters and defaults
 
@@ -12,7 +12,7 @@ None.
 
 ## Results and side effects
 
-No result set or explicit return-code contract. Read at most the first 40 numbered session-context slots, insert their metadata and truncated Info/Payload values, and clear each successfully inserted slot. If the buffered count exceeds 40, append a Warning reporting the dropped count. Finally clear `AsyncChannel-LogCount`.
+No result set or explicit return-code contract. Saves up to 40 buffered messages and clears each successfully saved entry. Buffered Info/Payload values are already truncated by the logging procedure. If additional messages were dropped because the buffer was full, it saves a Warning with that count.
 
 ## Transactions, permissions, and limits
 

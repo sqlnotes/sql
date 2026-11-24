@@ -2,7 +2,9 @@
 
 [Trace](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_TraceAddColumns.sql)
 
-Add supported selected output columns to events in one stopped native trace registration. Use complete catalog names; all is supported for column selection. TraceStart applies the configured bindings.
+Adds information to record for the trace's configured events, such as query text, duration or start time. Call it while configuring a stopped trace, before the first Start attempt.
+
+`@EventColumnList` contains complete comma-separated names from `z.v_TraceColumn`; use `all` for all supported columns. Only columns supported by each selected event can be added. The columns take effect when the trace starts.
 
 ```text
 @TraceName nvarchar(128) = null,

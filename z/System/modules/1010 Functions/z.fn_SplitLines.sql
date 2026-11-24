@@ -16,50 +16,50 @@ as return
 (
 	with x0	as
 	(
-		select	cast(1 as bigint) as StartPosition, isnull(cast(datalength(@Str)/2 as bigint), 0) TotalLength, 1 SeparatorLength, 
+		select	cast(1 as bigint) as StartPosition, isnull(cast(len(@Str + N'.') - 1 as bigint), 0) TotalLength, 1 SeparatorLength,
 				cast(char(0x0d) as nvarchar(1)) Separator1, cast(char(0x0a) as nvarchar(1)) Separator2
 	),
 	x1 as
 	(
-		select	a1.Ordinal , a1.TotalLength, 
-				case 
+		select	a1.Ordinal , a1.TotalLength,
+				case
 					when a1.NextSeparatorPosition1 > 0 and a1.NextSeparatorPosition2 = 0 then 1
 					when a1.NextSeparatorPosition1 = 0 and a1.NextSeparatorPosition2 > 0 then 1
-					when a1.NextSeparatorPosition1 > 0 and a1.NextSeparatorPosition2 > 0 then 
-						case when abs(a1.NextSeparatorPosition1 - a1.NextSeparatorPosition2) = 1 then 2 else 1 end
+					when a1.NextSeparatorPosition1 > 0 and a1.NextSeparatorPosition2 > 0 then
+						case when a1.NextSeparatorPosition2 - a1.NextSeparatorPosition1 = 1 then 2 else 1 end
 					else 0
-				end SeparatorLength, 
+				end SeparatorLength,
 				a1.Separator1, a1.Separator2,
 				a1.StartPosition,
-				case 
+				case
 					when a1.NextSeparatorPosition1 > 0 and a1.NextSeparatorPosition2 = 0 then a1.NextSeparatorPosition1
 					when a1.NextSeparatorPosition1 = 0 and a1.NextSeparatorPosition2 > 0 then a1.NextSeparatorPosition2
-					when a1.NextSeparatorPosition1 > 0 and a1.NextSeparatorPosition2 > 0 then 
+					when a1.NextSeparatorPosition1 > 0 and a1.NextSeparatorPosition2 > 0 then
 						case when a1.NextSeparatorPosition1 > a1.NextSeparatorPosition2 then a1.NextSeparatorPosition2 else a1.NextSeparatorPosition1 end
 					else 0
 				end NextSeparatorPosition
 		from (
-				select	1 as Ordinal, x0.TotalLength, x0.SeparatorLength, Separator1, Separator2, x0.StartPosition, 
-						charindex(Separator1, @Str, x0.StartPosition) NextSeparatorPosition1, 
+				select	1 as Ordinal, x0.TotalLength, x0.SeparatorLength, Separator1, Separator2, x0.StartPosition,
+						charindex(Separator1, @Str, x0.StartPosition) NextSeparatorPosition1,
 						charindex(Separator2, @Str, x0.StartPosition) NextSeparatorPosition2
 				from x0
 				where TotalLength >0
 			) a1
 		union all
-		select	a2. Ordinal, a2.TotalLength, 
-				case 
+		select	a2. Ordinal, a2.TotalLength,
+				case
 					when a2.NextSeparatorPosition1 > 0 and a2.NextSeparatorPosition2 = 0 then 1
 					when a2.NextSeparatorPosition1 = 0 and a2.NextSeparatorPosition2 > 0 then 1
-					when a2.NextSeparatorPosition1 > 0 and a2.NextSeparatorPosition2 > 0 then 
-						case when abs(a2.NextSeparatorPosition1 - a2.NextSeparatorPosition2) = 1 then 2 else 1 end						
+					when a2.NextSeparatorPosition1 > 0 and a2.NextSeparatorPosition2 > 0 then
+						case when a2.NextSeparatorPosition2 - a2.NextSeparatorPosition1 = 1 then 2 else 1 end
 					else 0
-				end SeparatorLength, 
+				end SeparatorLength,
 				a2.Separator1, a2.Separator2,
 				a2.StartPosition StartPosition,
-				case 
+				case
 					when a2.NextSeparatorPosition1 > 0 and a2.NextSeparatorPosition2 = 0 then a2.NextSeparatorPosition1
 					when a2.NextSeparatorPosition1 = 0 and a2.NextSeparatorPosition2 > 0 then a2.NextSeparatorPosition2
-					when a2.NextSeparatorPosition1 > 0 and a2.NextSeparatorPosition2 > 0 then 
+					when a2.NextSeparatorPosition1 > 0 and a2.NextSeparatorPosition2 > 0 then
 						case when a2.NextSeparatorPosition1 > a2.NextSeparatorPosition2 then a2.NextSeparatorPosition2 else a2.NextSeparatorPosition1 end
 					else 0
 				end NextSeparatorPosition
@@ -71,8 +71,8 @@ as return
 				from x1
 				where x1.NextSeparatorPosition > 0
 			) a2
-		
+
 	)
-	select Ordinal, case when NextSeparatorPosition > 0 then substring(@str, StartPosition, NextSeparatorPosition - StartPosition) else right(@Str, TotalLength - StartPosition + 1) end Value 
+	select	Ordinal, case when NextSeparatorPosition > 0 then substring(@str, StartPosition, NextSeparatorPosition - StartPosition) else right(@Str, TotalLength - StartPosition + 1) end Value
 	from x1
 )

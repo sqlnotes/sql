@@ -17,9 +17,9 @@ create or alter procedure z.usp_ReadBackupHeader
 as
 begin
 	set nocount on;
-	declare @Major int = try_convert(int, serverproperty('ProductMajorVersion')),
-		@IsS3 bit, @IsUrl bit, @RestoreSql nvarchar(max), @Sql nvarchar(max), @Columns nvarchar(max);
-	select @HeaderJson = null;
+	declare	@Major int = try_convert(int, serverproperty('ProductMajorVersion')),
+			@IsS3 bit, @IsUrl bit, @RestoreSql nvarchar(max), @Sql nvarchar(max), @Columns nvarchar(max);
+	select	@HeaderJson = null;
 	if @Major is null or @Major not in (15, 16, 17)
 		throw 50000, 'Unsupported RESTORE HEADERONLY layout. Supported SQL Server versions are 2019, 2022 and 2025.', 1;
 	if nullif(trim(@BackupFile), N'') is null
@@ -28,10 +28,10 @@ begin
 		throw 50000, 'Position must be positive or null for all backup sets.', 1;
 	if @ReturnResult is null
 		throw 50000, 'ReturnResult cannot be null.', 1;
-	select @IsS3 = iif(left(@BackupFile, 5) collate Latin1_General_100_CI_AS = N's3://', 1, 0),
-		@IsUrl = iif(left(@BackupFile, 7) collate Latin1_General_100_CI_AS = N'http://'
-			or left(@BackupFile, 8) collate Latin1_General_100_CI_AS = N'https://'
-			or left(@BackupFile, 5) collate Latin1_General_100_CI_AS = N's3://', 1, 0);
+	select	@IsS3 = iif(left(@BackupFile, 5) collate Latin1_General_100_CI_AS = N's3://', 1, 0),
+			@IsUrl = iif(left(@BackupFile, 7) collate Latin1_General_100_CI_AS = N'http://'
+				or left(@BackupFile, 8) collate Latin1_General_100_CI_AS = N'https://'
+				or left(@BackupFile, 5) collate Latin1_General_100_CI_AS = N's3://', 1, 0);
 	if @IsS3 = 1 and @Major < 16
 		throw 50000, 'S3 backup headers require SQL Server 2022 or later.', 1;
 
@@ -97,14 +97,14 @@ begin
 	-- Match the reader engine's native result before capturing it.
 	if @Major in (16, 17)
 		exec(N'alter table #Header add LastValidRestoreTime datetime, TimeZone nvarchar(32), CompressionAlgorithm nvarchar(32);');
-	select @RestoreSql = N'restore headeronly from ' + iif(@IsUrl = 1, N'url', N'disk')
-		+ N' = N''' + replace(@BackupFile, N'''', N'''''') + N''''
-		+ iif(@Position is null, N'', N' with file = ' + convert(nvarchar(11), @Position)) + N';';
-	insert #Header exec sys.sp_executesql @RestoreSql;
+	select	@RestoreSql = N'restore headeronly from ' + iif(@IsUrl = 1, N'url', N'disk')
+			+ N' = N''' + replace(@BackupFile, N'''', N'''''') + N''''
+			+ iif(@Position is null, N'', N' with file = ' + convert(nvarchar(11), @Position)) + N';';
+	insert #Header exec(@RestoreSql);
 	-- Complete the stable output schema after capturing the SQL Server 2019 layout.
 	if @Major = 15
 		exec(N'alter table #Header add LastValidRestoreTime datetime, TimeZone nvarchar(32), CompressionAlgorithm nvarchar(32);');
-	select @Columns = N'BackupName, BackupDescription, BackupType, ExpirationDate, Compressed, Position, DeviceType, UserName, ServerName, DatabaseName,
+	select	@Columns = N'BackupName, BackupDescription, BackupType, ExpirationDate, Compressed, Position, DeviceType, UserName, ServerName, DatabaseName,
 		DatabaseVersion, DatabaseCreationDate, BackupSize, FirstLSN, LastLSN, CheckpointLSN, DatabaseBackupLSN, BackupStartDate, BackupFinishDate,
 		SortOrder, CodePage, UnicodeLocaleId, UnicodeComparisonStyle, CompatibilityLevel, SoftwareVendorId, SoftwareVersionMajor, SoftwareVersionMinor,
 		SoftwareVersionBuild, MachineName, Flags, BindingID, RecoveryForkID, Collation, FamilyGUID, HasBulkLoggedData, IsSnapshot, IsReadOnly,
@@ -112,8 +112,8 @@ begin
 		ForkPointLSN, RecoveryModel, DifferentialBaseLSN, DifferentialBaseGUID, BackupTypeDescription, BackupSetGUID, CompressedBackupSize, Containment,
 		KeyAlgorithm, EncryptorThumbprint, EncryptorType, LastValidRestoreTime, TimeZone, CompressionAlgorithm';
 	-- Compile the projection only after the version-specific schema changes.
-	select @Sql = N'select @Json = (select ' + @Columns + N' from #Header order by Position for json path, include_null_values);'
-		+ iif(@ReturnResult = 1, N'select ' + @Columns + N' from #Header order by Position;', N'');
+	select	@Sql = N'select @Json = (select ' + @Columns + N' from #Header order by Position for json path, include_null_values);'
+			+ iif(@ReturnResult = 1, N'select ' + @Columns + N' from #Header order by Position;', N'');
 	exec sys.sp_executesql @Sql, N'@Json nvarchar(max) output', @Json = @HeaderJson output;
 end
 GO

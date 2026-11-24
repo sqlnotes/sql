@@ -4,19 +4,20 @@
 
 ## Purpose and behavior
 
-Generate create statements for SQL/Windows logins, Windows groups, and non-fixed server roles. Null source includes visible supported principals except public/fixed roles. Null target keeps source names. SQL-login output includes hashed password, SID, default language and password-policy settings, but not default database or disabled state.
+Produces SQL scripts to recreate SQL logins, Windows logins/groups and user-defined server roles. Use it when preparing selected principals for another instance or creating a copy under a new name. It returns the scripts without running them.
+
+`@SourceLogin` selects one principal; NULL includes all visible supported principals except `public` and fixed roles. `@TargetLogin` supplies the name to use in generated statements; NULL keeps the original names.
 
 ## Parameters and defaults
 
 ```text
-@SourceLogin nvarchar(128) = null, @TargetLogin nvarchar(128) = null
+@SourceLogin nvarchar(128) = null, 
+@TargetLogin nvarchar(128) = null
 ```
-
-These are the source-declared types and defaults. Table-valued-function callers must supply arguments or the `default` keyword explicitly.
 
 ## Results, permissions, and limits
 
-Returns ServerPrincipalID, LoginName, LoginType, SQL. Metadata/hash visibility controls completeness; read-only.
+Returns `ServerPrincipalID`, `LoginName`, `LoginType` and `SQL`. Review the `SQL` column before executing it. SQL-login scripts contain password hashes and SIDs, so restrict access to the output. They include default language and password-policy settings, but omit default database and disabled state. Metadata and password-hash visibility determine how complete the output can be.
 
 ## Dependencies
 

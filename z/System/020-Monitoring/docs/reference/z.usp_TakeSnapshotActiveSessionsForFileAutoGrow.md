@@ -4,7 +4,7 @@
 
 ## Purpose and behavior
 
-Append z.v_ActiveSessions rows into z.TraceFileAutoGrowActiveSessions correlated by TraceSequence. QueryPlan is intentionally not copied. Use read uncommitted and xact_abort; no explicit transaction. TraceID and EventName are accepted for callback compatibility but unused. No event existence check or throttling is applied.
+Saves the active requests visible when a file-growth event is processed. The saved rows in `z.TraceFileAutoGrowActiveSessions` can be joined to the growth event using `TraceSequence`, helping you investigate what was running around the growth. Query plans are not collected. Requests reflect snapshot time, which can be later than the event itself.
 
 ## Parameters and defaults
 
@@ -14,14 +14,14 @@ Append z.v_ActiveSessions rows into z.TraceFileAutoGrowActiveSessions correlated
 @EventName nvarchar(128) = null
 ```
 
-These are the source-declared types and defaults.
+`@TraceSequence` identifies the related file-growth event. The Trace framework supplies `@TraceID` and `@EventName` for callback compatibility; this snapshot does not use them to select requests.
 
 ## Results, permissions, and limits
 
-No defined result set. Requires snapshot insert and sufficient DMV visibility. Snapshot reflects collection-time requests, not necessarily event-time requests.
+Returns no rows; query the saved snapshot table. Requires snapshot insert access and sufficient DMV visibility. It uses read-uncommitted visibility and starts no transaction of its own; the callback participates in its caller's transaction.
 
 ## Dependencies
 
-Direct SQL object dependencies: `z.TraceFileAutoGrowActiveSessions`, `z.v_ActiveSessions`.
+Direct SQL object dependencies: `z.TraceFileAutoGrowActiveSessions`, `z.v_ActiveSessionsNoPlan`.
 
 See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md) for subsystem-wide constraints.

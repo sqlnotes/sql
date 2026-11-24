@@ -2,20 +2,16 @@
 
 [Subsystem](readme.md) | [Object reference](reference/readme.md)
 
-## Diagnose current behavior
+If a script is empty, check the source principal name and your metadata visibility. If a mapping or ownership change fails, check that the destination login exists and that you have permission to alter the selected principals. Earlier direct changes may remain applied after a later failure.
 
-A null source in either permission-copy function returns no rows because the catalog filter compares the name to null. Membership output uses the source principal instead of the requested target. The server generator incorrectly joins sys.database_role_members; server membership output cannot be trusted. The user generator emits revoke ... to for object/column permissions and derives XML collection schema from sys.types; those scripts can be invalid or omitted. Visibility depends on the caller. z.usp_ChangeServerRoleOwnerToSA uses the literal login sa, so it can fail when that login has been renamed.
+## Behavior and constraints
 
-## Permission and partial-operation failures
-
-Server/database security catalogs provide input; native create login, grant/deny/revoke, alter user, and alter authorization provide execution. There are no cross-feature dependencies.
-
-Read the relevant callable reference before retrying a failed write. Some procedures roll back any open transaction, including a caller's transaction; others leave earlier operations committed. Native server resources and filesystem actions do not share a single database rollback boundary. Catalog/DMV access is evaluated on the deployed server and depends on SQL Server version and caller context.
-
-## Verification limits
-
-These pages describe source behavior. A successful installation or module compilation does not demonstrate successful mail delivery, backup restoration, SQL Agent execution, trace workload collection, security migration, or application-specific Broker delivery.
+- A `null` `@SourceLogin` or `@SourceUser` in `z.fn_BuildQueryCopyLoginPermission` or `z.fn_BuildQueryCopyUserPermission` returns no rows because the catalog filter compares the principal name to `@SourceLogin` / `@SourceUser`.
+- Both permission generators substitute `@TargetLogin` / `@TargetUser` (when supplied) in permission statements and role membership statements (`alter server role ... add member ...` and `alter role ... add member ...`).
+- `z.usp_ChangeServerRoleOwnerToSA` transfers ownership of non-fixed server roles to the login named `sa`; if `sa` has been renamed, the generated `alter authorization` statement will fail.
+- `z.usp_FixOrphanUser` remaps instance-authenticated `SQL_USER` principals whose SIDs differ from a same-named `SQL_LOGIN`.
 
 ## Version constraint
 
-z.fn_BuildQueryCopyUserPermission references sys.external_languages and its external_language_id/language columns, available from the minimum supported SQL Server version, 2019 (15.x).
+`z.fn_BuildQueryCopyUserPermission` references `sys.external_languages` (`external_language_id`, `language`), available starting in SQL Server 2019 (15.x).
+

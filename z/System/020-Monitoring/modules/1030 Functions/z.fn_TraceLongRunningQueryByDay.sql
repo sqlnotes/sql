@@ -7,12 +7,15 @@ Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/020-Monitoring
 
 Summarizes retained long-running query events by date and duration bucket.
 */
-create or alter function z.fn_TraceLongRunningQueryByDay(@Days int)
+create or alter function z.fn_TraceLongRunningQueryByDay
+(
+	@Days int
+)
 returns table
 as
 return(
-	select  cast(Date as date) Date,
-			count(case when DurationInMS < 5000 then  1 end) [1.3-5],
+	select	cast(Date as date) Date,
+			count(case when DurationInMS < 5000 then 1 end) [1.3-5],
 			count(case when DurationInMS >= 5000 and DurationInMS < 10000 then 1 end) [5-10],
 			count(case when DurationInMS >= 10000 and DurationInMS < 15000 then 1 end) [10-15],
 			count(case when DurationInMS >= 15000 and DurationInMS < 20000 then 1 end) [15-20],
@@ -25,16 +28,15 @@ return(
 			count(case when DurationInMS >= 180000 and DurationInMS < 240000 then 1 end) [180-240],
 			count(case when DurationInMS >= 240000 then 1 end) [240+]
 	from (
-			select /*z.fn_ZSequenceIDToDatetime(TraceSequence)*/ StartTime Date, Duration / 1000.0 DurationInMS
+			select	/*z.fn_ZSequenceIDToDatetime(TraceSequence)*/ StartTime Date, Duration / 1000.0 DurationInMS
 			from z.TraceLongRunningQuery
 			where ApplicationName not like 'SQLAgent%'
-      		  and ApplicationName not like 'SSIS%'
-      		  and ApplicationName not like '%Microsoft SQL Server Management Studio%'
-      		  and ApplicationName not in('SQLServerCEIP')
-      		  and TextData not like '%backup%'
-      		  and TraceSequence >= z.fn_GenerateZSequenceID(cast(dateadd(day, -abs(@Days), getdate()) as date), 0)
+				and ApplicationName not like 'SSIS%'
+				and ApplicationName not like '%Microsoft SQL Server Management Studio%'
+				and ApplicationName not in('SQLServerCEIP')
+				and TextData not like '%backup%'
+				and TraceSequence >= z.fn_GenerateZSequenceID(cast(dateadd(day, -abs(@Days), getdate()) as date), 0)
 		) s
 	group by cast(Date as date)
-
-	)
+)
 

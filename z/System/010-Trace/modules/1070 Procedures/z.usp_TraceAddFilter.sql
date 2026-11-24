@@ -22,7 +22,6 @@ begin
 	set nocount, xact_abort on;
 	if @@trancount > 0
 	begin
-		set xact_abort off;
 		throw 50000, N'Trace configuration requires no existing transaction.', 1;
 	end;
 	begin try
@@ -33,10 +32,10 @@ begin
 			throw 50000, N'Either @TraceName or @TraceID must be provided.', 1;
 		end
 		declare @ResolvedTraceID int;
-		select @ResolvedTraceID = TraceID
+		select	@ResolvedTraceID = TraceID
 		from z.v_TraceOwned
 		where (@TraceName is null or Name = @TraceName) and (@TraceID is null or TraceID = @TraceID);
-		select @TraceID = @ResolvedTraceID;
+		select	@TraceID = @ResolvedTraceID;
 		if not exists(select 1 from z.Trace with (updlock, holdlock) where TraceID = @TraceID and CreatorSessionID = @@spid
 			and CreatorLoginTime = (select login_time from sys.dm_exec_sessions where session_id = @@spid))
 			throw 50000, N'The selected trace registration changed before configuration.', 1;
@@ -47,7 +46,7 @@ begin
 		if exists(select 1 from sys.fn_trace_geteventinfo(@TraceID))
 			throw 50000, N'Native event and filter configuration is fixed after binding begins; close and recreate this trace to change it.', 1;
 		if @Value is null begin commit; return; end;
-		select @LogicOperator = lower(trim(@LogicOperator)), @ComparisonOperator = lower(replace(@ComparisonOperator, ' ', ''));
+		select	@LogicOperator = lower(trim(@LogicOperator)), @ComparisonOperator = lower(replace(@ComparisonOperator, ' ', ''));
 		if @LogicOperator is null or @LogicOperator not in ('and', 'or')
 		begin
 			throw 50000, N'@LogicOperator must be and, or.', 1;
@@ -58,7 +57,7 @@ begin
 		end
 		if @ComparisonOperator = '!=' select @ComparisonOperator = '<>';
 		declare @Definition nvarchar(128), @DataType sysname, @SQL nvarchar(max), @TypedValue sql_variant;
-		select @ColumnID = ColumnID, @Definition = Definition, @DataType = DataType
+		select	@ColumnID = ColumnID, @Definition = Definition, @DataType = DataType
 		from z.v_TraceColumn
 		where (@ColumnID is null or ColumnID = @ColumnID) and (@ColumnName is null or ColumnName = @ColumnName)
 			and (@ColumnID is not null or @ColumnName is not null) and IsFilterable = 1;
@@ -76,11 +75,11 @@ begin
 			begin
 				throw 50000, N'Trace filter text exceeds the sql_variant limit of 4000 Unicode characters.', 1;
 			end
-			select @Definition = N'nvarchar(4000)';
+			select	@Definition = N'nvarchar(4000)';
 		end
 		if @Definition = N'varbinary(max)' select @Definition = N'varbinary(8000)';
 		-- Type definitions come only from SQL Server's trace column catalog.
-		select @SQL = N'select @TypedValue = convert(sql_variant, convert(' + @Definition + N', @Value));';
+		select	@SQL = N'select @TypedValue = convert(sql_variant, convert(' + @Definition + N', @Value));';
 		exec sys.sp_executesql @SQL, N'@Value sql_variant, @TypedValue sql_variant output', @Value, @TypedValue output;
 		if @DataType in ('nvarchar', 'varchar', 'nchar', 'char')
 			and datalength(convert(nvarchar(max), @TypedValue)) < datalength(convert(nvarchar(max), @Value))
@@ -88,7 +87,7 @@ begin
 			throw 50000, N'Trace filter value exceeds the selected column length.', 1;
 		end
 		insert into z.TraceFilter(TraceID, FilterOrdinal, ColumnID, LogicOperator, ComparisonOperator, Value)
-			select @TraceID, isnull(max(FilterOrdinal), 0) + 1, @ColumnID, @LogicOperator, @ComparisonOperator, @TypedValue
+			select	@TraceID, isnull(max(FilterOrdinal), 0) + 1, @ColumnID, @LogicOperator, @ComparisonOperator, @TypedValue
 			from z.TraceFilter where TraceID = @TraceID;
 		update z.Trace set ModificationDate = getdate() where TraceID = @TraceID;
 		commit;

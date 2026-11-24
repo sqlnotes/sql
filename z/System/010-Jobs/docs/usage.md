@@ -4,7 +4,7 @@
 
 ## Examples
 
-Execute against a database containing System and this subsystem. Examples describe current interfaces; environment permissions and data determine results.
+Use the first query to see which jobs belong to this database and whether they are enabled or currently executing. The second query previews the SQL Agent schedule fields for work that repeats every 15 minutes between 08:00 and 17:00; it does not create a job or schedule.
 
 ```sql
 select JobName, ServiceName, IsActive, IsExecuting
@@ -16,6 +16,31 @@ from z.fn_ToSQLAgentSchedule('Daily', 1, null, 'Minute', 15, '08:00-17:00', defa
 ```
 
 Schedules reside in msdb and are logically database-scoped by name. Jobs in the same database can reuse a schedule; different databases receive separate names. Creating/removing jobs and schedules changes msdb. Returned normalization rows describe the translation, not proof that SQL Agent accepted or executed it.
+
+## Job status
+
+Use `z.usp_GetJobStatus` to return the native SQL Agent job summary, including
+current execution status, step, retry count and previous outcome:
+
+```sql
+exec z.usp_GetJobStatus; -- All jobs visible to the caller.
+exec z.usp_GetJobStatus @JobName = N'z_(sql)_Example';
+```
+
+Supply `@JobID` instead to select by native job ID. Both selectors default to
+NULL; a name is the complete Agent job name, without automatic prefixing. See
+the [status reference](reference/z.usp_GetJobStatus.md) for result and permission details.
+
+For a scalar check of a local T-SQL step session, use
+`z.fn_IsSQLJobRunning(@JobID)`. It returns bit 1 when a visible matching Agent
+session exists and 0 otherwise, including for NULL. It does not cover jobs
+without a local T-SQL step session. See its
+[reference and visibility requirements](reference/supporting-objects.md#zfn_issqljobrunning).
+
+```sql
+select j.job_id JobID, j.name JobName, z.fn_IsSQLJobRunning(j.job_id) IsRunning
+from msdb.dbo.sysjobs j;
+```
 
 ## Job names
 
@@ -54,15 +79,25 @@ The former bit value 1 meant completion; use 3 to retain that behavior. Guard re
 
 ## Schedule vocabulary
 
+These parameters are shared by the schedule conversion functions and the job/schedule creation procedures:
+
+| Parameter | What to supply |
+| --- | --- |
+| `@Frequency` | When the schedule repeats: Daily, Weekly, Monthly or Specific; Agent Start and Idle follow Agent events. |
+| `@Interval` | Number of days, weeks or months between occurrences of a recurring schedule. |
+| `@ByDay` | Days or dates to include: weekdays for Weekly, day numbers or relative days for Monthly, and date/time values for Specific. Separate multiple entries with commas. |
+| `@IntradayFrequency` | How work repeats within a scheduled day: Hourly, Minute, Second or Specific. |
+| `@IntradayInterval` | Number of hours, minutes or seconds between runs when repeating within the day. |
+| `@ByTime` | Times or time ranges within the day, in `HH:mm[:ss]` format. Separate multiple entries with commas. |
+| `@StartDate`, `@EndDate` | First and last allowed dates for recurring schedules. Omit the start date to use SQL Server's local date; an omitted end date has no practical expiry. Specific schedules use the dates in `@ByDay` instead. |
+
 Use Daily, Weekly, Monthly, Specific, Agent Start or Idle. Interval is the day/week/month recurrence count. ByDay is comma-separated weekday names for Weekly, month numbers 1..31 or relative phrases such as First Monday for Monthly, and date-time values for Specific. IntradayFrequency is Hourly, Minute, Second or Specific. ByTime accepts comma-separated HH:mm[:ss] times or time ranges; repeating schedules use ranges, Specific intraday uses times. A lone repeating start time is expanded through one second before that time, potentially representing an overnight/full-day window; inspect native output rather than assuming cross-midnight support. Explicit reversed ranges are rejected. SQL Agent remains the final validator.
 
 Schedule keywords are case-insensitive and accent-sensitive regardless of database collation. For example, Weekly with Monday,tuesday retains both days, and monthly THIRD WEEKDAY has the same meaning as Third Weekday. Database names and the user command are preserved with their original text.
 
 Invalid relevant inputs, including any invalid or empty list member, reject the complete definition. The creation procedures raise error 51000 before changing existing jobs or schedules. To inspect the diagnostic without making changes, call z.fn_ValidateScheduleParameter with the same eight schedule arguments; NULL means validation succeeded. Parameters unused by the selected frequency retain their existing ignored behavior; Specific derives its execution dates from ByDay and ignores supplied StartDate and EndDate. Manual-only job creation is not inferred from an empty or invalid schedule.
 
-An omitted StartDate uses the SQL Server local date; EndDate remains unlimited (9999-12-31). Creation captures one operation date and passes it through validation, conversion and nested schedule creation. Explicit dates and recurring ByTime defaults are unchanged. Specific derives execution dates from ByDay, ignores StartDate/EndDate, and retains date-only values as midnight.
-
-Reuse requires the current database's literal prefix and matching native timing fields/end date. For every-day schedules (daily interval one), different start dates can share a schedule when both are on or before the captured operation date. Future starts require the same start date. Multi-day, weekly, monthly and other frequencies retain exact start-date matching. Prefer an exact date match, then the lowest schedule ID among eligible historical starts. Disabled schedules stay disabled. No existing schedule is renamed or modified.
+An omitted StartDate uses the SQL Server local date. Daily schedules with interval one may reuse an equivalent schedule that has already started. Use the returned schedule IDs for the actual assignments. [Schedule matching rules](reference/z.usp_CreateSchedule.md)
 
 ## Existing schedule changes
 

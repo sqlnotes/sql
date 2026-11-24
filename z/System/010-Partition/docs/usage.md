@@ -2,7 +2,11 @@
 
 [Guide](readme.md) · [Reference](reference/readme.md)
 
+Start by inspecting the policy for your partition function. Preview its changes before execution, especially when several tables share the function or retention is allowed to delete expired data.
+
 ## Inspect policy
+
+This query shows the two policies shipped for Schema Z's shared partition storage. Use your own partition-function name to inspect a custom policy.
 
 ```sql
 select *
@@ -40,6 +44,8 @@ For regular monthly RIGHT boundaries with interval 1, October 2026 with `Partiti
 The retained table suffix identifies the removed upper boundary, not a month label: August data switched at September 1 uses `<Table>_Partition_20260901`. A catch-all can span several months, so PartitionsToKeep does not guarantee exactly that many physical partitions or months of data. Maintenance does not recreate missing historical boundaries.
 
 ## Standalone boundaries
+
+Use the standalone boundary helpers when you only need to add boundaries for a date range. They do not expire old data or recover a populated tail in the same way as automatic retention maintenance.
 
 ```sql
 select Ordinal, Date, SQL

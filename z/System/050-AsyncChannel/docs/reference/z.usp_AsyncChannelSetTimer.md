@@ -4,7 +4,9 @@
 
 ## Purpose and behavior
 
-Arm or replace the single pending Service Broker timer on an open conversation endpoint in the current database. Expiry enqueues a DialogTimer message on the queue owning that endpoint; it does not signal the opposite endpoint.
+Schedules a timer message on an open Service Broker conversation in the current database. Use a receiving endpoint handle from a processing batch to wake that channel's processor later, even when no new payload arrives. The message goes to the queue owning the supplied endpoint; a sender-side handle therefore wakes the sender queue instead.
+
+A conversation endpoint has one pending timer. Setting it again replaces that timer. Expiry queues a DialogTimer message rather than calling the processor directly.
 
 ## Parameters and defaults
 

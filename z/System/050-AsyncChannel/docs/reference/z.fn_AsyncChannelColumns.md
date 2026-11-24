@@ -4,13 +4,13 @@
 
 ## Purpose and parameters
 
-An inline table-valued function that reads interface column metadata and returns SQL fragments for codec and interface generation.
+Builds the column descriptions and SQL fragments used to generate a channel's serializer, deserializer and insert interface. It works from an authored interface view's column metadata. Application code normally uses the generated channel objects rather than calling this generation helper directly.
 
 ```text
 @ObjectID int
 ```
 
-No default is declared. A NULL, unknown or invisible object ID returns no column rows.
+`@ObjectID` is the catalog object ID whose columns should be described, normally the channel's authored interface view. No default is declared. A NULL, unknown or invisible object ID returns no column rows.
 
 ## Returned columns
 

@@ -13,23 +13,23 @@ begin
 	set nocount on
 	if @@trancount > 0
 		return
-	declare @Count int = isnull(cast(session_context(N'AsyncChannel-LogCount') as int), 0), @Index int = 1,
+	declare	@Count int = isnull(cast(session_context(N'AsyncChannel-LogCount') as int), 0), @Index int = 1,
 			@InfoKey sysname, @PayloadKey sysname, @MetaKey sysname, @Meta nvarchar(400), @Info nvarchar(4000)
 	while @Index <= @Count and @Index <= 40
 	begin
 		select	@InfoKey = N'AsyncChannel-LogInfo-' + cast(@Index as nvarchar(10)), @PayloadKey = N'AsyncChannel-LogPayload-' + cast(@Index as nvarchar(10)),
 				@MetaKey = N'AsyncChannel-LogMeta-' + cast(@Index as nvarchar(10))
-		select @Meta = cast(session_context(@MetaKey) as nvarchar(400))
+		select	@Meta = cast(session_context(@MetaKey) as nvarchar(400))
 		insert into z.AsyncChannelLog (AsyncChannelID, Level, Info, Payload, SessionID, ConversationHandle)
 			values (json_value(@Meta, '$.c'), json_value(@Meta, '$.l'), cast(session_context(@InfoKey) as nvarchar(4000)), cast(session_context(@PayloadKey) as nvarchar(4000)), json_value(@Meta, '$.s'), json_value(@Meta, '$.h'))
 		exec sys.sp_set_session_context @key = @InfoKey, @value = null
 		exec sys.sp_set_session_context @key = @PayloadKey, @value = null
 		exec sys.sp_set_session_context @key = @MetaKey, @value = null
-		select @Index = @Index + 1
+		select	@Index = @Index + 1
 	end
 	if @Count > 40
 	begin
-		select @Info = N'AsyncChannel log buffer: ' + cast(@Count - 40 as nvarchar(10)) + N' further rows were dropped (40 slots).'
+		select	@Info = N'AsyncChannel log buffer: ' + cast(@Count - 40 as nvarchar(10)) + N' further rows were dropped (40 slots).'
 		insert into z.AsyncChannelLog (AsyncChannelID, Level, Info, SessionID)
 			values (json_value(@Meta, '$.c'), 'Warning', @Info, json_value(@Meta, '$.s'))
 	end

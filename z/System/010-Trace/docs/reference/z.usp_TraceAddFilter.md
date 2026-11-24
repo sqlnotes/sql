@@ -2,7 +2,11 @@
 
 [Trace](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_TraceAddFilter.sql)
 
-Append a typed predicate with a FilterOrdinal. NULL Value adds nothing. Validate catalog column, operator and typed value; reject truncation. Accept and/or and =, !=, <>, >, <, >=, <=, like, not like; normalize != to <>. LIKE requires character data. TraceStart applies filters natively, grouped by column in ordinal order. Native filters combine different columns with AND; native text comparison semantics apply.
+Limits which activity a trace captures. For example, filter `SPID <> @@spid` to exclude the connection running the trace, or filter a text column to focus on particular statements. Add filters before the trace's first Start attempt.
+
+Select a column by `@ColumnName` or `@ColumnID`, choose `@ComparisonOperator`, and supply a value of the appropriate type in `@Value`. NULL adds no filter. Supported comparisons are `=`, `!=`, `<>`, `>`, `<`, `>=`, `<=`, `like` and `not like`; LIKE comparisons require character data. Invalid or truncated typed values are rejected.
+
+`@LogicOperator` joins predicates on the same column with `and` or `or`. Different columns are combined with `AND` by SQL Trace. Filter order is therefore not a single boolean expression across columns; SQL Trace applies each column's predicates in their configured order.
 
 ```text
 @TraceName nvarchar(128) = null,

@@ -2,7 +2,7 @@
 
 [AsyncChannel](../readme.md)
 
-Only shared framework objects are installed. Per-channel generated objects are created on demand by the generator and remain separate from the framework definitions.
+Choose an object below to configure channels, send work, manage processing capacity, inspect generated SQL or investigate diagnostics. Start with [usage](../usage.md) for the complete workflow. Installation provides shared framework objects; each application's channel objects are generated separately when requested.
 
 | Object | Responsibility |
 | --- | --- |

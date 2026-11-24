@@ -4,7 +4,11 @@
 
 ## Behavior and parameters
 
-Back up the selected databases sequentially in ascending data-file size. Every invocation processes its selected list again. There is no parallel worker pool, persistent status, application lock or retention operation. Errors propagate and stop remaining work; earlier backups remain.
+Backs up the selected databases on the current SQL Server instance, one at a time, from smallest to largest data-file size. Choose a full, differential or log backup and a local folder, network share or supported storage URL. Each call takes a new set of backups; it does not delete older files.
+
+Use [parallel backup](z.usp_BackupDatabasesParallel.md) when several databases should back up concurrently. Independent calls to this procedure do not share work. If a backup fails, the call stops and earlier successful backups remain.
+
+The main choices are `@Databases` for what to back up, `@BackupType` for the kind of backup, and `@BackupFolder` for the destination. Compression is enabled by default. The complete declaration below includes naming and native-option overrides.
 
 ```text
 @Databases nvarchar(max) = 'AllDatabases',
@@ -14,23 +18,39 @@ Back up the selected databases sequentially in ascending data-file size. Every i
 @OtherBackupOptions nvarchar(max) = null,
 @ServerName sysname = null,
 @BackupFileNameFormat nvarchar(4000) = N'{ServerName}${InstanceName}${DatabaseName}_{yyyyMMdd}_{HHmmssfffffff}',
-@FullBackupIfNeeded bit = 0
+@FullBackupIfNeeded bit = 1,
+@CopyOnly bit = 0
 ```
 
-Databases accepts AllDatabases, UserDatabases, SystemDatabases or comma-separated names. Exclude tempdb and error/recovery states; skip SIMPLE recovery for LOG. Read-only databases automatically include COPY_ONLY for disk and URL backups. SQL Server honors it for FULL and LOG; with DIFFERENTIAL it has no effect and the requested type remains DIFF. Read-write backups use COPY_ONLY only when explicitly supplied in OtherBackupOptions. Compression NULL uses the server default. OtherBackupOptions supplies trusted SQL options, including an existing credential option where appropriate.
+`@Databases` accepts the group keywords `AllDatabases`, `UserDatabases` and
+`SystemDatabases`, a comma-separated list with spaces trimmed around each name,
+or a JSON array of literal names such as `N'["Region,West","Reporting"]'`.
+A valid JSON array is read as an array and only its string elements are used.
+Array names retain leading and trailing spaces. Selection excludes tempdb and
+error/recovery states and skips SIMPLE recovery for LOG.
+
+When upgrading a call that used the former exact-name argument, pass the name
+as a one-element JSON array in `@Databases` and remove the old argument.
+Review positional calls too because `@CopyOnly` now occupies the ninth slot.
+
+Set `@CopyOnly = 1` to include `COPY_ONLY` for disk and URL backups. SQL Server
+applies it to FULL and LOG and ignores it for DIFFERENTIAL. Read-only databases
+include `COPY_ONLY` automatically. Compression NULL uses the server default.
+OtherBackupOptions supplies trusted SQL options, including an existing credential
+option where appropriate.
 
 ServerName is a destination naming label, not a remote SQL connection. NULL uses @@servername; otherwise the supplied name replaces it in the server/instance prefix. A name without an instance uses MSSQLSERVER; a backslash separates a named instance. The procedure always backs up databases on the instance where it executes.
 
 ## Full backup when needed
 
-Set FullBackupIfNeeded to 1 to establish a regular full backup when a selected
-database lacks the prerequisite for the requested backup:
+By default, `@FullBackupIfNeeded = 1` allows the procedure to take a regular full
+backup when a selected database lacks the prerequisite for a DIFF or LOG backup.
 
 - DIFF with no primary data-file differential base performs FULL instead of DIFF.
 - LOG with an uninitialized log backup chain completes FULL, then performs LOG.
 - Existing differential bases and initialized log chains keep the requested type.
   FULL requests and the existing SIMPLE-recovery LOG skip are unchanged.
-- The default 0, and NULL, preserve the requested backup behavior.
+- Pass `0` or `NULL` to disable the fallback.
 
 Detection uses the target database's sys.database_files primary-file
 differential_base_lsn/differential_base_guid and
@@ -43,26 +63,25 @@ token. A prerequisite full uses the same destination, compression and additional
 options. Errors stop the call; LOG is attempted only after a successful full and
 a confirmed initialized log chain.
 
-A prerequisite full must establish a new differential base. Read-only databases
-requiring fallback are rejected because their automatic COPY_ONLY policy cannot
-establish it. Do not supply COPY_ONLY in OtherBackupOptions when fallback is
-needed: the copy-only file can be created, but the call fails if the new base was
-not established and no subsequent LOG is attempted. Options remain trusted SQL;
-they are not parsed or rewritten. A regular full changes the differential base
-used by subsequent differential backups.
+A prerequisite full must establish a new differential base. If fallback is needed,
+a read-only database or `@CopyOnly = 1` causes an error before the backup runs.
+A `COPY_ONLY` supplied through OtherBackupOptions can produce a copy-only file
+before the base check fails. A regular full changes the differential base used
+by subsequent differential backups.
 
 ```sql
-exec z.usp_BackupDatabase @Databases = N'Sales', @BackupType = N'Diff',
-    @FullBackupIfNeeded = 1;
+-- Take a prerequisite full backup if the log chain needs initialization.
+exec z.usp_BackupDatabase @Databases = N'Sales', @BackupType = N'Log';
 
-exec z.usp_BackupDatabase @Databases = N'Sales', @BackupType = N'Log',
-    @FullBackupIfNeeded = 1;
+-- Request only a differential backup.
+exec z.usp_BackupDatabase @Databases = N'Sales', @BackupType = N'Diff',
+    @FullBackupIfNeeded = 0;
 ```
 
 ## Additional backup options
 
 OtherBackupOptions is appended unchanged after generated compression,
-DIFFERENTIAL and read-only COPY_ONLY options. NULL or whitespace omits extras.
+DIFFERENTIAL and COPY_ONLY options. NULL or whitespace omits extras.
 The procedure does not parse, validate or deduplicate supplied options. SQL
 Server decides option validity when BACKUP executes; duplicate options may be
 accepted by the engine and are not normalized by this procedure. Use
@@ -84,7 +103,7 @@ Server$NamedInstance$Database_yyyyMMdd_HHmmssfffffff.trn
 
 Server, instance and database components use `$` separators. The default instance
 is included as MSSQLSERVER. The extension is appended automatically: `.bak`,
-`.diff` or `.trn`. Timestamp tokens use one SQL Server local datetime2(7) value;
+`.diff` or `.trn`. Timestamp tokens use one UTC datetime2(7) value;
 `fffffff` writes seven fractional-second digits. Clock accuracy and uniqueness
 are not implied by the number of digits. See [date/time formatting](https://learn.microsoft.com/en-us/dotnet/standard/base-types/custom-date-and-time-format-strings).
 
@@ -92,6 +111,8 @@ BackupFileNameFormat supplies the filename without its extension. Supported
 replacement tokens are `{ServerName}`, `{InstanceName}`, `{DatabaseName}`,
 `{BackupType}`, `{yyyyMMdd}`, `{HHmmssfffffff}`, `{HHmmssffffff}`, `{HHmmss}`,
 `{fffffff}` and `{ffffff}`.
+All tokens are optional. Other brace text, such as `{daatabase}`, is literal.
+
 For example:
 
 ```sql
@@ -104,10 +125,12 @@ exec z.usp_BackupDatabase @Databases = N'Sales',
     @BackupFileNameFormat = N'{DatabaseName}_{yyyyMMdd}_{HHmmss}_{ffffff}';
 ```
 
-Components are transformed by [z.fn_StandardizeFileName](../../../docs/reference/functions.md#zfn_standardizefilename).
+[z.fn_StandardizeFileName](../../../docs/reference/functions.md#zfn_standardizefilename)
+standardizes the path components and the rendered filename before the backup
+extension is added. SQL Server and the destination determine accepted path and
+filename lengths.
 Custom layouts outside [recognized filename shapes](z.fn_DecodeBackupFileName.md)
 use broader restore header discovery and require header-based cleanup.
-
 
 ## Azure and S3 destinations
 
@@ -117,7 +140,8 @@ Use preconfigured SQL Server credentials and storage permissions. Azure block-bl
 
 ## Execution and retention
 
-Run outside a transaction. For a bounded pool across selected databases, use
+Call with `IMPLICIT_TRANSACTIONS OFF` and no active transaction. Transaction
+validation runs with `XACT_ABORT ON`. For a bounded pool across selected databases, use
 [z.usp_BackupDatabasesParallel](z.usp_BackupDatabasesParallel.md). Independent
 sequential calls do not share assignments. Filesystem backups need SQL Server service-account destination access. The main procedure requires no application-lock or extended-property write permissions.
 

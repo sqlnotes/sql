@@ -2,6 +2,8 @@
 
 [Subsystem](readme.md) | [Object reference](reference/readme.md)
 
+Use this page when a job cannot be created, a schedule is rejected, or a job appears not to be running. Check schedule input first, then Agent availability and permissions.
+
 ## Diagnose current behavior
 
 Creation procedures reject an invalid schedule with error 51000 before changing jobs, categories or schedule attachments. A partially invalid list is rejected as a whole. Use z.fn_ValidateScheduleParameter to obtain the validation message; z.fn_ToSQLAgentSchedule returns no rows for invalid input. An empty conversion result is an error, not a request to remove all schedules. Agent Start is supported.
@@ -14,10 +16,4 @@ Start/stop detection relies on program_name patterns and is not an authoritative
 
 ## Permission and partial-operation failures
 
-System supplies z.fn_SplitString. SQL Server Agent, msdb job/schedule procedures and z.usp_AcquireSemaphore are required. The helpers do not start the Agent service.
-
-Read the relevant callable reference before retrying a failed write. Some procedures roll back any open transaction, including a caller's transaction; others leave earlier operations committed. Native server resources and filesystem actions do not share a single database rollback boundary. Catalog/DMV access is evaluated on the deployed server and depends on SQL Server version and caller context.
-
-## Verification limits
-
-These pages describe source behavior. A successful installation or module compilation does not demonstrate successful mail delivery, backup restoration, SQL Agent execution, trace workload collection, security migration, or application-specific Broker delivery.
+Check the caller's msdb job/schedule rights and whether SQL Server Agent is running. Job creation can also create a category outside the transaction that protects job and schedule changes. If reconciliation fails inside a caller transaction, inspect the transaction state before retrying. [Creation details](reference/z.usp_CreateServiceJob.md)

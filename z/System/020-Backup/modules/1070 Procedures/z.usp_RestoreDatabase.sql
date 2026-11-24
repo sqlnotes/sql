@@ -26,7 +26,6 @@ begin
 	set nocount,xact_abort on;
 	if @@trancount <> 0
 	begin
-		set xact_abort off;
 		throw 50000, 'RestoreDatabase cannot run inside a user transaction.', 1;
 	end
 
@@ -42,9 +41,9 @@ begin
 	if @RecoveryType is null or @RecoveryType not in ('NORECOVERY', 'RECOVERY', 'STANDBY')
 		throw 50000, 'RecoveryType must be NORECOVERY, RECOVERY or STANDBY.', 1;
 
-	declare @IsLinux bit = z.fn_IsLinux(), @Separator nchar(1), @IsFolder bit = 0, @FileExists bit,
-		@IsUrl bit, @BackupDevice nvarchar(4), @FileID int, @Path nvarchar(4000), @HeaderJson nvarchar(max), @Sql nvarchar(max),
-		@DatabaseID int, @Continue bit, @SourceName sysname, @State tinyint, @IsStandby bit;
+	declare	@IsLinux bit = z.fn_IsLinux(), @Separator nchar(1), @IsFolder bit = 0, @FileExists bit,
+			@IsUrl bit, @BackupDevice nvarchar(4), @FileID int, @Path nvarchar(4000), @HeaderJson nvarchar(max), @Sql nvarchar(max),
+			@DatabaseID int, @Continue bit, @SourceName sysname, @State tinyint, @IsStandby bit;
 	if nullif(trim(translate(@OtherRestoreOptions, nchar(9) + nchar(10) + nchar(11) + nchar(12) + nchar(13), N'     ')), N'') is null
 		select	@OtherRestoreOptions = null;
 	select	@Separator = iif(@IsLinux = 1, N'/', N'\'),
@@ -53,11 +52,11 @@ begin
 							or left(@BackupPath, 8) collate Latin1_General_100_CI_AS = N'https://'
 							or left(@BackupPath, 5) collate Latin1_General_100_CI_AS = N's3://',
 						1, 0);
-	select @BackupDevice = iif(@IsUrl = 1, N'url', N'disk');
+	select	@BackupDevice = iif(@IsUrl = 1, N'url', N'disk');
 	if @IsLinux = 0
 	begin
 		if @IsUrl = 0
-			select @BackupPath = replace(@BackupPath, N'/', N'\');
+			select	@BackupPath = replace(@BackupPath, N'/', N'\');
 		select	@DataFolder = replace(@DataFolder, N'/', N'\'),
 				@LogFolder = replace(@LogFolder, N'/', N'\'),
 				@StandbyFolder = replace(@StandbyFolder, N'/', N'\');
@@ -67,7 +66,7 @@ begin
 	-- Remote paths identify exactly one object; only local paths can be tested or enumerated as folders.
 	if @IsUrl = 0
 	begin
-		select @IsFolder = file_is_a_directory, @FileExists = file_exists from sys.dm_os_file_exists(@BackupPath);
+		select	@IsFolder = file_is_a_directory, @FileExists = file_exists from sys.dm_os_file_exists(@BackupPath);
 		if @IsFolder is null
 			throw 50000, 'BackupPath is inaccessible.', 1;
 		if @IsFolder = 0 and @FileExists = 0
@@ -85,7 +84,7 @@ begin
 	if @IsFolder = 1
 	begin
 		insert #RestoreFiles (Path)
-			select distinct e.full_filesystem_path
+			select	distinct e.full_filesystem_path
 			from sys.dm_os_enumerate_filesystem(@BackupPath, N'*') e
 			where e.is_directory = 0;
 	end
@@ -110,8 +109,8 @@ begin
 		primary key(FileID, BackupID)
 	);
 
-	declare @Automatic bit = iif(@TargetDatabaseName is null, 1, 0), @Outcome varchar(20), @ReachedLSN numeric(25,0),
-		@TargetName sysname, @SourceFamily uniqueidentifier, @EligibleSources int, @AliasTargets int;
+	declare	@Automatic bit = iif(@TargetDatabaseName is null, 1, 0), @Outcome varchar(20), @ReachedLSN numeric(25,0),
+			@TargetName sysname, @SourceFamily uniqueidentifier, @EligibleSources int, @AliasTargets int;
 	create table #RestorePlannedPaths (DatabaseName sysname not null, Path nvarchar(4000) collate Latin1_General_100_BIN2 not null);
 	create table #RestorePlan
 	(
@@ -155,29 +154,29 @@ begin
 		RouteID int identity not null primary key, FamilyGUID uniqueidentifier, Fork uniqueidentifier, ReachedLSN numeric(25,0),
 		BaseGUID uniqueidentifier, BaseLSN numeric(25,0), CanDiff bit not null, Processed bit not null default 0
 	);
-	declare @GroupID int, @GroupPrefix nvarchar(4000), @DiscoveryRoute int, @DiscoveryLSN numeric(25,0), @DiscoveryEnd numeric(25,0),
-		@DiscoveryFamily uniqueidentifier, @DiscoveryFork uniqueidentifier, @DiscoveryPass bit = 0;
+	declare	@GroupID int, @GroupPrefix nvarchar(4000), @DiscoveryRoute int, @DiscoveryLSN numeric(25,0), @DiscoveryEnd numeric(25,0),
+			@DiscoveryFamily uniqueidentifier, @DiscoveryFork uniqueidentifier, @DiscoveryPass bit = 0;
 	while exists(select * from #DiscoveryGroups where Processed = 0) or @DiscoveryPass = 0
 	begin
 		if not exists(select * from #DiscoveryGroups where Processed = 0)
 		begin
 			-- Unknown filenames can extend a previously complete source or introduce a different differential base.
-			select @DiscoveryPass = 1;
+			select	@DiscoveryPass = 1;
 			update #DiscoveryGroups set Processed = 0 where Prefix is not null;
 			if @@rowcount = 0 break;
 		end
-		select top (1) @GroupID = GroupID, @GroupPrefix = Prefix from #DiscoveryGroups where Processed = 0 order by iif(Prefix is null, 1, 0), Prefix;
+		select	top (1) @GroupID = GroupID, @GroupPrefix = Prefix from #DiscoveryGroups where Processed = 0 order by iif(Prefix is null, 1, 0), Prefix;
 		update #DiscoveryGroups set Processed = 1 where GroupID = @GroupID;
 		while 1 = 1
 		begin
 			truncate table #DiscoverySources;
 			;with s as
 			(
-				select b.*, row_number() over(partition by b.FamilyGUID order by b.BackupFinishDate desc, b.Position desc) RowNumber
-				from #RestoreBackups b join #RestoreFiles f on f.FileID = b.FileID where b.IsEligible = 1 and exists(select * from #RestoreBackups g join #RestoreFiles gf on gf.FileID = g.FileID where gf.Prefix = @GroupPrefix and g.FamilyGUID = b.FamilyGUID)
+				select	b.*, row_number() over(partition by b.FamilyGUID order by b.BackupFinishDate desc, b.Position desc) RowNumber
+				from #RestoreBackups b inner join #RestoreFiles f on f.FileID = b.FileID where b.IsEligible = 1 and exists(select * from #RestoreBackups g inner join #RestoreFiles gf on gf.FileID = g.FileID where gf.Prefix = @GroupPrefix and g.FamilyGUID = b.FamilyGUID)
 			)
 			insert #DiscoverySources (FamilyGUID, DatabaseName, Fork)
-				select FamilyGUID, DatabaseName, LastFork from s where RowNumber = 1;
+				select	FamilyGUID, DatabaseName, LastFork from s where RowNumber = 1;
 			-- A continuation boundary belongs to its native family, never to a filename label alone.
 			update s set NativeLSN = n.RedoLSN, NativeFork = r.recovery_fork_guid,
 				NativeBaseGUID = n.BaseGUID, NativeBaseLSN = n.BaseLSN,
@@ -187,18 +186,18 @@ begin
 				left join sys.database_recovery_status r on r.database_id = d.database_id and r.family_guid = s.FamilyGUID and (d.state = 1 or d.is_in_standby = 1)
 				outer apply
 				(
-					select min(f.redo_start_lsn) RedoLSN, max(iif(f.file_id = 1, f.differential_base_guid, null)) BaseGUID,
-						max(iif(f.file_id = 1, f.differential_base_lsn, null)) BaseLSN
+					select	min(f.redo_start_lsn) RedoLSN, max(iif(f.file_id = 1, f.differential_base_guid, null)) BaseGUID,
+							max(iif(f.file_id = 1, f.differential_base_lsn, null)) BaseLSN
 					from sys.master_files f where f.database_id = r.database_id and f.type = 0
 				) n;
 			-- STANDBY can lack native redo metadata; use only the latest compatible unrecovered restore.
 			update s set NativeLSN = h.last_lsn
 			from #DiscoverySources s
-				join sys.databases d on d.name = coalesce(@TargetDatabaseName, s.DatabaseName) and d.is_in_standby = 1
+				inner join sys.databases d on d.name = coalesce(@TargetDatabaseName, s.DatabaseName) and d.is_in_standby = 1
 				cross apply
 				(
-					select top (1) b.last_lsn, b.family_guid, b.last_recovery_fork_guid, b.type, r.*
-					from msdb.dbo.restorehistory r join msdb.dbo.backupset b on b.backup_set_id = r.backup_set_id
+					select	top (1) b.last_lsn, b.family_guid, b.last_recovery_fork_guid, b.type, r.*
+					from msdb.dbo.restorehistory r inner join msdb.dbo.backupset b on b.backup_set_id = r.backup_set_id
 					where r.destination_database_name = d.name order by r.restore_history_id desc
 				) h
 			where s.NativeLSN is null and h.family_guid = s.FamilyGUID and h.last_recovery_fork_guid = s.NativeFork
@@ -207,64 +206,64 @@ begin
 			update s set Fork = coalesce(s.NativeFork, a.LastFork, s.Fork) from #DiscoverySources s
 				outer apply
 				(
-					select top (1) b.LastFork from #RestoreBackups b join #RestoreFiles f on f.FileID = b.FileID
+					select	top (1) b.LastFork from #RestoreBackups b inner join #RestoreFiles f on f.FileID = b.FileID
 					where b.FamilyGUID = s.FamilyGUID and b.BackupType = 1 and b.IsEligible = 1
 					order by b.BackupFinishDate desc, b.Position desc
 				) a;
 			update s set EndLSN = a.EndLSN from #DiscoverySources s cross apply
-				(select max(b.LastLSN) EndLSN from #RestoreBackups b join #RestoreFiles f on f.FileID = b.FileID
+				(select max(b.LastLSN) EndLSN from #RestoreBackups b inner join #RestoreFiles f on f.FileID = b.FileID
 				 where b.FamilyGUID = s.FamilyGUID and b.LastFork = s.Fork and b.IsEligible = 1) a;
 			truncate table #DiscoveryRoutes;
 			insert #DiscoveryRoutes (FamilyGUID, Fork, ReachedLSN, BaseGUID, BaseLSN, CanDiff)
-				select b.FamilyGUID, b.LastFork, b.LastLSN, b.BackupSetGUID, b.CheckpointLSN, iif(b.IsCopyOnly = 0, 1, 0)
-				from #RestoreBackups b join #RestoreFiles f on f.FileID = b.FileID join #DiscoverySources s on s.FamilyGUID = b.FamilyGUID and s.Fork = b.LastFork
+				select	b.FamilyGUID, b.LastFork, b.LastLSN, b.BackupSetGUID, b.CheckpointLSN, iif(b.IsCopyOnly = 0, 1, 0)
+				from #RestoreBackups b inner join #RestoreFiles f on f.FileID = b.FileID inner join #DiscoverySources s on s.FamilyGUID = b.FamilyGUID and s.Fork = b.LastFork
 				where b.BackupType = 1 and b.IsEligible = 1 and s.NativeFork is null;
 			insert #DiscoveryRoutes (FamilyGUID, Fork, ReachedLSN, BaseGUID, BaseLSN, CanDiff)
-				select s.FamilyGUID, s.NativeFork, s.NativeLSN, b.BackupSetGUID, b.CheckpointLSN, iif(b.IsCopyOnly = 0, 1, 0)
+				select	s.FamilyGUID, s.NativeFork, s.NativeLSN, b.BackupSetGUID, b.CheckpointLSN, iif(b.IsCopyOnly = 0, 1, 0)
 				from #DiscoverySources s outer apply
 				(
-					select top (1) b.* from #RestoreBackups b where b.FamilyGUID = s.FamilyGUID and b.BackupType = 1 and b.IsEligible = 1
+					select	top (1) b.* from #RestoreBackups b where b.FamilyGUID = s.FamilyGUID and b.BackupType = 1 and b.IsEligible = 1
 						and b.LastFork = s.NativeFork and b.LastLSN = s.NativeLSN and b.BackupSetGUID = s.NativeBaseGUID and b.CheckpointLSN = s.NativeBaseLSN
 					order by b.BackupFinishDate desc, b.Position desc
 				) b where s.NativeLSN is not null and s.NativeFork is not null;
 			-- Keep full/log and full/differential/log alternatives separate; never apply a differential after a log.
 			insert #DiscoveryRoutes (FamilyGUID, Fork, ReachedLSN, CanDiff)
-				select r.FamilyGUID, r.Fork, b.LastLSN, 0 from #DiscoveryRoutes r join #RestoreBackups b
+				select	r.FamilyGUID, r.Fork, b.LastLSN, 0 from #DiscoveryRoutes r inner join #RestoreBackups b
 					on b.FamilyGUID = r.FamilyGUID and b.FirstFork = r.Fork and b.LastFork = r.Fork and b.DifferentialBaseGUID = r.BaseGUID and b.DifferentialBaseLSN = r.BaseLSN
 				where r.CanDiff = 1 and b.BackupType = 5 and b.IsEligible = 1 and b.LastLSN > r.ReachedLSN;
 			while exists(select * from #DiscoveryRoutes where Processed = 0)
 			begin
-				select top (1) @DiscoveryRoute = RouteID, @DiscoveryFamily = FamilyGUID, @DiscoveryFork = Fork, @DiscoveryLSN = ReachedLSN from #DiscoveryRoutes where Processed = 0 order by RouteID;
+				select	top (1) @DiscoveryRoute = RouteID, @DiscoveryFamily = FamilyGUID, @DiscoveryFork = Fork, @DiscoveryLSN = ReachedLSN from #DiscoveryRoutes where Processed = 0 order by RouteID;
 				while 1 = 1
 				begin
-					select @DiscoveryEnd = max(LastLSN) from #RestoreBackups where FamilyGUID = @DiscoveryFamily and IsEligible = 1 and BackupType = 2
+					select	@DiscoveryEnd = max(LastLSN) from #RestoreBackups where FamilyGUID = @DiscoveryFamily and IsEligible = 1 and BackupType = 2
 						and FirstFork = @DiscoveryFork and LastFork = @DiscoveryFork and FirstLSN <= @DiscoveryLSN and LastLSN > @DiscoveryLSN;
 					if @DiscoveryEnd is null break;
-					select @DiscoveryLSN = @DiscoveryEnd;
+					select	@DiscoveryLSN = @DiscoveryEnd;
 				end
 				update #DiscoveryRoutes set ReachedLSN = @DiscoveryLSN, Processed = 1 where RouteID = @DiscoveryRoute;
 			end
 			if exists(select * from #DiscoverySources) and not exists
 			(
-				select * from #DiscoverySources s where s.SkipSource = 0 and not exists
+				select	* from #DiscoverySources s where s.SkipSource = 0 and not exists
 					(select * from #DiscoveryRoutes r where r.FamilyGUID = s.FamilyGUID and r.Fork = s.Fork and r.ReachedLSN >= s.EndLSN)
 			) and @GroupPrefix is not null break;
-			select @FileID = null;
-			select top (1) @FileID = FileID, @Path = Path from #RestoreFiles
+			select	@FileID = null;
+			select	top (1) @FileID = FileID, @Path = Path from #RestoreFiles
 			where Inspected = 0 and (Prefix = @GroupPrefix or (Prefix is null and @GroupPrefix is null)) order by Stamp desc, Path desc;
 			if @FileID is null break;
 			begin try
-				select @HeaderJson = null;
+				select	@HeaderJson = null;
 				exec z.usp_ReadBackupHeader @BackupFile = @Path, @HeaderJson = @HeaderJson output, @ReturnResult = 0;
 				insert #RestoreBackups (FileID, Position, BackupType, DatabaseName, FamilyGUID, FirstFork, LastFork, ForkPointLSN, FirstLSN, LastLSN,
 					BackupFinishDate, BackupSetGUID, SoftwareVersionMajor, IsDamaged, IsSnapshot, HasIncompleteMetaData, CheckpointLSN, DifferentialBaseLSN, DifferentialBaseGUID, IsCopyOnly)
-					select @FileID, Position, BackupType, DatabaseName, FamilyGUID, FirstRecoveryForkID, RecoveryForkID, ForkPointLSN, FirstLSN, LastLSN,
-						BackupFinishDate, BackupSetGUID, SoftwareVersionMajor, IsDamaged, IsSnapshot, HasIncompleteMetaData, CheckpointLSN, DifferentialBaseLSN, DifferentialBaseGUID, IsCopyOnly
+					select	@FileID, Position, BackupType, DatabaseName, FamilyGUID, FirstRecoveryForkID, RecoveryForkID, ForkPointLSN, FirstLSN, LastLSN,
+							BackupFinishDate, BackupSetGUID, SoftwareVersionMajor, IsDamaged, IsSnapshot, HasIncompleteMetaData, CheckpointLSN, DifferentialBaseLSN, DifferentialBaseGUID, IsCopyOnly
 					from z.fn_DecodeBackupHeader(@HeaderJson);
 				if not exists(select * from #RestoreBackups where FileID = @FileID)
 					throw 50000, 'The input file contains no readable backup sets.', 1;
 				truncate table #InventoryLabel;
-				select @Sql = N'restore labelonly from ' + @BackupDevice + N' = N''' + replace(@Path, N'''', N'''''') + N''';';
+				select	@Sql = N'restore labelonly from ' + @BackupDevice + N' = N''' + replace(@Path, N'''', N'''''') + N''';';
 				insert #InventoryLabel exec(@Sql);
 				if (select count(*) from #InventoryLabel) <> 1 or exists(select * from #InventoryLabel where FamilyCount <> 1 or FamilyCount is null or FamilySequenceNumber <> 1)
 					throw 50000, 'Striped or ambiguous media is unsupported; complete single-file media is required.', 1;
@@ -286,39 +285,39 @@ begin
 	create table #Sources (FamilyGUID uniqueidentifier not null primary key, DatabaseName sysname not null, HasFull bit not null, Processed bit not null default 0);
 	;with s as
 	(
-		select FamilyGUID, DatabaseName, row_number() over (partition by FamilyGUID order by BackupFinishDate desc, BackupSetGUID, DatabaseName, Position desc) RowNumber
+		select	FamilyGUID, DatabaseName, row_number() over (partition by FamilyGUID order by BackupFinishDate desc, BackupSetGUID, DatabaseName, Position desc) RowNumber
 		from #RestoreBackups where IsEligible = 1
 	)
 	insert #Sources (FamilyGUID, DatabaseName, HasFull)
-		select s.FamilyGUID, s.DatabaseName, convert(bit, iif(exists(select * from #RestoreBackups b where b.FamilyGUID = s.FamilyGUID and b.BackupType = 1 and b.IsEligible = 1), 1, 0)) from s where RowNumber = 1;
+		select	s.FamilyGUID, s.DatabaseName, convert(bit, iif(exists(select * from #RestoreBackups b where b.FamilyGUID = s.FamilyGUID and b.BackupType = 1 and b.IsEligible = 1), 1, 0)) from s where RowNumber = 1;
 	insert #Outcomes (SourceDatabaseName, SourceFamilyGUID, Status, ErrorMessage)
-		select DatabaseName, FamilyGUID, 'Skipped', N'System database sources are excluded.' from #Sources
+		select	DatabaseName, FamilyGUID, 'Skipped', N'System database sources are excluded.' from #Sources
 		where DatabaseName collate Latin1_General_100_CI_AS in (N'master', N'model', N'msdb', N'tempdb');
 	delete from #Sources where DatabaseName collate Latin1_General_100_CI_AS in (N'master', N'model', N'msdb', N'tempdb');
 	if @Automatic = 0
 	begin
 		if @TargetDatabaseName collate Latin1_General_100_CI_AS in (N'master', N'model', N'msdb', N'tempdb') or db_id(@TargetDatabaseName) <= 4 or @TargetDatabaseName = db_name()
 			throw 50000, 'System databases and the database hosting this procedure cannot be restore targets.', 1;
-		select @DatabaseID = db_id(@TargetDatabaseName), @Continue = 0;
-		select @Continue = iif(state = 1 or is_in_standby = 1, 1, 0) from sys.databases where database_id = @DatabaseID;
+		select	@DatabaseID = db_id(@TargetDatabaseName), @Continue = 0;
+		select	@Continue = iif(state = 1 or is_in_standby = 1, 1, 0) from sys.databases where database_id = @DatabaseID;
 		if @Continue = 1 select @SourceFamily = family_guid from sys.database_recovery_status where database_id = @DatabaseID;
 		if @Continue = 0 or @SourceFamily is null
 		begin
 			if exists(select * from #Outcomes o where o.Status = 'Failed' and not exists
-				(select * from #RestoreBackups b join #RestoreFiles f on f.FileID = b.FileID where f.Path = o.BackupPath))
+				(select * from #RestoreBackups b inner join #RestoreFiles f on f.FileID = b.FileID where f.Path = o.BackupPath))
 				throw 50000, 'Unreadable backup identity prevents proving an unambiguous initialization source.', 1;
-			select @EligibleSources = count(*) from #Sources where HasFull = 1;
+			select	@EligibleSources = count(*) from #Sources where HasFull = 1;
 			if @EligibleSources > 1 throw 50000, 'Multiple restorable source database families are ambiguous for the requested destination.', 1;
 			if @EligibleSources = 0 throw 50000, 'A usable full backup is required to initialize or replace the destination.', 1;
-			select @SourceFamily = FamilyGUID from #Sources where HasFull = 1;
+			select	@SourceFamily = FamilyGUID from #Sources where HasFull = 1;
 		end
 		if not exists(select * from #Sources where FamilyGUID = @SourceFamily)
 			throw 50000, 'No available backup source matches the destination database family.', 1;
 		-- Known foreign media failures do not invalidate the selected source; unknown identities stay visible.
 		update o set Status = 'Ignored' from #Outcomes o
-		where o.Status = 'Failed' and exists(select * from #RestoreBackups b join #RestoreFiles f on f.FileID = b.FileID where f.Path = o.BackupPath)
-			and not exists(select * from #RestoreBackups b join #RestoreFiles f on f.FileID = b.FileID where f.Path = o.BackupPath and b.FamilyGUID = @SourceFamily);
-		select @SourceName = DatabaseName from #Sources where FamilyGUID = @SourceFamily;
+		where o.Status = 'Failed' and exists(select * from #RestoreBackups b inner join #RestoreFiles f on f.FileID = b.FileID where f.Path = o.BackupPath)
+			and not exists(select * from #RestoreBackups b inner join #RestoreFiles f on f.FileID = b.FileID where f.Path = o.BackupPath and b.FamilyGUID = @SourceFamily);
+		select	@SourceName = DatabaseName from #Sources where FamilyGUID = @SourceFamily;
 		exec z.usp_RestoreDatabaseTarget @BackupPath = @BackupPath, @TargetDatabaseName = @TargetDatabaseName,
 			@RecoveryType = @RecoveryType, @ReplaceExisting = @ReplaceExisting, @OtherRestoreOptions = @OtherRestoreOptions,
 			@DataFolder = @DataFolder, @LogFolder = @LogFolder, @StandbyFolder = @StandbyFolder,
@@ -330,26 +329,26 @@ begin
 	begin
 		while exists(select * from #Sources where Processed = 0)
 		begin
-			select top (1) @SourceFamily = FamilyGUID, @TargetName = DatabaseName, @SourceName = DatabaseName, @Outcome = null, @ReachedLSN = null from #Sources where Processed = 0 order by DatabaseName, FamilyGUID;
+			select	top (1) @SourceFamily = FamilyGUID, @TargetName = DatabaseName, @SourceName = DatabaseName, @Outcome = null, @ReachedLSN = null from #Sources where Processed = 0 order by DatabaseName, FamilyGUID;
 			update #Sources set Processed = 1 where FamilyGUID = @SourceFamily;
 			begin try
 				if (select count(*) from #Sources where DatabaseName = @TargetName) > 1
 					throw 50000, 'Different source families share a destination database name; automatic restore is ambiguous.', 1;
 				-- Reuse a unique existing source-name alias after a source rename; never invent a second secondary.
-				select @AliasTargets = count(*) from sys.databases d join sys.database_recovery_status r on r.database_id = d.database_id
+				select	@AliasTargets = count(*) from sys.databases d inner join sys.database_recovery_status r on r.database_id = d.database_id
 				where r.family_guid = @SourceFamily and (d.state = 1 or d.is_in_standby = 1)
 					and exists(select * from #RestoreBackups b where b.FamilyGUID = @SourceFamily and b.DatabaseName = d.name);
 				if @AliasTargets > 1 throw 50000, 'Several source-name aliases already have continuation targets for this family.', 1;
 				if @AliasTargets = 0 and db_id(@TargetName) is null and exists
-					(select * from sys.databases d join sys.database_recovery_status r on r.database_id = d.database_id
+					(select * from sys.databases d inner join sys.database_recovery_status r on r.database_id = d.database_id
 					where r.family_guid = @SourceFamily and (d.state = 1 or d.is_in_standby = 1))
 					throw 50000, 'A same-family continuation target exists outside the known source names; specify its destination explicitly.', 1;
 				if @AliasTargets = 1
-					select @TargetName = d.name from sys.databases d join sys.database_recovery_status r on r.database_id = d.database_id
+					select	@TargetName = d.name from sys.databases d inner join sys.database_recovery_status r on r.database_id = d.database_id
 					where r.family_guid = @SourceFamily and (d.state = 1 or d.is_in_standby = 1)
 						and exists(select * from #RestoreBackups b where b.FamilyGUID = @SourceFamily and b.DatabaseName = d.name);
-				select @DatabaseID = db_id(@TargetName), @State = null, @IsStandby = 0;
-				select @State = state, @IsStandby = is_in_standby from sys.databases where database_id = @DatabaseID;
+				select	@DatabaseID = db_id(@TargetName), @State = null, @IsStandby = 0;
+				select	@State = state, @IsStandby = is_in_standby from sys.databases where database_id = @DatabaseID;
 				if @TargetName = db_name() or @DatabaseID <= 4
 					insert #Outcomes (DatabaseName, SourceDatabaseName, SourceFamilyGUID, Status, ErrorMessage) values (@TargetName, @SourceName, @SourceFamily, 'Skipped', N'The database hosting this procedure and system targets are excluded.');
 				else if @DatabaseID is not null and isnull(@State, -1) <> 1 and @IsStandby = 0
@@ -382,7 +381,7 @@ begin
 	begin
 		declare @ExecutionOutcomeID int;
 		declare cExecuteTargets cursor local fast_forward for
-			select o.OutcomeID, o.DatabaseName from #Outcomes o join #RestoreTargetState s on s.DatabaseName = o.DatabaseName
+			select	o.OutcomeID, o.DatabaseName from #Outcomes o inner join #RestoreTargetState s on s.DatabaseName = o.DatabaseName
 			where o.Status in ('Initialized', 'Advanced', 'AlreadyCurrent') order by o.OutcomeID;
 		open cExecuteTargets;
 		fetch next from cExecuteTargets into @ExecutionOutcomeID, @TargetName;
@@ -400,7 +399,7 @@ begin
 		close cExecuteTargets;
 		deallocate cExecuteTargets;
 	end
-	select DatabaseName, SourceDatabaseName, SourceFamilyGUID, Status, LastLSN, ErrorNumber, ErrorMessage, BackupPath from #Outcomes order by OutcomeID;
+	select	DatabaseName, SourceDatabaseName, SourceFamilyGUID, Status, LastLSN, ErrorNumber, ErrorMessage, BackupPath from #Outcomes order by OutcomeID;
 	if @ShowPlan = 0 and exists(select * from #Outcomes where Status = 'Failed')
 		throw 50000, 'One or more backup sources failed; inspect the per-database restore outcomes.', 1;
 end

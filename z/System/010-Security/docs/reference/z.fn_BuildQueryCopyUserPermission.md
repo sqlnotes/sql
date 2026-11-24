@@ -4,19 +4,20 @@
 
 ## Purpose and behavior
 
-Generate visible explicit database permissions for the named source, grouping by state/securable and substituting target in permission clauses. Handles many securable classes, then appends database-role membership statements. Unsupported or null generated SQL is omitted.
+Produces scripts to copy a user's explicit permissions and role memberships in the current database. It does not create the destination user or execute the returned statements.
+
+Supply the existing user in `@SourceUser`. Set `@TargetUser` to apply the copied permissions to another user, or leave it NULL to keep the source name. A NULL source returns no rows.
 
 ## Parameters and defaults
 
 ```text
-@SourceUser nvarchar(128) = null, @TargetUser nvarchar(128) = null
+@SourceUser nvarchar(128) = null, 
+@TargetUser nvarchar(128) = null
 ```
-
-These are the source-declared types and defaults. Table-valued-function callers must supply arguments or the `default` keyword explicitly.
 
 ## Results, permissions, and limits
 
-Returns Ordinal int identity, Type varchar(100), SQL nvarchar(max); order explicitly by Ordinal. Read-only. Membership statements still name source. Object/column revoke syntax and XML collection schema handling need correction before generated scripts are used.
+Returns `Ordinal int`, `Type varchar(100)` and `SQL nvarchar(max)`. `Type` describes the generated statement and `SQL` contains the text to review or apply. Read rows in `Ordinal` order. Catalog visibility and the permission classes covered by the source limit what can be scripted.
 
 ## Dependencies
 

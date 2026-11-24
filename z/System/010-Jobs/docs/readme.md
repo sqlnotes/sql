@@ -2,7 +2,9 @@
 
 [System documentation](../../docs/readme.md)
 
-Translate readable schedules into SQL Agent fields and manage database-prefixed service jobs in msdb.
+Create SQL Server Agent jobs for a database using schedules such as "every 15 minutes between 08:00 and 17:00." Jobs can run up to ten T-SQL commands in order, and the helpers can start, stop, enable, disable or remove them.
+
+Jobs uses SQL Server Agent to do the actual scheduling and execution. Run the helpers from the database that owns the work; they give its jobs and schedules database-specific names in `msdb`.
 
 ## Start here
 

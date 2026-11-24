@@ -19,7 +19,6 @@ begin
 	set nocount, xact_abort on;
 	if @@trancount > 0
 	begin
-		set xact_abort off;
 		throw 50000, N'Trace configuration requires no existing transaction.', 1;
 	end;
 	begin try
@@ -30,10 +29,10 @@ begin
 			throw 50000, N'Either @TraceName or @TraceID must be provided.', 1;
 		end
 		declare @ResolvedTraceID int;
-		select @ResolvedTraceID = TraceID
+		select	@ResolvedTraceID = TraceID
 		from z.v_TraceOwned
 		where (@TraceName is null or Name = @TraceName) and (@TraceID is null or TraceID = @TraceID);
-		select @TraceID = @ResolvedTraceID;
+		select	@TraceID = @ResolvedTraceID;
 		if not exists(select 1 from z.Trace with (updlock, holdlock) where TraceID = @TraceID and CreatorSessionID = @@spid
 			and CreatorLoginTime = (select login_time from sys.dm_exec_sessions where session_id = @@spid))
 			throw 50000, N'The selected trace registration changed before configuration.', 1;
@@ -51,7 +50,7 @@ begin
 		begin
 			throw 50000, N'Callback must be an existing stored procedure in the current database.', 1;
 		end
-		select @ProcedureName = quotename(object_schema_name(@ProcedureID)) + N'.' + quotename(object_name(@ProcedureID));
+		select	@ProcedureName = quotename(object_schema_name(@ProcedureID)) + N'.' + quotename(object_name(@ProcedureID));
 		update z.TraceTrigger set ProcedureName = @ProcedureName where TraceID = @TraceID and EventName = @EventName;
 		if @@rowcount = 0 insert into z.TraceTrigger(TraceID, EventName, ProcedureName) values(@TraceID, @EventName, @ProcedureName);
 		update z.Trace set ModificationDate = getdate() where TraceID = @TraceID;

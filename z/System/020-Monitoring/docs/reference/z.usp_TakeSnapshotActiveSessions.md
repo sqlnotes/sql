@@ -4,17 +4,15 @@
 
 ## Purpose and behavior
 
-Insert current z.v_ActiveSessions rows into z.ActiveSessions; SnapshotDate and ActiveSessionID use table defaults. Repeated calls append snapshots; no explicit transaction or catch is used.
+Saves the currently visible active requests in `z.ActiveSessions` so you can inspect them after the requests finish. It captures the requests shown by `z.v_ActiveSessions`, excluding the collecting session. Each call adds another snapshot rather than replacing earlier ones. It is a picture of collection time, not a complete session history.
 
 ## Parameters and defaults
 
 None.
 
-These are the source-declared types and defaults.
-
 ## Results, permissions, and limits
 
-No defined result set. Requires insert access and sufficient DMV visibility.
+Returns no rows; query `z.ActiveSessions` for saved snapshots and use `SnapshotDate` to identify the collection time. Requires insert access and enough DMV visibility to see the requests of interest. The procedure does not start a transaction of its own; insert errors propagate.
 
 ## Dependencies
 

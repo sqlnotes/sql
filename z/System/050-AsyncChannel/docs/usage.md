@@ -4,7 +4,7 @@
 
 ## Build and run the demo
 
-[`z.usp_CreateDemoAsyncChannel`](../modules/1070%20Examples/z.usp_CreateDemoAsyncChannel.sql) demonstrates channel construction. Its leading SQL comments contain the complete usage sequence. Installation defines the procedure; invoke it explicitly in a database where Service Broker is enabled. Choose unused channel and pool IDs. The procedure rejects existing Demo registrations or objects instead of overwriting them.
+The demo shows the complete send/process cycle: inserting typed rows sends messages, invoking the manual activator processes them, and querying the destination shows the saved records. Create it explicitly with [`z.usp_CreateDemoAsyncChannel`](reference/z.usp_CreateDemoAsyncChannel.md) in a database where Service Broker is enabled. Choose unused channel and pool IDs; existing Demo registrations or objects are rejected rather than overwritten.
 
 ```sql
 exec z.usp_CreateDemoAsyncChannel @AsyncChannelID = 0, @ActivatorPoolID = 0;
@@ -16,7 +16,7 @@ exec z.usp_AsyncChannel_Demo_Activator;
 select RecordID, Description, Date from z.AsyncChannel_Demo order by RecordID;
 ```
 
-The creator builds a pool, destination table `z.AsyncChannel_Demo`, authored interface `z.AsyncChannel_Demo_Interface`, and a Manual channel registration. It creates the interface before invoking the generator so column metadata is available. After generation supplies the codecs and processing scaffold, it replaces that new scaffold with `z.usp_AsyncChannel_Demo_Process`, which decodes payload rows into the destination table. Manual activation makes the send/receive steps visible; the creator sends no sample data itself.
+The creator provides the destination table `z.AsyncChannel_Demo`, the insert interface `z.AsyncChannel_Demo_Interface`, a one-place processing pool and the Demo processor. Manual activation keeps sending and processing visible as separate steps. The creator itself sends no sample data. Delivery is asynchronous, so another activator invocation may be needed if the first one runs before messages arrive.
 
 Use the same sequence for an application channel: define the interface, register settings, generate infrastructure, and implement processing. The demo is separate from the generic framework objects and is created only on request. Channel removal preserves the authored view, processor and destination table; its pool is also retained. The SQL header describes cleanup ownership.
 
@@ -27,6 +27,8 @@ Applications register channels in `z.AsyncChannel`; no registration is seeded. C
 Before generating, author the expected interface view: `<schema>.AsyncChannel_<Name>_Interface`. Its column names, order and types define serializer inputs and deserializer outputs. Avoid reserved enqueue parameter names `ConversationHandle`, `Payload` and `Attempt`, and use conventional identifier characters. Supply an application processing procedure with one `z.AsyncChannelMessage readonly` parameter. Generated stubs are scaffolding, not application processing.
 
 Inspect the computed names, `IsValid` and `InvalidReason` in `z.v_AsyncChannel`. Inspect `GeneratedScript`, `ExistingScript`, `IsSameScript` and `NeedDeployment` in `z.v_AsyncChannelScripts`, ordered by `Ordinal`, before invoking `z.usp_AsyncChannelDeploy` with the channel ID. The drift indicator is separate from `NeedDeployment`; existing module text is not automatically replaced. `@ForceDeployment = 1` regenerates framework-managed channel modules while preserving existing Interface, Processing, Queue and Service objects.
+
+When upgrading an existing AsyncChannel installation to slot-based pool release, pause automatic activation and manual activator calls and allow running activators to finish. Install the updated System semaphore helpers and AsyncChannel modules, then run `z.usp_AsyncChannelDeploy @AsyncChannelID = ..., @ForceDeployment = 1` for each existing generated channel. Regeneration gives each activator the updated pool acquire and release calls. Direct callers of the pool procedures must also pass the acquired slot through to release.
 
 Send structured rows by inserting into the channel interface or calling its generated `<schema>.usp_AsyncChannel_<Name>_Enqueue`. For already serialized fragments, call `z.usp_AsyncChannelSend`, or insert `(AsyncChannelID, DataSequence, Data)` into either shared framework interface. The batched interface joins fragments in sequence and chunks by `MaxRowsPerMessage`; the other interface sends one fragment per row. Supply JSON fragments without enclosing the complete batch in an array: the generated deserializer supplies the surrounding array for a batch fragment.
 

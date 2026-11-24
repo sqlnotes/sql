@@ -2,7 +2,9 @@
 
 [System documentation](../../docs/readme.md)
 
-Generate login and permission scripts, repair SQL-user SID mappings, remap users to logins by transformed names, and change server-role owners.
+Prepare scripts to recreate logins or copy a principal's permissions, and repair database users whose login mappings no longer match. The scripting functions return SQL for review; the mapping and ownership procedures apply changes directly.
+
+Security works with SQL Server's server logins, database users, roles and permission catalogs. Use it for selected security-administration tasks rather than as a complete security-migration tool.
 
 ## Start here
 

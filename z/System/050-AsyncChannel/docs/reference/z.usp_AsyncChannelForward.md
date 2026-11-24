@@ -14,7 +14,7 @@ Forward only rows with `IsPayload = 1` from a received message table to each sel
 @Batched bit = 1
 ```
 
-`@AsyncChannelIDs` is a comma-separated list of integer IDs. Spaces and empty tokens are ignored, and duplicates are removed. Noninteger tokens fail conversion. With `@Batched = 0`, insert through `z.AsyncChannelMessage_Interface`; otherwise use `z.AsyncChannelMessageBatched_Interface`, which chunks according to destination configuration.
+`@AsyncChannelIDs` is a comma-separated list of integer destination IDs. Spaces and empty tokens are ignored, duplicates are removed, and noninteger tokens fail conversion. The default `@Batched = 1` combines fragments according to each destination's row limit per message through the batched interface. Set it to 0 to send each payload row separately through the ordinary interface.
 
 ## Results and side effects
 

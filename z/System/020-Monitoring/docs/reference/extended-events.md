@@ -2,6 +2,8 @@
 
 [Monitoring](../readme.md) | [Object index](readme.md)
 
+Use these tools to keep a history of SQL errors and slow completed queries. The collectors read server-wide Extended Events sessions and save typed rows plus original XML in `z.ErrorEvent` and `z.LongRunningQueryEvent`. Call them periodically; reading the views or installing Monitoring alone does not collect history.
+
 These server-scoped sessions capture all databases. Error capture has no QRTZ
 exclusion. They are separate from the SQL Trace framework and system_health.
 Installing Monitoring defines procedures and tables; it does not create or start
@@ -113,9 +115,10 @@ partition-key conventions. DurationInMS is duration converted from microseconds;
 CPU retains the source event's native units. Repeated events can describe a batch
 and its statements separately; the four completion classes are not unique queries.
 
-Both guarded baselines only create absent tables. Existing installations above
-Monitoring version 0.0.0 skip baselines; prepare missing tables explicitly before
-running collectors. No migration or subsystem version change is supplied.
+Both guarded baselines create absent tables while preserving existing tables.
+Standard deployment includes the Monitoring baseline automatically while
+Monitoring has no version folders or is at version 0.0.0 or its first version
+folder.
 
 ## Reception limits
 

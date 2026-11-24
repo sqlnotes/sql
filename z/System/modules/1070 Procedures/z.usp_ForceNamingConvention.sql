@@ -19,11 +19,12 @@ create or alter procedure z.usp_ForceNamingConvention
 as
 begin
 	set nocount on;
-	-- Renames are intentionally non-atomic; never roll back a caller's transaction.
+	-- Callers can rename in their own transaction and recover from individual rename errors.
+	-- IgnoreError can continue with later renames after a recoverable error.
 	set xact_abort off;
-	declare @ObjectName nvarchar(1200), @NewName nvarchar(128), @ObjectType varchar(13), @ObjectID int,
-		@Entry nvarchar(max), @SchemaName sysname, @Name sysname, @Position int, @Dots int,
-		@Delimiter nchar(1), @Character nchar(1);
+	declare	@ObjectName nvarchar(1200), @NewName nvarchar(128), @ObjectType varchar(13), @ObjectID int,
+			@Entry nvarchar(max), @SchemaName sysname, @Name sysname, @Position int, @Dots int,
+			@Delimiter nchar(1), @Character nchar(1);
 	declare @Schemas table (SchemaID int not null primary key);
 	declare @Objects table (ObjectID int not null primary key);
 	declare @Entries table (Selector varchar(10) not null, Name nvarchar(max), JsonType int not null);
@@ -49,7 +50,7 @@ begin
 	-- Keep the original single-object and positional calling convention.
 	if @TableName is not null
 	begin
-		select @ObjectID = object_id(@TableName);
+		select	@ObjectID = object_id(@TableName);
 		if @ObjectID is null or parsename(@TableName, 4) is not null
 			or (parsename(@TableName, 3) is not null and parsename(@TableName, 3) <> db_name())
 			or not exists (select 1 from sys.objects where object_id = @ObjectID and type in ('U', 'V'))
@@ -57,19 +58,19 @@ begin
 		insert @Objects (ObjectID) values (@ObjectID);
 	end
 
-	declare SelectorCursor cursor local static for select distinct Name from @Entries where Selector = 'Table';
-	open SelectorCursor;
-	fetch next from SelectorCursor into @Entry;
+	declare cSelectors cursor local static for select distinct Name from @Entries where Selector = 'Table';
+	open cSelectors;
+	fetch next from cSelectors into @Entry;
 	while @@fetch_status = 0
 	begin
 		if datalength(@Entry) > 1034
 			throw 50001, '@TableNames contains an identifier longer than two delimited sysnames.', 1;
-		select @SchemaName = parsename(@Entry, 2), @Name = parsename(@Entry, 1),
-			@Position = 1, @Dots = 0, @Delimiter = null;
+		select	@SchemaName = parsename(@Entry, 2), @Name = parsename(@Entry, 1),
+				@Position = 1, @Dots = 0, @Delimiter = null;
 		-- Count separators outside delimited names; dots and escaped brackets in names are valid.
 		while @Position <= len(@Entry)
 		begin
-			select @Character = substring(@Entry, @Position, 1);
+			select	@Character = substring(@Entry, @Position, 1);
 			if @Delimiter is null
 			begin
 				if @Character = N'[' select @Delimiter = N']';
@@ -81,53 +82,53 @@ begin
 				if substring(@Entry, @Position + 1, 1) = @Delimiter select @Position += 1;
 				else select @Delimiter = null;
 			end
-			select @Position += 1;
+			select	@Position += 1;
 		end
 		if @Dots <> 1 or @Delimiter is not null or @SchemaName is null or @Name is null
 			or parsename(@Entry, 3) is not null or parsename(@Entry, 4) is not null
 			throw 50001, '@TableNames entries must be exactly schema-qualified names in the current database.', 1;
-		select @ObjectID = object_id(quotename(@SchemaName) + N'.' + quotename(@Name));
+		select	@ObjectID = object_id(quotename(@SchemaName) + N'.' + quotename(@Name));
 		if not exists (select 1 from sys.objects where object_id = @ObjectID and type in ('U', 'V'))
 			throw 50001, '@TableNames contains an unknown table or view in the current database.', 1;
 		if not exists (select 1 from @Objects where ObjectID = @ObjectID) insert @Objects (ObjectID) values (@ObjectID);
-		fetch next from SelectorCursor into @Entry;
+		fetch next from cSelectors into @Entry;
 	end
-	close SelectorCursor;
-	deallocate SelectorCursor;
+	close cSelectors;
+	deallocate cSelectors;
 	if not exists (select 1 from @Schemas) and not exists (select 1 from @Objects)
 		throw 50001, 'Supply at least one schema or table through @SchemaNames, @TableNames or @TableName.', 1;
 
 	insert @Objects (ObjectID)
-		select o.object_id from sys.objects o
-			join @Schemas s on s.SchemaID = o.schema_id
+		select	o.object_id from sys.objects o
+			inner join @Schemas s on s.SchemaID = o.schema_id
 		where o.type in ('U', 'V') and o.is_ms_shipped = 0
 			and not exists (select 1 from @Objects t where t.ObjectID = o.object_id);
 	create table #RenamePlan (ObjectName nvarchar(1200) not null, NewName nvarchar(128) not null, ObjectType varchar(13) not null);
 	insert #RenamePlan (ObjectName, NewName, ObjectType)
-		select case when i.IsPrimaryKey = 1 or i.IsUniqueConstraint = 1 then
-				quotename(i.SchemaName) + N'.' + quotename(i.IndexName)
-			else quotename(i.SchemaName) + N'.' + quotename(i.ObjectName) + N'.' + quotename(i.IndexName) end,
-			i.ExpectedIndexName, case when i.IsPrimaryKey = 1 or i.IsUniqueConstraint = 1 then 'Object' else 'Index' end
-		from z.v_Indexes i join @Objects o on o.ObjectID = i.ObjectID
+		select	case when i.IsPrimaryKey = 1 or i.IsUniqueConstraint = 1 then
+				 quotename(i.SchemaName) + N'.' + quotename(i.IndexName)
+				else quotename(i.SchemaName) + N'.' + quotename(i.ObjectName) + N'.' + quotename(i.IndexName) end,
+				i.ExpectedIndexName, case when i.IsPrimaryKey = 1 or i.IsUniqueConstraint = 1 then 'Object' else 'Index' end
+		from z.v_Indexes i inner join @Objects o on o.ObjectID = i.ObjectID
 		where i.ExpectedIndexName <> i.IndexName
 		union all
-		select quotename(d.SchemaName) + N'.' + quotename(d.DefaultName), d.ExpectedDefaultName, 'Object'
-		from z.v_DefaultConstraints d join @Objects o on o.ObjectID = d.ParentObjectID
+		select	quotename(d.SchemaName) + N'.' + quotename(d.DefaultName), d.ExpectedDefaultName, 'Object'
+		from z.v_DefaultConstraints d inner join @Objects o on o.ObjectID = d.ParentObjectID
 		where d.ExpectedDefaultName <> d.DefaultName
 		union all
-		select quotename(f.SchemaName) + N'.' + quotename(f.ForeignKeyName), f.ExpectedForeignKeyName, 'Object'
-		from z.v_ForeignKeys f join @Objects o on o.ObjectID = f.ParentObjectID
+		select	quotename(f.SchemaName) + N'.' + quotename(f.ForeignKeyName), f.ExpectedForeignKeyName, 'Object'
+		from z.v_ForeignKeys f inner join @Objects o on o.ObjectID = f.ParentObjectID
 		where f.ExpectedForeignKeyName <> f.ForeignKeyName;
 	if @ShowPlan = 1
 	begin
-		select ObjectName, NewName, ObjectType from #RenamePlan order by ObjectName, ObjectType, NewName;
+		select	ObjectName, NewName, ObjectType from #RenamePlan order by ObjectName, ObjectType, NewName;
 		return;
 	end
 
-	declare RenameCursor cursor local static for
-		select ObjectName, NewName, ObjectType from #RenamePlan order by ObjectName, ObjectType, NewName;
-	open RenameCursor;
-	fetch next from RenameCursor into @ObjectName, @NewName, @ObjectType;
+	declare cRenames cursor local static for
+		select	ObjectName, NewName, ObjectType from #RenamePlan order by ObjectName, ObjectType, NewName;
+	open cRenames;
+	fetch next from cRenames into @ObjectName, @NewName, @ObjectType;
 	while @@fetch_status = 0
 	begin
 		begin try
@@ -138,8 +139,8 @@ begin
 			if isnull(@IgnoreError, 0) = 0 throw;
 			print error_message();
 		end catch
-		fetch next from RenameCursor into @ObjectName, @NewName, @ObjectType;
+		fetch next from cRenames into @ObjectName, @NewName, @ObjectType;
 	end
-	close RenameCursor;
-	deallocate RenameCursor;
+	close cRenames;
+	deallocate cRenames;
 end

@@ -2,7 +2,7 @@
 
 [Trace](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_TraceRemoveColumns.sql)
 
-Remove selected output columns from one stopped native trace registration while retaining required SPID bindings. TraceStart applies the remaining bindings.
+Removes information you no longer want to record for a trace's configured events. Pass the column names in `@EventColumnList`; required `SPID` columns are retained. This changes the planned capture columns, not data already collected.
 
 ```text
 @TraceName nvarchar(128) = null,

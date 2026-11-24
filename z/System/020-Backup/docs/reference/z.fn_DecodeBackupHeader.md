@@ -2,7 +2,7 @@
 
 [Backup objects](readme.md) | [Header reader](z.usp_ReadBackupHeader.md)
 
-An inline table-valued function that decodes the HeaderJson output from z.usp_ReadBackupHeader. It returns all 59 header columns in the same order and SQL types as the reader, including numeric(25,0) LSNs, GUIDs, datetime values, bit flags and a varbinary(20) EncryptorThumbprint.
+Turns the JSON output of `z.usp_ReadBackupHeader` into typed rows that you can filter, join or insert into a table. Use it to work with backup identity, dates and LSNs without writing JSON mappings. It returns the reader's 59 header columns in the same order and SQL types, including `numeric(25,0)` LSNs, GUIDs, dates, flags and a `varbinary(20)` EncryptorThumbprint.
 
 ## Parameter and behavior
 

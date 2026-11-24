@@ -2,7 +2,9 @@
 
 [Trace](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_TraceAssertOwner.sql)
 
-Require a matching registration created by the current session ID/login time. No UUID or separate collector registration is used. This helper validates metadata selection; native operations use the registered TraceID.
+Checks that the selected trace belongs to the current connection. Configuration and Start use this helper to keep one connection from changing another connection's trace. It validates the registration without starting, stopping or collecting a trace.
+
+Select by `@TraceName` or `@TraceID`; when both are supplied they must identify the same registration. Ownership includes the connection's login time, so a reused session ID does not inherit a previous connection's traces.
 
 ```text
 @TraceName nvarchar(128) = null,

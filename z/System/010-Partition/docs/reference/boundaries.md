@@ -2,9 +2,13 @@
 
 [Object index](readme.md)
 
+Add missing boundaries to an existing date-based partition function. Use the function to generate a plan, or the procedure to preview or execute it. These helpers leave existing boundaries in place and do not expire data.
+
 ## z.fn_BuildQueryCreatePartitionForDateRange
 
 [Source](../../modules/1020%20Functions/z.fn_BuildQueryCreatePartitionForDateRange.sql)
+
+Returns the SQL needed for the requested date range without executing it. Supply either a table using the function or the partition-function name directly.
 
 ```sql
 create or alter function z.fn_BuildQueryCreatePartitionForDateRange
@@ -25,6 +29,8 @@ returns @ret table(Ordinal int identity(1,1), SQL nvarchar(max), Date datetime)
 
 [Source](../../modules/1070%20Procedures/z.usp_CreatePartitionForDateRange.sql)
 
+Executes the boundary plan, or returns it for review with `@ShowPlan = 1`. Execution affects every partition scheme using the selected function.
+
 ```sql
 create or alter procedure z.usp_CreatePartitionForDateRange
 (
@@ -42,15 +48,23 @@ create or alter procedure z.usp_CreatePartitionForDateRange
 
 ## Parameters and returned plan
 
-Use ObjectName or PartitionFunctionName to identify the existing function. Supported key types are date, datetime, datetime2, smalldatetime or bigint System IDs. Date keys require Daily or coarser periods. Default period Monthly, interval 1, DateFrom current UTC time when null, DateTo computed from count when null, count 3, storage default filegroup when null/Default/[Default]. Negative count requests backward boundaries.
+Use `@ObjectName` or `@PartitionFunctionName` to identify the existing function. Supported keys are date, datetime, datetime2, smalldatetime or bigint System IDs. Date keys require Daily or coarser periods.
 
-Both rounded endpoints are included. The TVF returns Ordinal identity, SQL and Date. Procedure ShowPlan returns Ordinal, Date and SQL in Ordinal order; the default ShowPlan = 0 preserves execution behavior. Each missing boundary emits next-used statements for all schemes, a split and next-used statements again. Validation failures become executable throw text in a row. Selecting output does not throw those generated errors.
+| Parameter | Meaning |
+| --- | --- |
+| `@PartitionRangeType`, `@PartitionRangeTypeInterval` | Period and number of periods between boundaries; defaults are Monthly and 1. |
+| `@DateFrom`, `@DateTo` | Requested range. An omitted start uses current UTC time; an omitted end is calculated from the count. Both rounded endpoints are included. |
+| `@NumberOfPartitions` | Number of interval increments when calculating the end; defaults to 3. A negative value requests boundaries backward in time. |
+| `@FileGroup` | Filegroup for new partitions. NULL, Default and [Default] use the database default. |
+| `@ShowPlan` | Procedure only: 1 returns the proposed SQL; 0 executes it. |
+
+The function returns `Ordinal`, `SQL` and `Date`; procedure preview returns `Ordinal`, `Date` and `SQL` in execution order. An error can appear as executable error text in a plan row. Reading the plan does not execute that error or any partition changes.
 
 ## Execution and limits
 
 With ShowPlan = 1, the procedure only reads metadata and returns the builder SQL. It does not execute generated errors, next-used statements or splits, start a transaction or acquire the maintenance application lock. Preview supports INSERT EXEC capture and caller transactions; it preserves implicit_transactions and xact_abort settings. Runtime planning errors return an error SQL row with Ordinal 0 and Date NULL. A NULL ShowPlan parameter is rejected.
 
-With ShowPlan = 0, the procedure resolves the function, acquires the same per-function session application lock as automatic maintenance, generates SQL under that lock and executes it by Ordinal in its own transaction. Caller transactions and implicit_transactions on are rejected without rolling back caller work. Metadata/function/scheme DDL permissions are required.
+With ShowPlan = 0, the procedure resolves the function, acquires the same per-function session application lock as automatic maintenance, generates SQL under that lock and executes it by Ordinal in its own transaction. Execute with no caller transaction and with IMPLICIT_TRANSACTIONS OFF. The execution guard raises an error with XACT_ABORT ON, which makes an active caller transaction uncommittable when the caller catches the error. Metadata/function/scheme DDL permissions are required.
 
 Weekly is supported and starts Monday independently of DATEFIRST; intervals must be positive. Invalid interval/type inputs produce executable error rows rather than throwing during function selection. Keep date/count products within SQL Server arithmetic and key-type limits.
 

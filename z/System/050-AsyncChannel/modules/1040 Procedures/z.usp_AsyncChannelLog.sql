@@ -38,15 +38,15 @@ begin
 	end
 
 	begin try
-		select @Count = isnull(cast(session_context(N'AsyncChannel-LogCount') as int), 0) + 1
+		select	@Count = isnull(cast(session_context(N'AsyncChannel-LogCount') as int), 0) + 1
 		if @Count <= 40
 		begin
-			select @Meta = (select @AsyncChannelID c, @Level l, @SessionID s, @ConversationHandle h for json path, without_array_wrapper)
-			select @Key = N'AsyncChannel-LogInfo-' + cast(@Count as nvarchar(10)), @InfoValue = left(@Info, 4000)
+			select	@Meta = (select @AsyncChannelID c, @Level l, @SessionID s, @ConversationHandle h for json path, without_array_wrapper)
+			select	@Key = N'AsyncChannel-LogInfo-' + cast(@Count as nvarchar(10)), @InfoValue = left(@Info, 4000)
 			exec sys.sp_set_session_context @key = @Key, @value = @InfoValue
-			select @Key = N'AsyncChannel-LogPayload-' + cast(@Count as nvarchar(10)), @PayloadValue = left(@Payload, 4000)
+			select	@Key = N'AsyncChannel-LogPayload-' + cast(@Count as nvarchar(10)), @PayloadValue = left(@Payload, 4000)
 			exec sys.sp_set_session_context @key = @Key, @value = @PayloadValue
-			select @Key = N'AsyncChannel-LogMeta-' + cast(@Count as nvarchar(10))
+			select	@Key = N'AsyncChannel-LogMeta-' + cast(@Count as nvarchar(10))
 			exec sys.sp_set_session_context @key = @Key, @value = @Meta
 		end
 		-- rows beyond the 40 slots are dropped, but counted so the flush can report them

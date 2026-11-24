@@ -10,55 +10,55 @@ Reports backup media and restore history from msdb metadata.
 create or alter view z.v_BackupRestore
 as
 select	bs.database_name DatabaseName,
-	case
-			when bs.type = 'D' and bs.is_copy_only = 0 then 'Full Database'
-			when bs.type = 'D' and bs.is_copy_only = 1 then 'Full Copy-Only Database'
-			when bs.type = 'I' then 'Differential Database Backup'
-			when bs.type = 'L' then 'Transaction Log'
-			when bs.type = 'F' then 'File or Filegroup'
-			when bs.type = 'G' then 'Differential File'
-			when bs.type = 'P' then 'Partial'
-			when bs.type = 'Q' then 'Differential Partial'
-		end BackupType,
-	bs.Backup_Start_Date BackupStartDate,
-	bs.Backup_Finish_Date BackupFinishDate,
-	datediff(second, bs.Backup_Start_Date, bs.Backup_Finish_Date) DurationInSec,
-	z.fn_FormatDurationMilliseconds(datediff_big(millisecond, bs.backup_start_date, bs.backup_finish_date)) Duration,
-	convert(decimal(10, 2), bs.backup_size/1024./1024.) BackupSizeMB,
-	convert(decimal(10, 2), bs.compressed_backup_size/1024./1024.) CompressedBackupSizeMB,
-	bf.physical_device_name LatestBackupLocation,
-	rh.destination_database_name RestoredDatabaseName,
-	rh.restore_date RestoreDate,
-	case rh.restore_type
-			when 'D' then 'Database'
-			when 'F' then 'File'
-			when 'G' then 'Filegroup'
-			when 'I' then 'Differential'
-			when 'L' then 'Log'
-			when 'V' then 'Verifyonly'
-		end RestoreType,
-	rh.replace RestoreWithReplace,
-	case bf.device_type
-			when 2 then 'Disk'
-			when 5 then 'Tape'
-			when 7 then 'Virtual device'
-			when 9 then 'Azure Storage'
-			when 105 then 'A permanent backup device'
-			else 'Other Device'
-		end DeviceType,
-	bs.recovery_model RecoveryModel,
-	bs.database_backup_lsn DatabaseBackupLSN,
-	bs.checkpoint_lsn CheckPointLSN,
-	bs.first_lsn FirstLNS,
-	bs.last_lsn LastLNS,
-	bs.machine_name ServerName,
-	bs.compatibility_level CompatibilityLevel,
-	bs.collation_name CollationName,
-	bms.is_password_protected IsPasswordProtected,
-	bms.software_name BackupSoftware,
-	rh.user_name RestoreLoginName,
-	bs.backup_set_id BackupSetID
+		case
+				when bs.type = 'D' and bs.is_copy_only = 0 then 'Full Database'
+				when bs.type = 'D' and bs.is_copy_only = 1 then 'Full Copy-Only Database'
+				when bs.type = 'I' then 'Differential Database Backup'
+				when bs.type = 'L' then 'Transaction Log'
+				when bs.type = 'F' then 'File or Filegroup'
+				when bs.type = 'G' then 'Differential File'
+				when bs.type = 'P' then 'Partial'
+				when bs.type = 'Q' then 'Differential Partial'
+			end BackupType,
+		bs.backup_start_date BackupStartDate,
+		bs.backup_finish_date BackupFinishDate,
+		datediff(second, bs.backup_start_date, bs.backup_finish_date) DurationInSec,
+		z.fn_FormatDurationMilliseconds(datediff_big(millisecond, bs.backup_start_date, bs.backup_finish_date)) Duration,
+		convert(decimal(10, 2), bs.backup_size/1024./1024.) BackupSizeMB,
+		convert(decimal(10, 2), bs.compressed_backup_size/1024./1024.) CompressedBackupSizeMB,
+		bf.physical_device_name LatestBackupLocation,
+		rh.destination_database_name RestoredDatabaseName,
+		rh.restore_date RestoreDate,
+		case rh.restore_type
+				when 'D' then 'Database'
+				when 'F' then 'File'
+				when 'G' then 'Filegroup'
+				when 'I' then 'Differential'
+				when 'L' then 'Log'
+				when 'V' then 'Verifyonly'
+			end RestoreType,
+		rh.replace RestoreWithReplace,
+		case bf.device_type
+				when 2 then 'Disk'
+				when 5 then 'Tape'
+				when 7 then 'Virtual device'
+				when 9 then 'Azure Storage'
+				when 105 then 'A permanent backup device'
+				else 'Other Device'
+			end DeviceType,
+		bs.recovery_model RecoveryModel,
+		bs.database_backup_lsn DatabaseBackupLSN,
+		bs.checkpoint_lsn CheckPointLSN,
+		bs.first_lsn FirstLNS,
+		bs.last_lsn LastLNS,
+		bs.machine_name ServerName,
+		bs.compatibility_level CompatibilityLevel,
+		bs.collation_name CollationName,
+		bms.is_password_protected IsPasswordProtected,
+		bms.software_name BackupSoftware,
+		rh.user_name RestoreLoginName,
+		bs.backup_set_id BackupSetID
 from msdb.dbo.backupset bs
-	left outer join msdb.dbo.backupmediafamily bf ON bs.media_set_id = bf.media_set_id
-	inner join msdb.dbo.backupmediaset bms ON bs.media_set_id = bms.media_set_id
+	left outer join msdb.dbo.backupmediafamily bf on bs.media_set_id = bf.media_set_id
+	inner join msdb.dbo.backupmediaset bms on bs.media_set_id = bms.media_set_id
 	left outer join msdb.dbo.restorehistory rh on rh.backup_set_id = bs.backup_set_id

@@ -11,7 +11,7 @@ rowversion.
 create or alter function z.fn_GetLastCommittedRowVersion()
 returns binary(8)
 as
-begin 
+begin
 	/*
 		Returns an inclusive polling watermark: one less than the lowest active
 		rowversion in the current database. Capture it before reading changes and

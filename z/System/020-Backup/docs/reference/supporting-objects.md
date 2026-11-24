@@ -4,10 +4,10 @@
 
 ## Access and behavior
 
-Views/functions here read data without modifying it. Table access requires the corresponding select or write permission. Server/database catalog and DMV visibility can hide rows or reject access; permission on a wrapper alone does not guarantee access through every underlying system object. Definitions do not grant caller privileges. Units and interpretation below follow the expressions in source.
+Use these read-only views to inspect backup and restore records already retained by the local SQL Server instance. They report history rather than opening backup files. The caller needs access to the underlying `msdb` history; granting access to a wrapper does not grant additional system privileges.
 
 ## z.v_BackupRestore
 
 [Source](../../modules/1020%20Views/z.v_BackupRestore.sql)
 
-msdb backupset/media/restorehistory joins -> server/database/type/device/software/recovery/compatibility/collation, dates/duration/location, backup/compressed MB, LSNs, password flag and restore details. Can return multiple rows per backup for media stripes and restore operations. Preserves source aliases FirstLNS/LastLNS. It reports recorded history, not current file existence or recoverability.
+Combines backup, media and restore history so you can see where a backup was written and where it was restored. Results include database/server names, backup type, dates, duration, media location, backup/compressed sizes in MB, LSNs and recovery details. A backup can appear more than once when it has several media files or restore records. The existing `FirstLNS` and `LastLNS` aliases are retained. A recorded path does not prove that its file still exists or can be restored.

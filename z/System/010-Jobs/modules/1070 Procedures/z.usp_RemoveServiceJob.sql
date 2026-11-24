@@ -19,7 +19,7 @@ begin
 		begin tran;
 		exec @LockResult = z.usp_AcquireSemaphore @SemaphoreName = @Resource, @TotalCount = 1, @LockOwner = N'Transaction', @LockTimeout = 15000;
 		if @LockResult <= 0 throw 51001, 'Could not acquire the database schedule operation lock.', 1;
-		select @JobID = z.fn_GetServiceJobID(@Name);
+		select	@JobID = z.fn_GetServiceJobID(@Name);
 		if @JobID is not null
 			exec msdb.dbo.sp_delete_job @job_id = @JobID, @delete_unused_schedule = 0;
 		commit;

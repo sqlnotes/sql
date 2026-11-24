@@ -2,6 +2,8 @@
 
 [Guide](readme.md) · [Reference and source](reference/readme.md)
 
+Use the maintenance preview and the reported engine error to identify the affected function and tables. A failed operation does not undo earlier operations that already committed.
+
 ## Invalid policies
 
 Use positive period intervals, nonnegative forward counts and `PartitionsToKeep >= -1`. Value -1 disables expiration; zero retains the current-period cutoff behavior. Minute, Hourly, Daily, Weekly, Monthly and Yearly are supported. Weekly starts Monday in UTC independently of DATEFIRST. Date keys cannot represent subday boundaries, so Hourly/Minute policies are rejected for that key type. Keep date spans within the supported key type and arithmetic range.
@@ -24,4 +26,4 @@ Execute with no caller transaction and implicit_transactions off. A competing ma
 
 Preview does not reserve a plan for future execution. Installation and updates invoke the job factory to create or reconcile the hourly maintenance job. New jobs are enabled; existing job enabled state is preserved. Ensure the installer has Agent/msdb job and schedule permissions. Initialization preserves customized policies rather than restoring shipped values.
 
-For RIGHT expiration, the retained upper partition is also held temporarily while empty neighbors merge. The empty destination's per-index compression is restored before switching retained rows back. Adjacent partitions with different filegroups for any index are rejected before DDL because preserving that placement would require data movement. Temporary merge holders use the _Partition_MergeHold suffix and must not already exist.
+If RIGHT expiration fails, check for an existing `_Partition_MergeHold` table and compare the adjacent filegroups for every index. Different filegroups require data movement and the procedure rejects them. [Retention details](reference/retention.md#recovery-expiration-and-compression)

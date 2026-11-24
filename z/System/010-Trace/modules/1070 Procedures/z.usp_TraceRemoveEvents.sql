@@ -18,7 +18,6 @@ begin
 	set nocount, xact_abort on;
 	if @@trancount > 0
 	begin
-		set xact_abort off;
 		throw 50000, N'Trace configuration requires no existing transaction.', 1;
 	end;
 	begin try
@@ -29,10 +28,10 @@ begin
 			throw 50000, N'Either @TraceName or @TraceID must be provided.', 1;
 		end
 		declare @ResolvedTraceID int;
-		select @ResolvedTraceID = TraceID
+		select	@ResolvedTraceID = TraceID
 		from z.v_TraceOwned
 		where (@TraceName is null or Name = @TraceName) and (@TraceID is null or TraceID = @TraceID);
-		select @TraceID = @ResolvedTraceID;
+		select	@TraceID = @ResolvedTraceID;
 		if not exists(select 1 from z.Trace with (updlock, holdlock) where TraceID = @TraceID and CreatorSessionID = @@spid
 			and CreatorLoginTime = (select login_time from sys.dm_exec_sessions where session_id = @@spid))
 			throw 50000, N'The selected trace registration changed before configuration.', 1;
@@ -51,14 +50,14 @@ begin
 			begin
 				if trim(@EventList) = N'' or exists
 				(
-					select 1 from string_split(@EventList, N',') s
+					select	1 from string_split(@EventList, N',') s
 					where trim(s.value) = N'' or not exists(select 1 from z.v_TraceEvent v where v.EventName = trim(s.value))
 				)
 				begin
 					throw 50000, N'@EventList must contain comma-separated catalog names without empty or unknown values.', 1;
 				end
 				insert into @Events(EventID)
-					select distinct v.TraceEventID from z.v_TraceEvent v
+					select	distinct v.TraceEventID from z.v_TraceEvent v
 						inner join string_split(@EventList, N',') s on v.EventName = trim(s.value);
 			end
 		end

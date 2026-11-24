@@ -16,8 +16,8 @@ begin
 		return
 
 	declare @AsyncChannelID int, @LastAsyncChannelID int, @Payload nvarchar(max), @Handle uniqueidentifier
-	declare Messages cursor local static for
-		select r.AsyncChannelID, string_agg(r.Data, N',') within group (order by r.DataSequence)
+	declare cMessages cursor local static for
+		select	r.AsyncChannelID, string_agg(r.Data, N',') within group (order by r.DataSequence)
 		from (
 				select	ChunkID = (row_number() over (partition by i.AsyncChannelID order by i.DataSequence) - 1) / isnull(c.MaxRowsPerMessage, 2147483647),
 						i.AsyncChannelID, i.DataSequence, i.Data
@@ -27,19 +27,19 @@ begin
 			) r
 		group by r.AsyncChannelID, r.ChunkID
 		order by r.AsyncChannelID, r.ChunkID
-	open Messages
-	fetch next from Messages into @AsyncChannelID, @Payload
+	open cMessages
+	fetch next from cMessages into @AsyncChannelID, @Payload
 	while @@fetch_status = 0
 	begin
 		if @LastAsyncChannelID is null or @LastAsyncChannelID <> @AsyncChannelID
 		begin
-			select @LastAsyncChannelID = @AsyncChannelID, @Handle = null
+			select	@LastAsyncChannelID = @AsyncChannelID, @Handle = null
 			exec z.usp_AsyncChannelGetConversationHandle @AsyncChannelID = @AsyncChannelID, @ConversationHandle = @Handle output
 		end
 		if @Handle is not null
 			exec z.usp_AsyncChannelSend @AsyncChannelID = @AsyncChannelID, @Data = @Payload, @ConversationHandle = @Handle output
-		fetch next from Messages into @AsyncChannelID, @Payload
+		fetch next from cMessages into @AsyncChannelID, @Payload
 	end
-	close Messages
-	deallocate Messages
+	close cMessages
+	deallocate cMessages
 end

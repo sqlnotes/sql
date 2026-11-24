@@ -2,7 +2,9 @@
 
 [Trace](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_TraceAddEvents.sql)
 
-Add explicit event selections and supported output bindings to one stopped native trace registration. NULL EventList does nothing; NULL EventColumnList inherits current columns. Retain SPID where supported. Lists trim/deduplicate complete catalog names and reject invalid entries. The whole value all is accepted for columns, not event names. TraceStart applies the metadata to the native trace.
+Chooses which kinds of SQL Server activity a trace will capture, such as `SQL:BatchCompleted`, and which information to record for each event. Configure these selections before starting the trace for the first time.
+
+`@EventList` is a comma-separated list of complete names from `z.v_TraceEvent`. `@EventColumnList` chooses columns from `z.v_TraceColumn`; NULL keeps the current column selection and `all` requests all supported columns. A NULL event list makes no change. Spaces and duplicates are removed; unknown or empty entries are rejected. `SPID` is retained where the event supports it. Event names must be explicit; `all` applies only to columns.
 
 ```text
 @TraceName nvarchar(128) = null,

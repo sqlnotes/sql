@@ -17,24 +17,45 @@ create or alter function z.fn_GetPeriodStart
 returns datetime
 as
 begin
-	return	(
-				select
-					case @Period
-						when 'Second' then dateadd(second, datediff_big(second, StartDate, @Date) / @Interval * @Interval, StartDate)
-						when 'Minute' then dateadd(minute, datediff_big(minute, StartDate, @Date) / @Interval * @Interval, StartDate)
-						when 'Hourly' then dateadd(hour, datediff_big(hour, StartDate, @Date) / @Interval * @Interval, StartDate)
-						when 'Daily' then dateadd(day, datediff_big(day, StartDate, @Date) / @Interval * @Interval, StartDate)
-						--when 'Weekly' then dateadd(week, datediff_big(week, StartDate, @Date) / @Interval * @Interval, StartDate)
-						when 'Weekly' then dateadd(day, convert(int, floor(datediff_big(day, w.WeekStartDate, @Date) / (7.0 * nullif(@Interval, 0))) * @Interval * 7), w.WeekStartDate)
-						when 'Monthly' then dateadd(month, datediff_big(month, StartDate, @Date) / @Interval * @Interval, StartDate)
-						when 'Yearly' then dateadd(year, datediff_big(year, StartDate, @Date) / @Interval * @Interval, StartDate)
-					end
-				from (select convert(datetime2, isnull(@StartDate, '0006-01-01'), 121) StartDate) d
-					cross apply
-					(
-						select dateadd(day, -((datediff(day, '1900-01-01', a.AnchorDate) % 7 + 7) % 7), a.AnchorDate) WeekStartDate
-						from (select convert(datetime2, convert(date, isnull(@StartDate, '1900-01-01'))) AnchorDate) a
-					) w
-			)
+	declare	@Anchor datetime2 = isnull(@StartDate, '20200101'), @At datetime2 = @Date,
+			@Step bigint = abs(convert(bigint, nullif(@Interval, 0))), @Units bigint, @Boundary datetime2;
+	if @Period = 'Weekly'
+	begin
+		-- Multiweek periods start on the Monday of the anchor's week, at midnight.
+		select	@Anchor = convert(date, isnull(@StartDate, '19000101'));
+		select	@Anchor = dateadd(day, -((datediff(day, '19000101', @Anchor) % 7 + 7) % 7), @Anchor),
+				@Step = 7 * @Step, @Period = 'Daily';
+	end;
+
+	-- DATEDIFF counts calendar boundaries. Match the original anchor's position
+	-- within the input unit before deciding how many whole units have elapsed.
+	declare @DayAnchor datetime2 = dateadd(day, datediff(day, @Anchor, @At), @Anchor);
+	select	@Units = case @Period
+				when 'Second' then datediff_big(second, @Anchor, @At)
+				when 'Minute' then datediff_big(minute, @Anchor, @At)
+				when 'Hourly' then datediff_big(hour, @Anchor, @At)
+				when 'Daily' then datediff(day, @Anchor, @At)
+				when 'Monthly' then datediff(month, @Anchor, @At)
+				when 'Yearly' then datediff(year, @Anchor, @At)
+			end,
+			@Boundary = case @Period
+				when 'Second' then dateadd(second, datediff(second, @DayAnchor, @At), @DayAnchor)
+				when 'Minute' then dateadd(minute, datediff(minute, @DayAnchor, @At), @DayAnchor)
+				when 'Hourly' then dateadd(hour, datediff(hour, @DayAnchor, @At), @DayAnchor)
+				when 'Daily' then @DayAnchor
+				when 'Monthly' then dateadd(month, datediff(month, @Anchor, @At), @Anchor)
+				when 'Yearly' then dateadd(year, datediff(year, @Anchor, @At), @Anchor)
+			end;
+	if @Boundary > @At select @Units -= 1;
+	-- Normalize a negative remainder to floor dates on both sides of the anchor.
+	select	@Units = @Units - ((@Units % @Step + @Step) % @Step);
+	return case @Period
+		when 'Second' then dateadd(second, @Units, @Anchor)
+		when 'Minute' then dateadd(minute, @Units, @Anchor)
+		when 'Hourly' then dateadd(hour, @Units, @Anchor)
+		when 'Daily' then dateadd(day, @Units, @Anchor)
+		when 'Monthly' then dateadd(month, @Units, @Anchor)
+		when 'Yearly' then dateadd(year, @Units, @Anchor)
+	end;
 end
 go

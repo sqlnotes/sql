@@ -1,6 +1,8 @@
 # Trace
 
-The Trace subsystem creates and collects native SQL Server rowset traces. One definition corresponds to one physical trace, with its own events, native filters, receiving table and callbacks. Traces have no scheduled stop time and continue until explicitly stopped or closed.
+Captures selected SQL Server activity and stores the received events in database tables. Choose the events, columns and filters you need, then collect them on a dedicated connection. Optional stored-procedure callbacks can react to each recorded event.
+
+Trace uses SQL Server Trace directly. Each definition has its own trace, receiving table and callbacks; it continues capturing until stopped or closed. [Monitoring](../../020-Monitoring/docs/readme.md) supplies ready-made diagnostic presets built on this framework.
 
 - [Architecture](architecture.md)
 - [Usage](usage.md)

@@ -16,7 +16,7 @@ extensions are `.bak` (1), `.diff` (5) and `.trn` (2).
 | --- | --- |
 | Prefix | Filename prefix before the timestamp, including server/instance components |
 | DatabaseName | Database-name hint from the filename |
-| BackupTime | Parsed local timestamp as datetime2(7) |
+| BackupTime | Timestamp written in the filename, returned as datetime2(7) without timezone conversion |
 | BackupType | FULL = 1, DIFF = 5, LOG = 2 |
 | SourceServerName | Server label, or NULL for the legacy database-only convention |
 | SourceInstanceName | Instance label when present, otherwise NULL |

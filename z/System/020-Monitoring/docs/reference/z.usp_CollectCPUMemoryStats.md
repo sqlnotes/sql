@@ -4,8 +4,9 @@
 
 ## Purpose and behavior
 
-Collect z.v_CPUMemoryStats into z.CPUMemoryStats with at most one row per second.
-Date is truncated to the beginning of its second, retaining local server time.
+Preserves SQL Server's recent CPU and memory readings in `z.CPUMemoryStats` so they remain available after the native ring buffer changes. It reads `z.v_CPUMemoryStats` and stores at most one reading for each local server second. Repeated collection refreshes an existing second with the latest available reading rather than adding duplicate history.
+
+Date is rounded down to the beginning of its second, retaining local server time.
 Within each second in the current source read, the row with the latest original
 Date supplies the CPU/memory measurements. Equally latest timestamps can supply
 either row. A matching stored second is refreshed with that reading; an unseen
@@ -47,7 +48,6 @@ VIEW SERVER PERFORMANCE STATE for these diagnostic DMVs. Destination
 insert/update/select access is required; the procedure grants no privileges.
 
 The guarded baseline creates a missing table and widens an existing int
-WorkingSetDelta column to nullable bigint without replacing rows. The installer
-runs this baseline while Monitoring is at version 0.0.0; installed versions above
-0.0.0 skip baselines and require a separate upgrade path. No version increase is
-supplied.
+WorkingSetDelta column to nullable bigint without replacing rows. Standard
+deployment includes the Monitoring baseline automatically while Monitoring has
+no version folders or is at version 0.0.0 or its first version folder.

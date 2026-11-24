@@ -4,15 +4,15 @@
 
 ## Purpose and behavior
 
-Read retained z.TraceLongRunningQuery rows whose TraceSequence is at least the generated date cutoff for abs(Days). Group by StartTime date and duration buckets, converting Duration microseconds to milliseconds. Exclude SQLAgent, SSIS, Management Studio, SQLServerCEIP and text containing backup. Null ApplicationName/TextData fail the filters and are excluded.
+Summarizes retained long-running-query Trace data by day and execution-duration range. Use it to see whether slow-query counts are increasing without starting a new collection. It reads `z.TraceLongRunningQuery`; the Trace collector must already have saved the events.
+
+`@Days` selects a day-based lookback using its absolute value. Results group events by their recorded StartTime date. SQLAgent, SSIS, Management Studio, SQLServerCEIP and SQL text containing `backup` are excluded, as are rows with missing application name or SQL text.
 
 ## Parameters and defaults
 
 ```text
 @Days int
 ```
-
-These are the source-declared types and defaults. Table-valued-function callers must supply arguments or the `default` keyword explicitly.
 
 ## Results, permissions, and limits
 

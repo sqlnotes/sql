@@ -4,19 +4,20 @@
 
 ## Purpose and behavior
 
-Resolve null source to the current database; default snapshot name is <source>_Snapshot. Reject an unknown source or existing target. Read data-file logical names/paths through source-database sp_executesql and issue CREATE DATABASE AS SNAPSHOT OF. Sparse filenames append a dot and the snapshot name with spaces removed to each source path. Uses xact_abort; no explicit transaction or catch.
+Creates a native SQL Server database snapshot: a read-only view of the source database at creation time. Use it when you need to query a stable copy while the source continues to change. It creates sparse snapshot files beside the source data files; it does not create a backup or restore the source.
 
 ## Parameters and defaults
 
 ```text
-@SourceDatabaseName nvarchar(128) = null,@DatabaseSnapshotName nvarchar(128) = null
+@SourceDatabaseName nvarchar(128) = null,
+@DatabaseSnapshotName nvarchar(128) = null
 ```
 
-These are the source-declared types and defaults.
+Omit `@SourceDatabaseName` to snapshot the current database. Omit `@DatabaseSnapshotName` to use `<source>_Snapshot`. An unknown source or an already-existing snapshot name causes an error. Each sparse filename appends a dot and the snapshot name, with spaces removed, to its source data-file path.
 
 ## Results, permissions, and limits
 
-No defined result set. Requires native snapshot creation permissions, supported source/edition, and service-account storage access. It does not delete snapshots or implement restore/revert.
+Creates the named snapshot without returning rows. Requires native snapshot creation permissions, a supported source/edition, and SQL Server service-account storage access. It does not delete snapshots or implement restore/revert. Errors propagate; the procedure does not wrap its work in an explicit transaction.
 
 ## Dependencies
 

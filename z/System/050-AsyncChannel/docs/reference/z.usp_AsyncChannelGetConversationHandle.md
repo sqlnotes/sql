@@ -4,7 +4,9 @@
 
 ## Purpose and behavior
 
-Obtain the current SQL session's reusable conversation for an active channel. Resolve its target service and `Readers` value, assign a group bucket using `@@spid % Readers`, and create a dialog when no matching saved group bucket exists. The dialog uses the shared sender service, current-database target and AsyncChannel contract with encryption off.
+Returns a conversation handle that the current SQL session can use to send work to an active channel. It reuses the session's saved conversation when the channel's grouping still matches, or creates a replacement when needed. Sending helpers use this procedure so callers usually do not need to manage conversation creation themselves.
+
+Conversations run between the shared sender service and the channel's target service in the current database, using the AsyncChannel contract with encryption off. Grouping depends on the sending session and the channel's Readers setting.
 
 ## Parameters and defaults
 

@@ -13,20 +13,19 @@ begin
 	set nocount, xact_abort on;
 	if @@trancount > 0
 	begin
-		set xact_abort off;
 		throw 50000, N'Trace cleanup requires no existing transaction.', 1;
 	end;
 	declare @Permission sysname = case when convert(int, serverproperty('ProductMajorVersion')) >= 16
 		then N'VIEW SERVER PERFORMANCE STATE' else N'VIEW SERVER STATE' end;
 	if isnull(has_perms_by_name(null, null, @Permission), 0) <> 1
 		throw 50000, N'Trace cleanup requires full server session visibility.', 1;
-	declare @TraceID int, @CreatorSessionID int, @CreatorLoginTime datetime,
-		@ReturnCode int, @Message nvarchar(2048);
-	declare t cursor local static read_only for
-		select TraceID, CreatorSessionID, CreatorLoginTime from z.Trace r
+	declare	@TraceID int, @CreatorSessionID int, @CreatorLoginTime datetime,
+			@ReturnCode int, @Message nvarchar(2048);
+	declare cTraces cursor local static read_only for
+		select	TraceID, CreatorSessionID, CreatorLoginTime from z.Trace r
 		where not exists(select 1 from sys.dm_exec_sessions s where s.session_id = r.CreatorSessionID and s.login_time = r.CreatorLoginTime);
-	open t;
-	fetch next from t into @TraceID, @CreatorSessionID, @CreatorLoginTime;
+	open cTraces;
+	fetch next from cTraces into @TraceID, @CreatorSessionID, @CreatorLoginTime;
 	while @@fetch_status = 0
 	begin
 		-- Lock the exact registration until its native resource and metadata are retired.
@@ -43,7 +42,7 @@ begin
 						exec @ReturnCode = sys.sp_trace_setstatus @TraceID, 0;
 						if @ReturnCode <> 0 and exists(select 1 from sys.traces where id = @TraceID and is_rowset = 1 and stop_time is null and status = 1)
 						begin
-							select @Message = concat(N'Abandoned native trace ', @TraceID, N': stop failed; return code ', @ReturnCode, N'.');
+							select	@Message = concat(N'Abandoned native trace ', @TraceID, N': stop failed; return code ', @ReturnCode, N'.');
 							throw 50000, @Message, 1;
 						end;
 					end try
@@ -57,7 +56,7 @@ begin
 						exec @ReturnCode = sys.sp_trace_setstatus @TraceID, 2;
 						if @ReturnCode <> 0 and exists(select 1 from sys.traces where id = @TraceID and is_rowset = 1 and stop_time is null)
 						begin
-							select @Message = concat(N'Abandoned native trace ', @TraceID, N': close failed; return code ', @ReturnCode, N'.');
+							select	@Message = concat(N'Abandoned native trace ', @TraceID, N': close failed; return code ', @ReturnCode, N'.');
 							throw 50000, @Message, 1;
 						end;
 					end try
@@ -80,9 +79,9 @@ begin
 			if @@trancount > 0 rollback;
 			throw;
 		end catch;
-		fetch next from t into @TraceID, @CreatorSessionID, @CreatorLoginTime;
+		fetch next from cTraces into @TraceID, @CreatorSessionID, @CreatorLoginTime;
 	end;
-	close t;
-	deallocate t;
+	close cTraces;
+	deallocate cTraces;
 end;
 go

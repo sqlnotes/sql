@@ -2,9 +2,13 @@
 
 [Monitoring](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_CollectTrace.sql)
 
-Accepts @TransactionDurationInSec int = 5, a positive commit window in seconds passed to the collector. Pending event transactions span reads and idle waits; blocking work can extend this window. Run z.usp_TraceCleanup, then create/configure/start four native rowset traces: BlockedProcessReport, LongRunningQueryTrace, TraceErrors and FileAutoGrowTrace. Each has its own native events and filters, destination table and callbacks, without a scheduled stop time. All exclude the collector SPID; long-query duration is greater than 1300000 microseconds. Register blocking/growth snapshot callbacks and collect on one connection with the long default duration.
+Starts diagnostic collection for blocked-process reports, slow queries, SQL errors and database-file growth. It saves events in `z.TraceBlockedProcessReport`, `z.TraceLongRunningQuery`, `z.TraceError` and `z.TraceFileAutoGrow`, with related active-request snapshots for blocking and growth. Use it on a dedicated connection when you want these four Monitoring presets together.
 
-TraceCreate allocates a stopped native trace; TraceStart configures and starts it. Collection polls each trace with bounded reads and closes the selected traces/configuration on completion, retaining diagnostic data. Cleanup removes only framework traces whose original owner session/login is absent; idle connected owners are preserved. Installation does not start capture or configure the blocked-process threshold.
+This is a long-running synchronous call, not a background-job launcher. It uses four native SQL traces with no scheduled stop time and collects them on the calling connection. All four exclude the collector's own session; the slow-query preset captures durations greater than 1.3 seconds. Installation does not start collection or configure the server's blocked-process threshold.
+
+`@TransactionDurationInSec int = 5` is a positive commit window in seconds, not the total collection duration. Pending event transactions span reads and idle waits, and blocking can extend the window.
+
+Collected diagnostic rows remain available after the traces close. The procedure cleans up abandoned framework traces before starting, and closes its selected traces/configuration when collection completes. Cleanup preserves traces whose original owner session is still connected, even if idle.
 
 Dependencies include z.TraceBlockedProcessReport, z.TraceError, z.TraceFileAutoGrow, z.TraceLongRunningQuery, z.usp_TraceCleanup, z.usp_TraceCreate, z.usp_TraceAddEvents, z.usp_TraceAddFilter, z.usp_TraceSetTrigger, z.usp_TraceStart, z.usp_TraceCollectAndClose, z.usp_TakeSnapshotActiveSessionsForBlockedProcessReport and z.usp_TakeSnapshotActiveSessionsForFileAutoGrow. Native trace, destination and callback privileges are required.
 

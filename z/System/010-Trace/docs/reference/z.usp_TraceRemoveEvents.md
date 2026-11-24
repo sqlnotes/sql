@@ -2,7 +2,7 @@
 
 [Trace](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_TraceRemoveEvents.sql)
 
-Remove selected events and their column bindings from one stopped native trace registration. The whole value all selects all configured events. TraceStart applies remaining configuration.
+Removes kinds of activity from a trace's planned capture. Supply complete event names in `@EventList`; `all` or NULL removes every configured event. Their selected columns are removed with them, while previously collected data is retained.
 
 ```text
 @TraceName nvarchar(128) = null,

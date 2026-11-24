@@ -12,26 +12,26 @@ as
 begin
 	set nocount on
 	begin try
-	declare @TraceMetaDataViewName sysname = 'v_TraceMetaData', @SQL nvarchar(max), @h1 sql_variant, @h2 sql_variant,
+	declare	@TraceMetaDataViewName sysname = 'v_TraceMetaData', @SQL nvarchar(max), @h1 sql_variant, @h2 sql_variant,
 			@TraceDefinitionViewName sysname = 'v_TraceDefinition'
 
-	select @SQL = 'create or alter view z.' + @TraceMetaDataViewName + '
+	select	@SQL = 'create or alter view z.' + @TraceMetaDataViewName + '
 as
-	select tc.name CategoryName, te.name EventName, te.trace_event_id TraceEventID' 
-	+ (
-		select ', isnull(max(case when b.trace_column_id = ' + cast(trace_column_id as nvarchar(max)) + ' then 1 end), 0) as ' + quotename(name) 
-		from sys.trace_columns 
-		order by trace_column_id 
-		for xml path(''), type
-	).value('.', 'nvarchar(max)') + '
+	select	tc.name CategoryName, te.name EventName, te.trace_event_id TraceEventID'
+			+ (
+			select	', isnull(max(case when b.trace_column_id = ' + cast(trace_column_id as nvarchar(max)) + ' then 1 end), 0) as ' + quotename(name)
+			from sys.trace_columns
+			order by trace_column_id
+			for xml path(''), type
+			).value('.', 'nvarchar(max)') + '
 	from sys.trace_categories tc
 		inner join sys.trace_events te on te.category_id = tc.category_id
 		inner join sys.trace_event_bindings b on b.trace_event_id = te.trace_event_id
 	group by te.name, te.trace_event_id, tc.name
 ;';
 	--exec z.usp_PrintString @SQL
-	select @h1 = cast(cast(hashbytes('MD5', @SQL) as uniqueidentifier) as sql_variant)
-	select @h2 = (select value from sys.fn_listextendedproperty('Code Hash', N'SCHEMA', 'z', N'VIEW', @TraceMetaDataViewName, null, null))
+	select	@h1 = cast(cast(hashbytes('MD5', @SQL) as uniqueidentifier) as sql_variant)
+	select	@h2 = (select value from sys.fn_listextendedproperty('Code Hash', N'SCHEMA', 'z', N'VIEW', @TraceMetaDataViewName, null, null))
 	if @h1 <> isnull(@h2, cast(0x0 as uniqueidentifier))
 	begin
 		exec(@SQL)
@@ -42,30 +42,30 @@ as
 		exec sys.sp_addextendedproperty @name = 'Code Hash', @value = @h1 ,@level0type = N'SCHEMA', @level0name = 'z', @level1type = N'VIEW', @level1name = @TraceMetaDataViewName
 	end
 
-	select @SQL = 'create or alter view z.' + @TraceDefinitionViewName + '
+	select	@SQL = 'create or alter view z.' + @TraceDefinitionViewName + '
 as
-select t.id as TraceID, t.status IsActive, tc.name CategoryName, te.name EventName, te.trace_event_id TraceEventID, case when i.eventid is not null then 1 else 0 end IsEventSelected' 
-	+ (
-		select ', max(case when i.columnid = ' + cast(trace_column_id as nvarchar(max)) + ' then isnull(f.Filter, '''') end) as ' + quotename(name) 
-		from sys.trace_columns 
-		order by trace_column_id 
-		for xml path(''), type
-	).value('.', 'nvarchar(max)') + '
+select	t.id as TraceID, t.status IsActive, tc.name CategoryName, te.name EventName, te.trace_event_id TraceEventID, case when i.eventid is not null then 1 else 0 end IsEventSelected'
+			+ (
+			select	', max(case when i.columnid = ' + cast(trace_column_id as nvarchar(max)) + ' then isnull(f.Filter, '''') end) as ' + quotename(name)
+			from sys.trace_columns
+			order by trace_column_id
+			for xml path(''), type
+			).value('.', 'nvarchar(max)') + '
 from sys.trace_categories tc
 	left join sys.trace_events te on te.category_id = tc.category_id
 	cross apply sys.traces t
 	outer apply (
-					select i.columnid, i.eventid
+					select	i.columnid, i.eventid
 					from sys.fn_trace_geteventinfo(t.id) i
 					where te.trace_event_id = i.eventid
 				) i
 	outer apply (
-					select (
-								select  case f.logical_operator 
+					select	(
+								select	case f.logical_operator
 											when 0 then '' and ''
 											else '' or ''
-										end  + ''('' 
-										+ tc.name + '' ''  
+										end  + ''(''
+										+ tc.name + '' ''
 											+ case f.comparison_operator
 												when 0 then ''='' --''Equal''
 												when 1 then ''<>'' --''Not equal''
@@ -75,8 +75,8 @@ from sys.trace_categories tc
 												when 5 then ''<='' --''Less than or equal''
 												when 6 then ''Like''
 												else ''Not like''
-											end + '' '' + 
-											
+											end + '' '' +
+
 											case tc.type_name
 												when ''datetime'' then convert(nvarchar(max), cast(f.value as datetime), 121)
 												when ''image'' then convert(nvarchar(max), cast(f.value as varbinary(max)), 1)
@@ -87,15 +87,15 @@ from sys.trace_categories tc
 										+'')''
 								from sys.fn_trace_getfilterinfo(t.id) f
 									inner join sys.trace_columns tc on tc.trace_column_id = f.columnid
-								where f.columnid = i.columnID
+								where f.columnid = i.columnid
 								for xml path(''''), type
 						).value(''.'', ''nvarchar(max)'') Filter
 				) f
 group by t.id, t.status, te.trace_event_id, te.name, tc.name, i.eventid
 '
 	--exec z.usp_PrintString @SQL
-	select @h1 = cast(cast(hashbytes('MD5', @SQL) as uniqueidentifier) as sql_variant)
-	select @h2 = (select value from sys.fn_listextendedproperty('Code Hash', N'SCHEMA', 'z', N'VIEW', @TraceDefinitionViewName, null, null))
+	select	@h1 = cast(cast(hashbytes('MD5', @SQL) as uniqueidentifier) as sql_variant)
+	select	@h2 = (select value from sys.fn_listextendedproperty('Code Hash', N'SCHEMA', 'z', N'VIEW', @TraceDefinitionViewName, null, null))
 	if @h1 <> isnull(@h2, cast(0x0 as uniqueidentifier))
 	begin
 		exec(@SQL)

@@ -4,15 +4,15 @@
 
 ## Purpose and behavior
 
-Change ownership of visible SERVER_ROLE principals whose owning_principal_id differs from 1 to the literal login sa. Null CurrentOwnerName selects all such roles; otherwise current owner name uses LIKE, including wildcard semantics. No explicit transaction or catch; earlier role changes can persist on error.
+Transfers ownership of user-defined server roles to the login named `sa`. Use it when replacing individual administrator ownership with a common server-role owner. Roles already owned by principal ID 1 and fixed server roles are left unchanged.
+
+`@CurrentOwnerName` limits the changes to roles owned by a matching login. It uses SQL `LIKE` patterns, so `%` and `_` are wildcards. Leave it NULL to select all eligible visible roles. Changes are applied directly without a single transaction around the whole operation; earlier changes can persist if a later one fails.
 
 ## Parameters and defaults
 
 ```text
 @CurrentOwnerName nvarchar(128) = null
 ```
-
-These are the source-declared types and defaults.
 
 ## Results, permissions, and limits
 

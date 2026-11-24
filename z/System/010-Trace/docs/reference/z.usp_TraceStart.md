@@ -2,7 +2,9 @@
 
 [Trace](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_TraceStart.sql)
 
-Apply event bindings and typed native filters to each selected stopped trace, then start that same native trace. Native event bindings are added idempotently; native filters are cleared and reapplied. Once native event binding begins, events/columns/filters are fixed until Close/Create, including after a partially failed Start. A running trace is not restarted. Requires the creator session/login and at least one selected event; rejects ambient transactions.
+Starts capturing activity for the selected trace using its configured events, columns and filters. Run it on the connection that created the trace, outside an existing transaction. At least one event must be selected. Starting an already running trace does not restart it.
+
+Configure events, columns and filters before the first Start attempt. Once applying that configuration begins, it is fixed even if Start only partly succeeds: close and recreate the trace to change it. Stop followed by Start resumes capture with the same configuration. Starting capture does not collect events into the destination table; use CollectAndClose for that.
 
 ```text
 @TraceName nvarchar(128) = null,

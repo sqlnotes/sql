@@ -9,40 +9,38 @@ Generated scripts, existing definitions and deployment/drift flags.
 */
 create or alter view z.v_AsyncChannelScripts
 as
-	select
-		v.AsyncChannelID, v.Name, s.Ordinal, s.ObjectType, s.ObjectName, s.GeneratedScript,
-		e.ExistingScript,
+	select	v.AsyncChannelID, v.Name, s.Ordinal, s.ObjectType, s.ObjectName, s.GeneratedScript,
+			e.ExistingScript,
 		-- The engine stores 'create or alter <type>' as 'create   <type>', so compare both forms.
-		IsSameScript = cast(iif(e.ExistingScript is null, null,
-				iif(e.ExistingScript = s.GeneratedScript or e.ExistingScript = stuff(s.GeneratedScript, 1, 16, N'create   '), 1, 0)) as bit),
-		NeedDeployment = cast(case
-				when s.ObjectType = 'Service' then iif(exists (select 1 from sys.services where name collate database_default = s.ObjectName), 0, 1)
-				when s.ObjectType = 'ActivatorBinding' then
-					case when v.ActivationType = 'Auto'
-						then iif(exists (select 1 from sys.service_queues q where q.object_id = object_id(v.QueueName) and q.is_activation_enabled = 1 and object_id(q.activation_procedure) = object_id(v.ActivatorProcedure) and q.max_readers = v.Readers), 0, 1)
-						else iif(exists (select 1 from sys.service_queues q where q.object_id = object_id(v.QueueName) and q.is_activation_enabled = 1), 1, 0)
-					end
-				else iif(object_id(s.ObjectName) is null, 1, 0)
-			end as bit)
+			IsSameScript = cast(iif(e.ExistingScript is null, null,
+					iif(e.ExistingScript = s.GeneratedScript or e.ExistingScript = stuff(s.GeneratedScript, 1, 16, N'create   '), 1, 0)) as bit),
+			NeedDeployment = cast(case
+					when s.ObjectType = 'Service' then iif(exists (select 1 from sys.services where name collate database_default = s.ObjectName), 0, 1)
+					when s.ObjectType = 'ActivatorBinding' then
+						case when v.ActivationType = 'Auto'
+							then iif(exists (select 1 from sys.service_queues q where q.object_id = object_id(v.QueueName) and q.is_activation_enabled = 1 and object_id(q.activation_procedure) = object_id(v.ActivatorProcedure) and q.max_readers = v.Readers), 0, 1)
+							else iif(exists (select 1 from sys.service_queues q where q.object_id = object_id(v.QueueName) and q.is_activation_enabled = 1), 1, 0)
+						end
+					else iif(object_id(s.ObjectName) is null, 1, 0)
+				end as bit)
 	from z.v_AsyncChannel v
-		cross apply (select nl = cast(nchar(13) + nchar(10) as nvarchar(max)),
-					t1 = nchar(9), t2 = replicate(nchar(9), 2), t3 = replicate(nchar(9), 3),
-					t4 = replicate(nchar(9), 4), t5 = replicate(nchar(9), 5), t6 = replicate(nchar(9), 6)) f
+		cross apply (select	nl = cast(nchar(13) + nchar(10) as nvarchar(max)),
+							t1 = nchar(9), t2 = replicate(nchar(9), 2), t3 = replicate(nchar(9), 3),
+							t4 = replicate(nchar(9), 4), t5 = replicate(nchar(9), 5), t6 = replicate(nchar(9), 6)) f
 		outer apply (
-			select
-				ParamList         = string_agg(cast(c.ParamDecl as nvarchar(max)), N',
+			select	ParamList         = string_agg(cast(c.ParamDecl as nvarchar(max)), N',
 		') within group (order by c.column_id),
-				ParamListNull     = string_agg(cast(c.ParamDecl + N' = null' as nvarchar(max)), N',
+					ParamListNull     = string_agg(cast(c.ParamDecl + N' = null' as nvarchar(max)), N',
 		') within group (order by c.column_id),
-				SerializeList     = string_agg(cast(c.SerializeExpr as nvarchar(max)), N',
+					SerializeList     = string_agg(cast(c.SerializeExpr as nvarchar(max)), N',
 				') within group (order by c.column_id),
-				OpenJsonWithList  = string_agg(cast(c.OpenJsonWith as nvarchar(max)), N',
+					OpenJsonWithList  = string_agg(cast(c.OpenJsonWith as nvarchar(max)), N',
 			') within group (order by c.column_id),
-				OuterSelectList   = string_agg(cast(c.OuterSelect as nvarchar(max)), N',
+					OuterSelectList   = string_agg(cast(c.OuterSelect as nvarchar(max)), N',
 			') within group (order by c.column_id),
-				ValueArgList      = string_agg(cast(N'@' + c.ColumnName as nvarchar(max)), N', ') within group (order by c.column_id),
-				CrossApplyArgList = string_agg(cast(c.CrossApplyArg as nvarchar(max)), N', ') within group (order by c.column_id),
-				InterfaceColumnList = string_agg(cast(c.ColumnName + N' = cast(null as ' + c.TypeName + N')' as nvarchar(max)), N',
+					ValueArgList      = string_agg(cast(N'@' + c.ColumnName as nvarchar(max)), N', ') within group (order by c.column_id),
+					CrossApplyArgList = string_agg(cast(c.CrossApplyArg as nvarchar(max)), N', ') within group (order by c.column_id),
+					InterfaceColumnList = string_agg(cast(c.ColumnName + N' = cast(null as ' + c.TypeName + N')' as nvarchar(max)), N',
 		') within group (order by c.column_id)
 			from z.fn_AsyncChannelColumns(v.SourceInterfaceObjectID) c
 		) a
@@ -95,7 +93,7 @@ as
 				f.t1 + N'exec z.usp_AsyncChannelGetConversationHandle @AsyncChannelID = ' + cast(v.AsyncChannelID as nvarchar(10)) + N', @ConversationHandle = @Handle output, @MaxRowsPerMessage = @MaxRows output;' + f.nl +
 				f.t1 + N'if @Handle is null' + f.nl +
 				f.t2 + N'return;' + f.nl + f.nl +
-				f.t1 + N'declare Chunks cursor local static for' + f.nl +
+				f.t1 + N'declare cChunks cursor local static for' + f.nl +
 				f.t2 + N'select string_agg(c.Json, N'','')' + f.nl +
 				f.t2 + N'from (' + f.nl +
 				f.t4 + N'select' + f.nl +
@@ -106,8 +104,8 @@ as
 				f.t3 + N') c' + f.nl +
 				f.t2 + N'group by c.ChunkID' + f.nl +
 				f.t2 + N'order by c.ChunkID;' + f.nl +
-				f.t1 + N'open Chunks;' + f.nl +
-				f.t1 + N'fetch next from Chunks into @Payload;' + f.nl +
+				f.t1 + N'open cChunks;' + f.nl +
+				f.t1 + N'fetch next from cChunks into @Payload;' + f.nl +
 				f.t1 + N'while @@fetch_status = 0' + f.nl +
 				f.t1 + N'begin' + f.nl +
 				f.t2 + N'set @Attempt = 0;' + f.nl +
@@ -130,10 +128,10 @@ as
 				f.t5 + N'throw;' + f.nl +
 				f.t3 + N'end catch' + f.nl +
 				f.t2 + N'end' + f.nl +
-				f.t2 + N'fetch next from Chunks into @Payload;' + f.nl +
+				f.t2 + N'fetch next from cChunks into @Payload;' + f.nl +
 				f.t1 + N'end' + f.nl +
-				f.t1 + N'close Chunks;' + f.nl +
-				f.t1 + N'deallocate Chunks;' + f.nl +
+				f.t1 + N'close cChunks;' + f.nl +
+				f.t1 + N'deallocate cChunks;' + f.nl +
 				N'end'
 			),
 			(50, N'Enqueue', v.EnqueueProcedure,
@@ -226,7 +224,7 @@ as
 				-- Channel activators win deadlocks; interrupted peers (pollers, ad-hoc work) can retry,
 				-- while a rolled-back receive would poison-retry and risk losing the batch.
 				f.t1 + N'set deadlock_priority high;' + f.nl + f.nl +
-				f.t1 + N'declare @AsyncChannelID int = ' + cast(v.AsyncChannelID as nvarchar(10)) + N', @MaxIdle int, @MaxExecution int, @MaxMessages int, @DebugMode bit, @Level varchar(20), @Info nvarchar(100), @ErrMsg nvarchar(4000), @Payload nvarchar(max), @Handle uniqueidentifier, @MsgTypeID int, @LastActivity datetime2(3) = sysutcdatetime(), @Started datetime2(3) = sysutcdatetime(), @ActivatorPoolID int, @PoolResult int, @ReceiveTimeout int;' + f.nl +
+				f.t1 + N'declare @AsyncChannelID int = ' + cast(v.AsyncChannelID as nvarchar(10)) + N', @MaxIdle int, @MaxExecution int, @MaxMessages int, @DebugMode bit, @Level varchar(20), @Info nvarchar(100), @ErrMsg nvarchar(4000), @Payload nvarchar(max), @Handle uniqueidentifier, @MsgTypeID int, @LastActivity datetime2(3) = sysutcdatetime(), @Started datetime2(3) = sysutcdatetime(), @ActivatorPoolID int, @PoolSlot int, @PoolResult int, @ReceiveTimeout int;' + f.nl +
 				f.t1 + N'select @MaxIdle = MaxIdleDurationSeconds, @MaxExecution = MaxExecutionSeconds, @MaxMessages = MaxMessagesPerReceive, @DebugMode = DebugMode from z.AsyncChannel where AsyncChannelID = @AsyncChannelID;' + f.nl + f.t1 + N'select @ReceiveTimeout = iif(@MaxIdle = 0, 0, 500);' + f.nl +
 				f.t1 + N'exec sys.sp_set_session_context @key = N''AsyncChannel-AsyncChannelID'', @value = @AsyncChannelID;' + f.nl +
 				f.t1 + N'exec sys.sp_set_session_context @key = N''AsyncChannel-DebugMode'', @value = @DebugMode;' + f.nl +
@@ -270,25 +268,25 @@ as
 				f.t3 + N'else' + f.nl +
 				f.t3 + N'begin' + f.nl +
 				f.t4 + N'set @LastActivity = sysutcdatetime();' + f.nl +
-				f.t4 + N'declare c cursor local fast_forward for' + f.nl +
+				f.t4 + N'declare cMessages cursor local fast_forward for' + f.nl +
 				-- DialogTimer rows are consumed by the receive and nothing else: not logged, not ended, no catalog lookup.
 				f.t5 + N'select ConversationHandle, MessageTypeID, Payload from @Msgs where IsPayload = 0 and MessageTypeID <> @TimerTypeID;' + f.nl +
-				f.t4 + N'open c;' + f.nl +
-				f.t4 + N'fetch next from c into @Handle, @MsgTypeID, @Payload;' + f.nl +
+				f.t4 + N'open cMessages;' + f.nl +
+				f.t4 + N'fetch next from cMessages into @Handle, @MsgTypeID, @Payload;' + f.nl +
 				f.t4 + N'while @@fetch_status = 0' + f.nl +
 				f.t4 + N'begin' + f.nl +
 				f.t5 + N'select @Level = iif(@MsgTypeID = @ErrorTypeID, ''Error'', ''Info''), @Info = case @MsgTypeID when @EndDialogTypeID then N''EndDialog'' when @ErrorTypeID then N''Error'' else N''Unknown message type '' + cast(@MsgTypeID as nvarchar(10)) end;' + f.nl +
 				f.t5 + N'exec z.usp_AsyncChannelLog @AsyncChannelID = @AsyncChannelID, @Level = @Level, @Info = @Info, @Payload = @Payload, @SessionID = @@spid, @ConversationHandle = @Handle;' + f.nl +
 				f.t5 + N'if @MsgTypeID in (@EndDialogTypeID, @ErrorTypeID)' + f.nl +
 				f.t6 + N'end conversation @Handle;' + f.nl +
-				f.t5 + N'fetch next from c into @Handle, @MsgTypeID, @Payload;' + f.nl +
+				f.t5 + N'fetch next from cMessages into @Handle, @MsgTypeID, @Payload;' + f.nl +
 				f.t4 + N'end' + f.nl +
-				f.t4 + N'close c;' + f.nl +
-				f.t4 + N'deallocate c;' + f.nl + f.nl +
+				f.t4 + N'close cMessages;' + f.nl +
+				f.t4 + N'deallocate cMessages;' + f.nl + f.nl +
 				-- Processing runs for payload rows and for DialogTimer rows (a timer is a wake-up for the Processing procedure).
 				f.t4 + N'if exists (select 1 from @Msgs where IsPayload = 1 or MessageTypeID = @TimerTypeID)' + f.nl +
 				f.t4 + N'begin' + f.nl +
-				f.t5 + N'exec @PoolResult = z.usp_AsyncChannelActivatorPoolAcquire @AsyncChannelID = @AsyncChannelID, @ActivatorPoolID = @ActivatorPoolID output;' + f.nl +
+				f.t5 + N'exec @PoolResult = z.usp_AsyncChannelActivatorPoolAcquire @AsyncChannelID = @AsyncChannelID, @ActivatorPoolID = @ActivatorPoolID output, @Slot = @PoolSlot output;' + f.nl +
 				f.t5 + N'if @PoolResult < 0' + f.nl +
 				f.t5 + N'begin' + f.nl +
 				f.t6 + N'rollback;' + f.nl +
@@ -303,8 +301,8 @@ as
 				f.t5 + N'end' + f.nl +
 				f.t4 + N'end' + f.nl +
 				f.t4 + N'commit;' + f.nl +
-				f.t4 + N'exec z.usp_AsyncChannelActivatorPoolRelease @ActivatorPoolID = @ActivatorPoolID;' + f.nl +
-				f.t4 + N'select @ActivatorPoolID = null;' + f.nl +
+				f.t4 + N'exec z.usp_AsyncChannelActivatorPoolRelease @ActivatorPoolID = @ActivatorPoolID, @Slot = @PoolSlot;' + f.nl +
+				f.t4 + N'select @ActivatorPoolID = null, @PoolSlot = null;' + f.nl +
 				-- MaxExecutionSeconds bounds one call: a Manual pull under the ETL's transaction and an activated reader both return after it.
 				f.t4 + N'if @MaxExecution > 0 and datediff_big(millisecond, @Started, sysutcdatetime()) >= convert(bigint, @MaxExecution) * 1000' + f.nl +
 				f.t5 + N'break;' + f.nl +
@@ -313,7 +311,7 @@ as
 				f.t2 + N'begin catch' + f.nl +
 				f.t3 + N'if @@trancount > 0' + f.nl +
 				f.t4 + N'rollback;' + f.nl +
-				f.t3 + N'exec z.usp_AsyncChannelActivatorPoolRelease @ActivatorPoolID = @ActivatorPoolID;' + f.nl +
+				f.t3 + N'exec z.usp_AsyncChannelActivatorPoolRelease @ActivatorPoolID = @ActivatorPoolID, @Slot = @PoolSlot;' + f.nl +
 				f.t3 + N'set @ErrMsg = z.fn_GetFullErrorMessage();' + f.nl +
 				f.t3 + N'set @Payload = (select string_agg(Payload, nchar(10)) from @Msgs where IsPayload = 1);' + f.nl +
 				f.t3 + N'begin try' + f.nl +
@@ -342,29 +340,29 @@ as
 		-- Deployed state for drift detection. Modules come from object_definition; Queue, Service and
 		-- ActivatorBinding are scripted back from the catalogs in the template's exact format, so the
 		-- comparable information lines up character-for-character with the generated Script.
-		outer apply (select ExistingScript = case s.ObjectType
-			when 'Queue' then
-				(select N'create queue ' + v.QueueName + N' with status = ' + iif(q.is_receive_enabled = 1, N'on', N'off')
-						+ N', retention = ' + iif(q.is_retention_enabled = 1, N'on', N'off')
-						+ N', poison_message_handling (status = ' + iif(q.is_poison_message_handling_enabled = 1, N'on', N'off') + N');'
-					from sys.service_queues q where q.object_id = object_id(v.QueueName))
-			when 'Service' then
-				(select N'create service ' + quotename(sv.name collate database_default) + N' on queue '
-						+ schema_name(q.schema_id) collate database_default + N'.' + q.name collate database_default
-						+ N' (' + (select string_agg(quotename(sc.name collate database_default), N', ') from sys.service_contract_usages u
-									inner join sys.service_contracts sc on sc.service_contract_id = u.service_contract_id
-									where u.service_id = sv.service_id) + N');'
-					from sys.services sv
-						inner join sys.service_queues q on q.object_id = sv.service_queue_id
-					where sv.name collate database_default = s.ObjectName)
-			when 'ActivatorBinding' then
-				(select case when q.is_activation_enabled = 1 and q.activation_procedure is not null
-						then N'if not exists (select 1 from sys.service_queues where object_id = object_id(''' + v.QueueName + N''') and is_activation_enabled = 1 and object_id(activation_procedure) = object_id(''' + a.ActualProcedure + N''') and max_readers = ' + cast(q.max_readers as nvarchar(10)) + N')' + f.nl +
-							f.t1 + N'alter queue ' + v.QueueName + N' with activation (status = on, procedure_name = ' + a.ActualProcedure + N', max_queue_readers = ' + cast(q.max_readers as nvarchar(10)) + N', execute as owner);'
-						else N'if exists (select 1 from sys.service_queues where object_id = object_id(''' + v.QueueName + N''') and is_activation_enabled = 1)' + f.nl +
-							f.t1 + N'alter queue ' + v.QueueName + N' with activation (status = off);'
-					end
-					from sys.service_queues q
-						outer apply (select ActualProcedure = object_schema_name(object_id(q.activation_procedure)) collate database_default + N'.' + object_name(object_id(q.activation_procedure)) collate database_default) a
-					where q.object_id = object_id(v.QueueName))
-			else object_definition(object_id(s.ObjectName)) end) e
+		outer apply (select	ExistingScript = case s.ObjectType
+							when 'Queue' then
+							(select	N'create queue ' + v.QueueName + N' with status = ' + iif(q.is_receive_enabled = 1, N'on', N'off')
+									+ N', retention = ' + iif(q.is_retention_enabled = 1, N'on', N'off')
+									+ N', poison_message_handling (status = ' + iif(q.is_poison_message_handling_enabled = 1, N'on', N'off') + N');'
+							from sys.service_queues q where q.object_id = object_id(v.QueueName))
+							when 'Service' then
+							(select	N'create service ' + quotename(sv.name collate database_default) + N' on queue '
+									+ schema_name(q.schema_id) collate database_default + N'.' + q.name collate database_default
+									+ N' (' + (select string_agg(quotename(sc.name collate database_default), N', ') from sys.service_contract_usages u
+												inner join sys.service_contracts sc on sc.service_contract_id = u.service_contract_id
+												where u.service_id = sv.service_id) + N');'
+							from sys.services sv
+							inner join sys.service_queues q on q.object_id = sv.service_queue_id
+							where sv.name collate database_default = s.ObjectName)
+							when 'ActivatorBinding' then
+							(select	case when q.is_activation_enabled = 1 and q.activation_procedure is not null
+									then N'if not exists (select 1 from sys.service_queues where object_id = object_id(''' + v.QueueName + N''') and is_activation_enabled = 1 and object_id(activation_procedure) = object_id(''' + a.ActualProcedure + N''') and max_readers = ' + cast(q.max_readers as nvarchar(10)) + N')' + f.nl +
+										f.t1 + N'alter queue ' + v.QueueName + N' with activation (status = on, procedure_name = ' + a.ActualProcedure + N', max_queue_readers = ' + cast(q.max_readers as nvarchar(10)) + N', execute as owner);'
+									else N'if exists (select 1 from sys.service_queues where object_id = object_id(''' + v.QueueName + N''') and is_activation_enabled = 1)' + f.nl +
+										f.t1 + N'alter queue ' + v.QueueName + N' with activation (status = off);'
+									end
+							from sys.service_queues q
+							outer apply (select ActualProcedure = object_schema_name(object_id(q.activation_procedure)) collate database_default + N'.' + object_name(object_id(q.activation_procedure)) collate database_default) a
+							where q.object_id = object_id(v.QueueName))
+							else object_definition(object_id(s.ObjectName)) end) e

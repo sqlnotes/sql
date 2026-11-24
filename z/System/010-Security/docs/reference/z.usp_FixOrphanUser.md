@@ -4,15 +4,15 @@
 
 ## Purpose and behavior
 
-For SQL_USER principals with same-named visible server principals and mismatched SIDs, execute ALTER USER WITH LOGIN. Null UserName selects all matches. It does not create missing logins. Cursor operations are not wrapped in an explicit transaction; earlier changes can persist if later execution fails.
+Repairs instance-authenticated SQL database users whose SID no longer matches a same-named SQL login, such as after moving a database to another instance. It maps each eligible user to that existing login and does not create missing logins.
+
+Supply `@UserName` to select one user, or leave it NULL to repair all matching visible users in the current database. Changes are applied directly without a single transaction around the whole operation; earlier repairs can persist if a later one fails.
 
 ## Parameters and defaults
 
 ```text
 @UserName nvarchar(128) = null
 ```
-
-These are the source-declared types and defaults.
 
 ## Results, permissions, and limits
 

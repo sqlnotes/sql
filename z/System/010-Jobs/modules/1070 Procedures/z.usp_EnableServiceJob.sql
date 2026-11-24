@@ -14,8 +14,8 @@ create or alter procedure z.usp_EnableServiceJob
 as
 begin
 	set nocount on
-	declare @JobID uniqueidentifier 
-	select @JobID = z.fn_GetServiceJobID(@Name)
+	declare @JobID uniqueidentifier
+	select	@JobID = z.fn_GetServiceJobID(@Name)
 	if @JobID is not null
-		exec msdb..sp_update_job @job_id = @JobID, @enabled = 1;
+		exec msdb.dbo.sp_update_job @job_id = @JobID, @enabled = 1;
 end

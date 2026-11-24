@@ -4,7 +4,9 @@
 
 ## Purpose and behavior
 
-Eight shared schedule inputs -> ScheduleID uniqueidentifier, Frequency, Interval, ByDay, IntradayFrequency, IntradayInterval, ByTime, StartDate, EndDate, Description. Normalize names/tokens, remove duplicates, sort, clamp second intervals to at least 10 and minute/hour intervals to at least 1, default an omitted recurring start date to the SQL Server local date and end date to 9999-12-31, derive MD5 ScheduleID. Return only rows with a non-null description. Read-only.
+Turns a readable schedule into a consistent representation that the other Jobs helpers can compare and convert. It standardizes equivalent names and removes repeated days or times without creating or changing an Agent schedule.
+
+The returned row contains `ScheduleID`, the eight normalized schedule fields, and a readable `Description`. Only rows with a description are returned. Use [the shared schedule parameters](../usage.md#schedule-vocabulary) to choose the days, times and recurrence you want.
 
 ## Parameters and defaults
 
@@ -19,9 +21,9 @@ Eight shared schedule inputs -> ScheduleID uniqueidentifier, Frequency, Interval
 @EndDate date = null
 ```
 
-These are the source-declared types and defaults. Table-valued-function callers must supply arguments or the `default` keyword explicitly.
-
 ## Results, permissions, and limits
+
+An omitted recurring start date becomes SQL Server's local date, and an omitted end date becomes `9999-12-31`. Repeating seconds are at least 10; repeating minutes and hours are at least 1. Equivalent normalized definitions receive the same MD5-derived `ScheduleID`.
 
 No writes or explicit transaction. Requires function access; schedule conversion does not validate a deployed Agent schedule. See subsystem troubleshooting for known conversion defects.
 

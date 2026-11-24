@@ -17,13 +17,13 @@ Choose unused explicit IDs. NULL IDs are rejected. Fixed Demo names allow only o
 
 ## Results and created objects
 
-No result set or explicit return-code contract. Create `z.AsyncChannel_Demo` with RecordID, Description and Date; author `z.AsyncChannel_Demo_Interface`; register the pool and channel; call `z.usp_AsyncChannelDeploy`; and replace the newly created processing scaffold with `z.usp_AsyncChannel_Demo_Process`.
+No result set or explicit return-code contract. The example provides the destination table `z.AsyncChannel_Demo` with RecordID, Description and Date, its insert interface `z.AsyncChannel_Demo_Interface`, and the application processor `z.usp_AsyncChannel_Demo_Process`, together with registered channel/pool settings and generated messaging objects.
 
 The processor deserializes payload rows, selects one row per RecordID and upserts the destination by RecordID. Generated objects include codecs, interface trigger, Enqueue procedure, target queue/service and channel activator. Settings include pool capacity 1/timeout 5 seconds, Readers 1, MaxRowsPerMessage 10, MaxMessagesPerReceive 100, idle limit 2 seconds and cooperative execution limit 5 seconds.
 
 ## Transactions, permissions, and limits
 
-Reject ambient explicit or implicit transactions. Begin an owned transaction and obtain a Transaction-owned one-permit creation semaphore with a 10-second wait. Reject existing Demo registrations, requested IDs, known objects or target service rather than overwriting them. Commit on success; catch rolls back and rethrows.
+Call outside explicit or implicit transactions. Creation is transactional and serialized with a 10-second lock wait. Existing Demo registrations, requested IDs, known objects or target service cause an error rather than being overwritten. Failed creation rolls back and reports the error.
 
 Requires DDL/registry/Broker permissions for all created objects and the activation context. Enable database Service Broker separately before sending. Manual activation must be invoked after sends commit; delivery is asynchronous, so an empty receive may need another invocation.
 

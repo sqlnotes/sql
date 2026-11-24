@@ -2,7 +2,9 @@
 
 [Trace](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_TraceStop.sql)
 
-Stop selected registered native traces without deleting their configuration. Explicit name/ID selectors may target another creator when SQL permissions allow; no selector means the current session/login. Already-stopped or vanished matching traces are normal. Actions use the registered TraceID under its registration lock. The trace can be explicitly started again with the same native configuration. Change events/columns/filters by closing and recreating it.
+Pauses capture while keeping the trace and its configuration available for a later Start. Collected data is retained. Stopping a trace that is already stopped or no longer available is a normal outcome.
+
+Use `@TraceName` or `@TraceID` to select a trace, including another connection's trace when permissions allow. Omit both to stop this connection's traces. Start resumes the same event, column and filter configuration; close and recreate the trace to change those selections.
 
 ```text
 @TraceName nvarchar(128) = null,

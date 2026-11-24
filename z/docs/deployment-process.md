@@ -1,12 +1,14 @@
 # Deployment process
 
-[Installer guide](readme.md) Â· [Metadata reference](reference.md)
+[Installer guide](readme.md) · [Metadata reference](reference.md)
+
+The installer applies local SQL files in a predictable order, skips eligible scripts that have already succeeded unchanged, and keeps a history of each update. Use this page to understand repeat deployments, add a migration, or decide what to do after a failure. For commands and connection options, start with [install and update](deploy.md).
 
 ## Source and plan
 
 [Deploy.ps1](../Deploy.ps1) orchestrates execution. [Deploy.Common.ps1](../Deploy.Common.ps1) defines traversal/connection/RPC helpers. [Deploy.sql](../Deploy.sql) bootstraps database/schema and current metadata; it requires SQLcmd mode and DatabaseName substitution.
 
-Each folder visits pre â†’ baseline â†’ versions â†’ modules â†’ direct SQL files â†’ other folders alphabetically â†’ post. Files sort by filename with ordinal case-insensitive comparison. Version children parse as .NET Version and sort numerically. The installed version is included, along with newer versions; hashing normally prevents unchanged replay.
+Within a folder, setup scripts run before definitions and cleanup runs afterward: `pre` → `baseline` → `versions` → `modules` → direct SQL files → other child folders → `post`. Ordinary files and child folders sort alphabetically, ignoring case; version folders sort by version number. The installed version is included along with newer versions, but unchanged scripts normally skip through hash checking.
 
 Only nonreserved children of subsystem roots become separately owned/versioned systems. Reserved names are pre, baseline, versions, modules, post, tests, docs. Descendants within a reserved stage organize that stage's files. Docs are excluded. Linked/reparse-point folders and invalid version paths are rejected.
 
@@ -16,16 +18,22 @@ The existing `890-SystemBeforePost/1010 Procedures` helpers are installed after 
 
 ## Baselines and identities
 
-Baseline eligibility is decided independently for each owning subsystem. Fresh/unversioned systems at 0.0.0 include baseline followed by all available versions. Existing systems with zero or one version folder also include baseline, followed by the installed version folder and higher versions when present. Existing systems with more than one version folder skip the entire baseline subtree, including its pre/post stages. Only direct numeric version folders count; reserved stage folders and .vs do not. Eligible ordinary files still use hash checking; eligible pre/post scripts always run. Children without migrations can remain 0.0.0.
+The installer reads each subsystem's installed version independently. A fresh or unversioned subsystem starts at 0.0.0. Only direct numeric children of `versions/` determine the supported range.
 
-When version folders exist, a nonzero installed version older than the earliest retained version is rejected with an upgrade-path error. Upgrade using an intermediate release before using a source tree whose older migrations have been consolidated into baseline. Fresh installations can use the consolidated baseline. Versions above the latest available version remain rejected as downgrades.
+| Installed state | Baseline | Version folders visited |
+| --- | --- | --- |
+| No version folders | Included | None. Eligible non-version scripts in `versions/` still run. |
+| Fresh, 0.0.0, or equal to the first retained version | Included | First through latest |
+| Above the first version and at or below the latest | Skipped, including its pre/post scripts | Installed through latest |
+| Nonzero and below the first version, or above the latest | Deployment rejected | None |
+
+An installation below the retained version floor requires reinstallation. Hash checking applies to eligible ordinary scripts. Eligible pre/post scripts run on every deployment.
 
 ### Baseline, migrations and rebasing
 
 The baseline contains complete initial table definitions and can be deployed
 without version folders. During initial-version development, put the initial
-columns, constraints and indexes directly in those definitions. Baseline files
-create absent objects; they do not contain rolling schema updates.
+columns, constraints and indexes directly in those definitions. Keep incremental upgrades in version folders.
 
 After that initial definition is established, preserve it. Put each subsequent
 schema change in the appropriate version folder, including CREATE TABLE for a
@@ -36,16 +44,7 @@ The installer still visits the version folder. A later 0.0.2 column addition
 belongs in its migration rather than an edit to the baseline; fresh installations
 reach that version by applying the later migrations after baseline creation.
 
-A deliberate rebase replaces baseline definitions with the complete schema at
-a chosen supported floor and consolidates the older migration history. For
-example, a project at 10.10.10 could rebase to 8.0.0: fresh installations start
-with the 8.0.0 baseline and apply later migrations; existing installations below
-8.0.0 no longer have a supported rolling upgrade through that source tree.
-Such installations need an intermediate release or a separately planned upgrade.
-A rebase must retain an explicit floor/version boundary and reject older existing
-installations, including existing unversioned 0.0.0 systems; baseline eligibility
-alone does not enforce that distinction. This is a policy for a future deliberate
-rebase, not a rebase of the current source tree.
+A deliberate rebase replaces the baseline with the complete schema at the new supported floor and consolidates older migrations. Plan explicitly for existing unversioned databases because the installer also uses 0.0.0 for a fresh installation.
 
 CodeBase uses paths such as `/System/010-Partition`. SQL derives SystemID as GUID from MD5 of `trim(lower(CodeBase))`. Case/outer-space aliases share identity according to SQL normalization/collation; paths are not normalized independently by PowerShell. Renaming a folder, including its prefix, changes identity. The renamed Trace, Jobs, Backup and Security paths therefore initialize new subsystem owners and hashes; guarded baselines become eligible under those owners. Existing metadata history remains under the former paths; the installer does not remap it or carry its version forward. Review baseline replay before updating an existing installation.
 
@@ -55,15 +54,15 @@ Every executed product script, including pre/post, gets SHA-256 from UTF-8 encod
 
 Only current successful hashes skip eligible scripts. Pre/post always execute within an eligible subtree, even if their hashes exist. Failed content retries. Identical contents share a canonical first filename; filenames alone do not determine identity.
 
-Before metadata RPC, content containing password or encryption is replaced entirely with `***`. This keyword filter is not general secret detection; keep secret literals out of source. Original text is used for execution/hashing.
+Stored source text is replaced with `***` when it contains the keywords `password` or `encryption`. This limits what is recorded in deployment metadata; it does not change the SQL that executes or reliably detect every secret. Keep secret values out of source files.
 
 Logs reference owner/hash and retain failure text/times. Pruning deactivates obsolete hashes, preserving history and successful baseline/version rows. Tests have null hashes and no retained source content.
 
 ## Transactions, locking and failures
 
-Bootstrap table creation is transactional; individual metadata begin/complete operations are transactional. The metadata connection holds session-owned binary semaphore `z.Deploy` with zero wait; a competing installer fails promptly. Bootstrap installs the shared semaphore helpers before the deployment-lock procedures. Bootstrap precedes this semaphore acquisition, so it does not serialize the complete bootstrap phase.
+Bootstrap table creation and individual metadata begin and complete operations are transactional. After bootstrap, the metadata connection takes the exclusive session-owned application lock `z.Deploy` with zero wait. A competing installer using the same lock fails promptly. Bootstrap runs before the lock is taken. The shared semaphore procedures are installed later by System module traversal.
 
-Before installing this synchronization update, stop active installers and drain affected Session-owned routines. Older callers may hold native locks without shared-helper context; replacing their release procedures mid-run cannot release those old holds through the new protocol. Let the old operation release them first, or close its physical connection before updating.
+Finish active installations before applying this update. Earlier installers acquired the slot lock `1-z.Deploy`. This version acquires `z.Deploy`, so the two versions can hold different locks at the same time. Let routines using the earlier semaphore format release their permits or disconnect before the System helpers are replaced. [Semaphore ownership and upgrades](../System/docs/reference/coordination.md#semaphores)
 
 Product files execute through separate SQL execution connections. Each starts with standard session options/open-transaction guard and ends with an open-transaction rollback/error guard. A file manages its own transaction. Entire deployment is not atomic; successful prior files/children remain after a later failure.
 

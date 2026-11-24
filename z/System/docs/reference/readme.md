@@ -2,6 +2,8 @@
 
 [Guide](../readme.md)
 
+Choose a topic below to find the object for your task. Reference pages explain its purpose, how to call it, and the result or changes to expect; source links provide implementation details.
+
 | Reference | Contents |
 | --- | --- |
 | [Functions](functions.md) | Every shared function: strings, dates, IDs, environment and SQL generation |

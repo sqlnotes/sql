@@ -16,21 +16,20 @@ begin
 	set nocount, xact_abort on;
 	if @@trancount <> 0
 	begin
-		set xact_abort off;
 		throw 50000, 'RestoreDatabase cannot run inside a user transaction.', 1;
 	end
 	if object_id('tempdb..#RestorePlan') is null or object_id('tempdb..#RestoreTargetState') is null or object_id('tempdb..#RestoreFileMap') is null
 		throw 50000, 'RestoreDatabaseExecute requires the caller completed restore plans.', 1;
 	if not exists(select * from #RestoreTargetState where DatabaseName = @TargetDatabaseName)
 		throw 50000, 'The destination has no completed restore plan.', 1;
-	declare @IsLinux bit = z.fn_IsLinux(), @InitialDatabaseID int, @InitialState tinyint, @InitialStandby bit, @InitialCreateDate datetime,
-		@Family uniqueidentifier, @RecoveryType varchar(10), @StandbyFile nvarchar(4000),
-		@CurrentOrdinal int, @StepType varchar(10), @Sql nvarchar(max), @AccessChanged bit = 0, @AccessCreateDate datetime;
-	select @InitialDatabaseID = InitialDatabaseID, @InitialState = InitialState, @InitialStandby = InitialStandby,
-		@InitialCreateDate = InitialCreateDate, @Family = FamilyGUID, @RecoveryType = RecoveryType, @StandbyFile = StandbyFile
+	declare	@IsLinux bit = z.fn_IsLinux(), @InitialDatabaseID int, @InitialState tinyint, @InitialStandby bit, @InitialCreateDate datetime,
+			@Family uniqueidentifier, @RecoveryType varchar(10), @StandbyFile nvarchar(4000),
+			@CurrentOrdinal int, @StepType varchar(10), @Sql nvarchar(max), @AccessChanged bit = 0, @AccessCreateDate datetime;
+	select	@InitialDatabaseID = InitialDatabaseID, @InitialState = InitialState, @InitialStandby = InitialStandby,
+			@InitialCreateDate = InitialCreateDate, @Family = FamilyGUID, @RecoveryType = RecoveryType, @StandbyFile = StandbyFile
 	from #RestoreTargetState where DatabaseName = @TargetDatabaseName;
-	select * into #Plan from #RestorePlan where DatabaseName = @TargetDatabaseName;
-	select * into #FileMap from #RestoreFileMap where DatabaseName = @TargetDatabaseName;
+	select	* into #Plan from #RestorePlan where DatabaseName = @TargetDatabaseName;
+	select	* into #FileMap from #RestoreFileMap where DatabaseName = @TargetDatabaseName;
 	create table #RestoreExecutionState
 	(
 		StateID tinyint not null primary key check (StateID = 1),
@@ -61,10 +60,10 @@ begin
 					and (case when @IsLinux = 1 then f.physical_name else lower(replace(f.physical_name, N'/', N'\')) end) collate Latin1_General_100_BIN2 =
 					(case when @IsLinux = 1 then m.DestinationPath else lower(m.DestinationPath) end) collate Latin1_General_100_BIN2))
 				and not exists(select * from sys.master_files f where f.database_id = @InitialDatabaseID and not exists(select * from #FileMap m where m.FileID = f.file_id and m.AddedOrdinal <= @CurrentOrdinal))
-				select @AccessCreateDate = d.create_date from sys.databases d join sys.database_recovery_status r on r.database_id = d.database_id
+				select	@AccessCreateDate = d.create_date from sys.databases d inner join sys.database_recovery_status r on r.database_id = d.database_id
 				where d.database_id = @InitialDatabaseID and d.name = @TargetDatabaseName and d.state = 0 and r.family_guid = @Family;
 			if @StepType = 'ACCESSMODE'
-				select @AccessChanged = AccessChanged from #RestoreExecutionState where StateID = 1;
+				select	@AccessChanged = AccessChanged from #RestoreExecutionState where StateID = 1;
 			else update #RestoreExecutionState set AccessChanged = @AccessChanged, AccessCreateDate = @AccessCreateDate where StateID = 1;
 			fetch next from cRestoreCommands into @CurrentOrdinal, @StepType, @Sql;
 		end
@@ -73,8 +72,8 @@ begin
 	end try
 	begin catch
 		-- Reuse the same guarded cleanup query while preserving the original restore error.
-		select @Sql = null;
-		select @Sql = Command from #Plan where BackupType = 'ACCESSMODE';
+		select	@Sql = null;
+		select	@Sql = Command from #Plan where BackupType = 'ACCESSMODE';
 		if @AccessChanged = 1 and @Sql is not null
 		begin
 			exec z.usp_PrintString @Sql;
@@ -82,7 +81,7 @@ begin
 				exec(@Sql);
 			end try
 			begin catch
-				select @Sql = N'Could not restore the destination access mode: ' + error_message();
+				select	@Sql = N'Could not restore the destination access mode: ' + error_message();
 				exec z.usp_PrintString @Sql;
 			end catch
 		end;

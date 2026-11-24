@@ -4,9 +4,9 @@
 
 ## Target and behavior
 
-An `instead of insert` trigger on [z.AsyncChannelMessageBatched_Interface](z.AsyncChannelMessageBatched_Interface.md). Empty inserted sets return immediately. It joins inserted rows to `z.AsyncChannel`, retaining only registered channels with IsActive = 1.
+Combines JSON fragments inserted into [z.AsyncChannelMessageBatched_Interface](z.AsyncChannelMessageBatched_Interface.md) into messages for each destination channel. Applications use the interface INSERT; they do not call this trigger directly. Only active registered channels receive messages.
 
-For each channel it assigns a row number ordered by DataSequence, divides rows into chunks using MaxRowsPerMessage (2147483647 when NULL), and builds each payload with `string_agg(Data, N',')` ordered by DataSequence. A local static cursor visits channel/chunk order, obtains a conversation handle on each channel change and invokes `z.usp_AsyncChannelSend` once per chunk when a handle exists.
+Within each channel, DataSequence determines fragment order and MaxRowsPerMessage determines the largest chunk. A NULL limit uses 2147483647 rows for chunking. Each chunk's fragments are joined with commas and sent as one message through the shared conversation/send helpers.
 
 ## Inputs, dependencies and limits
 

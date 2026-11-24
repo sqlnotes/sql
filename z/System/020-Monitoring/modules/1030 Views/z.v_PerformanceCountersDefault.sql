@@ -9,7 +9,7 @@ Selects the default set of live performance counters for collection.
 */
 create or alter view z.v_PerformanceCountersDefault
 as
-	select ObjectName, CounterName, InstanceName, CounterValue, CounterType, CounterTypeName, CounterTypeDescription
+	select	ObjectName, CounterName, InstanceName, CounterValue, CounterType, CounterTypeName, CounterTypeDescription
 	from z.v_PerformanceCounters
 where ObjectName not in ('SQL Server 2022 XTP Transactions')
 	and ObjectName not like 'SQL Server 2022 XTP%'
@@ -41,7 +41,7 @@ where ObjectName not in ('SQL Server 2022 XTP Transactions')
 				and CounterName in ('Lock Requests/sec', 'Lock Timeouts/sec', 'Lock Wait Time (ms)', 'Lock Waits/sec', 'Number of Deadlocks/sec')
 			or
 					ObjectName = 'SQLServer:Memory Manager'
-				and CounterName in ('Free Memory (KB)', 'Granted Workspace Memory (KB)','Lock Blocks','Lock Blocks Allocated','Lock Memory (KB)', 'Memory Grants Outstanding','Memory Grants Pending', 'Optimizer Memory (KB)', 'SQL Cache Memory (KB)', 'SQL Cache Memory (KB)')
+				and CounterName in ('Free Memory (KB)', 'Granted Workspace Memory (KB)','Lock Blocks','Lock Blocks Allocated','Lock Memory (KB)', 'Memory Grants Outstanding','Memory Grants Pending', 'Optimizer Memory (KB)', 'SQL Cache Memory (KB)')
 			or
 					ObjectName = 'SQLServer:Plan Cache'
 				and InstanceName = '_Total'

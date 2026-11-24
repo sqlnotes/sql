@@ -2,7 +2,11 @@
 
 [Guide](readme.md) · [Reference](reference/readme.md)
 
+These examples show how to use shared System helpers from your own SQL. Run them in the database where Schema Z is installed. Each section explains the result you should expect and links to further details where needed.
+
 ## Inspect columns
+
+Use `z.v_Objects` when you need column names and types without assembling several catalog queries. This example lists columns of visible objects in schema `z`:
 
 ```sql
 select SchemaName, ObjectName, ColumnName, DataType, PrimaryKeyOrder
@@ -15,6 +19,8 @@ Catalog visibility controls returned rows.
 
 ## Split text in order
 
+Use `z.fn_SplitString` to turn delimited text into rows. This example returns three rows, with `Ordinal` values 1–3 and the corresponding names in `Value`:
+
 ```sql
 select Ordinal, Value
 from z.fn_SplitString(N'Partition,Monitoring,Trace', N',')
@@ -25,6 +31,8 @@ option(maxrecursion 0);
 Recursive splitters can exceed the default recursion limit. Use an explicit sort for returned order.
 
 ## Generate and decode an identifier
+
+Use a sequence value and a timestamp to create a bigint identifier that can later be decoded. The example returns the generated identifier together with its timestamp and sequence component:
 
 ```sql
 declare @Sequence int = next value for z.SeqGeneralID;
@@ -38,6 +46,8 @@ The ID combines UTC seconds since 1900 and a 28-bit sequence. Allocation is not 
 
 ## Preview a schema copy
 
+Use `z.usp_CopyTableSchema` to create an empty table from an existing table's definition. Start with `@ShowPlan = 1` to inspect the statements before creating anything:
+
 ```sql
 exec z.usp_CopyTableSchema
 	@FullSourceTableName = N'z.PartitionedTableDataRetention',
@@ -50,6 +60,8 @@ This returns ordered `Ordinal`, `PartName` and `Definition` rows without creatin
 
 ## Print initialization SQL
 
+Use this helper to turn a table's current rows into a reusable initialization script. The following call prints a merge script; it does not apply the script:
+
 ```sql
 exec z.usp_DataInitializationHelper
 	@FullObjectName = N'z.PartitionedTableDataRetention',
@@ -59,6 +71,8 @@ exec z.usp_DataInitializationHelper
 This prints a script based on current rows, without executing its merge. Output can contain sensitive data.
 
 ## Preview and enforce naming conventions
+
+Use `z.usp_ForceNamingConvention` to give indexes and constraints consistent names. Preview the proposed renames first:
 
 ```sql
 exec z.usp_ForceNamingConvention
@@ -74,6 +88,8 @@ At least one selector is required. Existing calls with `@TableName`, including t
 Before deploying this change to an existing installation, capture custom `SchemaName` rows from `z.DatabaseSchemas` and update scheduled jobs or scripts to pass them as an explicit `@SchemaNames` JSON array. Deployment removes that table and its initialization procedure; its configured scope is not migrated automatically. The framework's post-script explicitly selects only `z`.
 
 ## Coordinate a transaction
+
+Use a semaphore when several sessions share work but only a limited number should enter a particular operation at once. A capacity of 1 allows one holder at a time. Check the return value before doing the protected work:
 
 ```sql
 begin tran;

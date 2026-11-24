@@ -4,7 +4,9 @@
 
 ## Purpose and behavior
 
-Append z.v_ActiveSessions rows into z.TraceBlockedProcessReportActiveSessions correlated by TraceSequence. QueryPlan is intentionally not copied. Use read uncommitted and xact_abort; no explicit transaction. TraceID and EventName are accepted for callback compatibility but unused. Return for unknown/null event text, text matching MScdc/vid_device_name/VIRTUAL_DEVICE/BACKUP/QRTZ, repeated TransactionID, or the rounded current second stored in session_context. Session-context markers are set before insert and survive transaction rollback.
+Saves active-request details to help investigate a blocked-process report. Rows are stored in `z.TraceBlockedProcessReportActiveSessions` and linked to the report by `TraceSequence`. Query plans are omitted. The snapshot shows requests visible when the callback runs, which may differ from the requests present when the blocking event occurred.
+
+To avoid noisy or repeated snapshots, it skips reports with missing event text, text matching `MScdc`, `vid_device_name`, `VIRTUAL_DEVICE`, `BACKUP` or `QRTZ`, the same transaction ID as the session's last snapshot, or another snapshot in the same rounded current second. Its per-session suppression markers survive rollback, so a rolled-back snapshot can still suppress a repeated attempt in that session.
 
 ## Parameters and defaults
 
@@ -14,11 +16,11 @@ Append z.v_ActiveSessions rows into z.TraceBlockedProcessReportActiveSessions co
 @EventName nvarchar(128) = null
 ```
 
-These are the source-declared types and defaults.
+`@TraceSequence` identifies the report being investigated. `@TraceID` and `@EventName` are accepted for Trace callback compatibility but do not change the snapshot selection.
 
 ## Results, permissions, and limits
 
-No defined result set. Requires snapshot insert and sufficient DMV visibility. Snapshot reflects collection-time requests, not necessarily event-time requests.
+Returns no rows; query the saved snapshot table and join to the report on `TraceSequence`. Requires snapshot insert access and sufficient DMV visibility. It uses read-uncommitted visibility, starts no transaction of its own and participates in the callback's transaction.
 
 ## Dependencies
 

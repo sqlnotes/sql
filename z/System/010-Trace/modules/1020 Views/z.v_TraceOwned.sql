@@ -9,8 +9,8 @@ Lists registered native traces created by the current session.
 */
 create or alter view z.v_TraceOwned
 as
-	select t.TraceID, t.Name, t.Description, t.CreationDate, t.ModificationDate, t.CreatorSessionID, t.CreatorLoginTime,
-		t.ReceivingTable, t.Status
+	select	t.TraceID, t.Name, t.Description, t.CreationDate, t.ModificationDate, t.CreatorSessionID, t.CreatorLoginTime,
+			t.ReceivingTable, t.Status
 	from z.v_Trace t
 	where t.CreatorSessionID = @@spid
 		and t.CreatorLoginTime = (select login_time from sys.dm_exec_sessions where session_id = @@spid);

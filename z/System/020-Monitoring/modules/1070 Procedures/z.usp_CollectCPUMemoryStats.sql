@@ -21,16 +21,16 @@ begin
 
 		;with x as
 		(
-			select d.Date, v.SystemIdle, v.SQLProcessUtilization, v.Other, v.UserModeTime, v.KernelModeTime,
-				v.PageFaults, v.WorkingSetDelta, v.MemoryUtilizationPercentage,
-				row_number() over(partition by d.Date order by v.Date desc) RecordOrdinal
+			select	d.Date, v.SystemIdle, v.SQLProcessUtilization, v.Other, v.UserModeTime, v.KernelModeTime,
+					v.PageFaults, v.WorkingSetDelta, v.MemoryUtilizationPercentage,
+					row_number() over(partition by d.Date order by v.Date desc) RecordOrdinal
 			from z.v_CPUMemoryStats v
 				cross apply (values(dateadd(millisecond, -datepart(millisecond, v.Date), v.Date))) d(Date)
 		),
 		s as
 		(
-			select Date, SystemIdle, SQLProcessUtilization, Other, UserModeTime, KernelModeTime,
-				PageFaults, WorkingSetDelta, MemoryUtilizationPercentage
+			select	Date, SystemIdle, SQLProcessUtilization, Other, UserModeTime, KernelModeTime,
+					PageFaults, WorkingSetDelta, MemoryUtilizationPercentage
 			from x
 			where RecordOrdinal = 1
 		)

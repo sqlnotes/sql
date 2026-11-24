@@ -17,8 +17,8 @@ begin
 	set nocount on;
 	if @TransactionDurationInSec is null or @TransactionDurationInSec < 1
 		throw 50000, N'Transaction duration must be positive.', 1;
-	declare @TraceID int, @TraceName nvarchar(128) = N'BlockedProcessReport',
-		@OwnerLoginTime datetime = (select login_time from sys.dm_exec_sessions where session_id = @@spid);
+	declare	@TraceID int, @TraceName nvarchar(128) = N'BlockedProcessReport',
+			@OwnerLoginTime datetime = (select login_time from sys.dm_exec_sessions where session_id = @@spid);
 	declare @ExistingTraces table (TraceID int not null primary key);
 	declare @CreatedTraces table (TraceID int not null primary key);
 	insert @ExistingTraces select TraceID from z.Trace where CreatorSessionID = @@spid and CreatorLoginTime = @OwnerLoginTime;
@@ -39,7 +39,7 @@ begin
 		exec z.usp_TraceStart @TraceName = @TraceName
 
 
-		select @TraceName = 'LongRunningQueryTrace'
+		select	@TraceName = 'LongRunningQueryTrace'
 		exec z.usp_TraceCreate @TraceName = @TraceName, @Description = 'Collect long running queries', @ReceivingTable = 'z.TraceLongRunningQuery', @TraceID = @TraceID output
 		if not exists(select 1 from @ExistingTraces where TraceID = @TraceID)
 			insert @CreatedTraces values(@TraceID);
@@ -58,7 +58,7 @@ begin
 									@Value = 1300000
 		exec z.usp_TraceStart @TraceName = @TraceName
 
-		select @TraceName = 'TraceErrors'
+		select	@TraceName = 'TraceErrors'
 		exec z.usp_TraceCreate @TraceName = @TraceName, @Description = 'Collect exceptions', @ReceivingTable = 'z.TraceError', @TraceID = @TraceID output
 		if not exists(select 1 from @ExistingTraces where TraceID = @TraceID)
 			insert @CreatedTraces values(@TraceID);
@@ -89,7 +89,7 @@ begin
 
 		exec z.usp_TraceStart @TraceName = @TraceName
 
-		select @TraceName = 'FileAutoGrowTrace'
+		select	@TraceName = 'FileAutoGrowTrace'
 		exec z.usp_TraceCreate @TraceName = @TraceName, @Description = 'Collect database file auto growth information ', @ReceivingTable = 'z.TraceFileAutoGrow', @TraceID = @TraceID output
 		if not exists(select 1 from @ExistingTraces where TraceID = @TraceID)
 			insert @CreatedTraces values(@TraceID);
@@ -109,9 +109,9 @@ begin
 	end try
 	begin catch
 		-- Startup can fail before CollectAndClose takes responsibility for cleanup.
-		declare c cursor local static read_only for select TraceID from @CreatedTraces;
-		open c;
-		fetch next from c into @TraceID;
+		declare cCreatedTraces cursor local static read_only for select TraceID from @CreatedTraces;
+		open cCreatedTraces;
+		fetch next from cCreatedTraces into @TraceID;
 		while @@fetch_status = 0
 		begin
 			begin try
@@ -121,10 +121,10 @@ begin
 			begin catch
 				print concat(N'CollectTrace cleanup failed for trace ', @TraceID, N': ', error_message());
 			end catch;
-			fetch next from c into @TraceID;
+			fetch next from cCreatedTraces into @TraceID;
 		end;
-		close c;
-		deallocate c;
+		close cCreatedTraces;
+		deallocate cCreatedTraces;
 		throw;
 	end catch;
 end;

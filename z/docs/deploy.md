@@ -2,6 +2,8 @@
 
 [Installer guide](readme.md) · [System guide](../System/docs/readme.md)
 
+`Deploy.ps1` installs or updates Schema Z in the SQL Server database you name. Start with `-ShowPlan` to see the files it would consider, then run the same command without that switch to apply the update. An absent database is created during execution.
+
 ## Prerequisites
 
 Use PowerShell 7 (the traversal uses modern .NET path APIs). If the `SqlServer` PowerShell module is missing, the installer automatically downloads it from PSGallery using `Install-Module -Scope CurrentUser`; this requires PowerShellGet and gallery access, but no administrator elevation. An available module is reused. Download or import failures stop before database access. `-ShowPlan` does not install or import the module.
@@ -27,14 +29,14 @@ Preview returns the filesystem plan without connecting or reading installed vers
 
 | Parameter | Default and behavior |
 | --- | --- |
-| ServerName | Required string |
-| DatabaseName | Required string; 1–128 characters; restricted SQLcmd/quote/bracket/newline delimiters rejected |
-| UserName, Password | Optional strings; omitted/empty user selects Windows authentication |
-| DisableHashChecking | Switch, false; true executes eligible unchanged scripts |
-| DisableTrustServerCertificate | Switch, false; true requires certificate validation |
-| RootPath | Script-adjacent System directory; selects deployment tree and root CodeBase |
-| ShowPlan | Switch, false; returns ordered validated plan without SQL |
-| RunTests | Switch, false; executes reserved test folders only in unhashed Test batches |
+| ServerName | Required. SQL Server instance to connect to. |
+| DatabaseName | Required. Database to install or update. Names must be 1–128 characters and cannot contain delimiters that interfere with SQLcmd substitution. |
+| UserName, Password | Optional SQL login credentials. Omit the user name, or pass an empty one, to use Windows authentication. |
+| DisableHashChecking | Off by default. Run eligible scripts even when their contents have not changed. It does not override version eligibility. |
+| DisableTrustServerCertificate | Off by default. Require validation of the server's certificate instead of trusting it. |
+| RootPath | Folder tree to deploy; defaults to the `System` folder beside the installer. The path also determines deployment ownership. |
+| ShowPlan | Preview the ordered files and their owners without connecting to SQL Server. It does not read the target's installed versions. |
+| RunTests | Run SQL from reserved test folders instead of a normal update. Records Test batches without updating subsystem versions. See [test-only mode](testing.md#test-only-mode). |
 
 Connections encrypt; certificate trust is enabled by default. Supply SQL credentials at runtime without committing values. Script execution has unlimited query timeout; metadata calls use 30 seconds and connection opening uses 15 seconds.
 

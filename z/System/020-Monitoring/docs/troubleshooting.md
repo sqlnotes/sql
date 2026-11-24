@@ -4,23 +4,13 @@
 
 ## Diagnose current behavior
 
-Empty request snapshots can be normal: the collector excludes its own session. Check DMV visibility before assuming there are no other requests. Missing ring-buffer events can mean system_health is absent, has no ring-buffer target, or has already overwritten events. Persisted duplicate keys can occur under concurrent collectors; the System Health insert uses a not-exists predicate without serialization. z.v_IndexSpaceUsed uses 8.192 / 1024 per page for columns labelled MB, rather than the usual 8 / 1024; use raw page counts when exact units matter.
+The active-request collector excludes its own session. An empty snapshot can mean there were no other visible requests. Check DMV permissions before interpreting the result.
 
-## Permission and partial-operation failures
+System Health needs a running session with a ring-buffer target. It deduplicates events in one snapshot. Two concurrent collectors can both select the same missing key. The primary key prevents duplicate storage, so one insert may fail. Coordinate calls when they can overlap.
 
-CPU WorkingSetDelta is bigint in both the ring-buffer view and history table.
-If an older table still has int, run the eligible Monitoring baseline to widen
-it before collection. A Monitoring version above 0.0.0 skips that baseline.
-System Health collection deduplicates identical keys within one ring-buffer
-snapshot; concurrent collectors still need caller coordination.
+For index space, use the page counts or KB columns for exact calculations. The compatibility columns labeled MB keep the original conversion. [Space columns](reference/supporting-objects.md#zv_indexspaceused)
 
-System supplies z.SeqGeneralID, PS_SchemaZPartitionGeneric and PS_SchemaZPartitionGenericDateTime. Server DMVs, Extended Events, and msdb Database Mail supply external data. System orchestration can schedule collection through Jobs.
-
-Read the relevant callable reference before retrying a failed write. Some procedures roll back any open transaction, including a caller's transaction; others leave earlier operations committed. Native server resources and filesystem actions do not share a single database rollback boundary. Catalog/DMV access is evaluated on the deployed server and depends on SQL Server version and caller context.
-
-## Verification limits
-
-These pages describe source behavior. A successful installation or module compilation does not demonstrate successful mail delivery, backup restoration, SQL Agent execution, trace workload collection, security migration, or application-specific Broker delivery.
+## Extended Events
 
 For the Error/Long Running Query XE collectors, an empty poll can mean the session
 has no dispatched events or has no ring_buffer target. The collectors call their

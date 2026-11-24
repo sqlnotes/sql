@@ -2,7 +2,7 @@
 
 [Subsystem](../readme.md) | [System](../../../docs/readme.md)
 
-Exact SQL identifiers link to behavior and source. Native system dependencies are described in [architecture](../architecture.md).
+Find live diagnostic views, stored history, collectors and summaries below. Use [usage](../usage.md) to choose a workflow; each reference explains its inputs, results and limits and links to the SQL definition. [Architecture](../architecture.md) explains how live sources and saved history fit together.
 
 | Object | Documentation | Definition |
 | --- | --- | --- |

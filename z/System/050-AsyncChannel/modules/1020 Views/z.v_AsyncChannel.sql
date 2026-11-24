@@ -88,7 +88,7 @@ as
 											ServiceName = '/SchemaZ/AsyncChannel/' + c.SchemaName + '/' + c.Name + '/Service'
 									from (
 											-- A channel's objects live in its ProcessingProcedure's schema ('z' when unqualified).
-											select c.*, SchemaName = isnull(parsename(c.ProcessingProcedure, 2), 'z')
+											select	c.*, SchemaName = isnull(parsename(c.ProcessingProcedure, 2), 'z')
 											from z.AsyncChannel c
 										)c
 								)c
