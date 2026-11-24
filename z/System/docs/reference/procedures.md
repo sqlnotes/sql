@@ -108,9 +108,9 @@ create or alter procedure z.usp_DataInitializationMaster
 )
 ```
 
-Runs procedures whose names start with `usp_DataInitialization` through [z.usp_ExecuteProcedures](#zusp_executeprocedures), one at a time, in schema and name order. It excludes `usp_DataInitializationHelper` and `usp_DataInitializationMaster`. The default schema is `z`; pass `@SchemaName = null` to include all schemas.
+Runs procedures whose names start with `usp_DataInitialization` through [z.usp_ExecuteProcedures](#zusp_executeprocedures), one at a time, in schema and name order. It excludes `usp_DataInitializationHelper` and `usp_DataInitializationMaster`. The default schema is `z`; pass `@SchemaName = null` to include all schemas. Supply a schema name without a comma.
 
-Each initialization procedure manages its own transactions. If one fails, the executor rolls back any open transaction, continues with the rest, and reports the errors at the end. Run a single initializer when each procedure must execute once per call. Concurrent calls can run an initialization procedure more than once, as explained below.
+Each initialization procedure manages its own transactions. If one fails, the executor rolls back any open transaction, continues with the rest, and prints the errors at the end. A discovery error ends the call before any initialization procedure runs. Run a single initializer when each procedure must execute once per call. Concurrent calls can run an initialization procedure more than once, as explained below.
 
 ## z.usp_DropAllLocalTempTables
 
@@ -141,42 +141,52 @@ Supply an object in the current database through `@ObjectName`. NULL or an unres
 
 ## z.usp_ExecuteProcedures
 
-Runs procedures selected by schema and name pattern, one at a time. Use it for groups of maintenance or initialization procedures that can be called without arguments.
+Runs groups of maintenance or initialization procedures across selected databases. Each procedure runs in its own database and receives no arguments. Any result sets come from the individual procedures and can have different shapes.
 
 [Source](../../modules/1070%20Procedures/z.usp_ExecuteProcedures.sql)
 
 ```sql
 create or alter procedure z.usp_ExecuteProcedures
 (
-	@SchemaName nvarchar(128),
-	@NamePattern nvarchar(1024),
-	@ExcludedProcedureNames nvarchar(max) = null
+	@SchemaNames nvarchar(max) = N'%',
+	@ProcedureNames nvarchar(max),
+	@ExcludedProcedureNames nvarchar(max) = null,
+	@DatabaseNames nvarchar(max) = null,
+	@ExcludedDatabaseNames nvarchar(max) = null,
+	@ExcludedSchemaNames nvarchar(max) = null
 )
 ```
 
-Runs all procedures matching the specified schema and name pattern, one at a time, in schema and alphabetical name order. With a single executor, each matching procedure is called once.
+This example runs refresh procedures in the `dbo` and `reporting` schemas of matching databases, skipping staging databases and procedures ending in `_Preview`.
 
-With multiple executors, a procedure that is already running is skipped without waiting. **This prevents simultaneous execution of the same procedure, but does not guarantee that each procedure executes only once across the executors.** Each executor has its own list and does not remember what the others have finished.
+```sql
+exec z.usp_ExecuteProcedures
+	@DatabaseNames = N'Sales!_%, Reporting', @ExcludedDatabaseNames = N'%!_Stage',
+	@SchemaNames = N'dbo, reporting',
+	@ProcedureNames = N'usp!_Refresh!_%, usp!_RebuildCache', @ExcludedProcedureNames = N'%!_Preview';
+```
+
+Each filter takes comma-separated SQL `like` patterns. A comma always separates list entries. `%` matches any text, `_` matches one character, and `!` escapes a special character. Use `!_` for a literal underscore. Spaces around list entries and empty entries are ignored. A name must match an inclusion pattern and pass every exclusion. Overlapping patterns select the same object once. Procedure patterns apply to the unqualified name in every selected schema. Database patterns use the dispatcher's database collation. Schema and procedure patterns use the target's catalog collation.
+
+| Scope | Inclusion | Exclusion |
+| --- | --- | --- |
+| Database | `@DatabaseNames = null` selects the database where the dispatcher is installed. `%` selects all visible, accessible, online databases. | `@ExcludedDatabaseNames` can exclude the current database too. Use `master, model, msdb, tempdb` with `%` to leave out the four system databases. |
+| Schema | `@SchemaNames` defaults to `%`, which includes all schemas. `null` also includes all schemas. | `@ExcludedSchemaNames` removes matching schemas from each selected database. |
+| Procedure | Supply `@ProcedureNames` explicitly. `%` includes all matching visible procedures. | `@ExcludedProcedureNames` removes matching names in every selected schema. |
+
+Each omitted exclusion leaves all names eligible. The dispatcher itself is always excluded. A scan with no matches succeeds. The dispatcher builds the complete list across databases before it starts any procedure. It then sorts by database, schema and procedure name using the dispatcher's database collation and runs each entry by its three-part name. New procedure names are picked up on a subsequent call.
+
+When updating existing calls, rename `@SchemaName` to `@SchemaNames` and `@NamePattern` to `@ProcedureNames`. Escape any literal wildcard characters in schema and exclusion names.
+
+Executors in the same dispatcher database share one semaphore slot per target procedure. A busy procedure is skipped without waiting. Each executor has its own list, so it can run a procedure again after another executor releases the slot. Dispatchers installed in different databases use independent semaphores.
 
 For example, thread 1 starts procedure 1. Thread 2 skips procedure 1, finishes procedure 2, and moves to procedure 3. When thread 1 finishes procedure 1, it reaches procedure 2 and runs it again because procedure 2 is no longer running. Procedure 2 has now executed twice.
 
 Use a single executor when each matching procedure should run once per call. Multiple executors are suitable only when repeated execution is acceptable. They can also run later procedures before earlier ones have finished in another thread.
 
-For example, this runs procedures in `dbo` whose names start with `usp_Refresh_`:
+If discovery fails, the dispatcher raises the error and ends the call before executing any procedure. If a selected procedure raises a catchable error, the dispatcher rolls back any open transaction, releases the semaphore, and continues. It prints the collected execution errors after the scan. The dispatcher makes one attempt per selected procedure and ignores procedure return codes.
 
-```sql
-exec z.usp_ExecuteProcedures @SchemaName = N'dbo', @NamePattern = N'usp!_Refresh!_%';
-```
-
-`@SchemaName` selects a schema in the current database; `null` includes all schemas. `@NamePattern` uses SQL `like` patterns: `%` matches any text, and `!` escapes a special character. In the example, `!_` matches a literal underscore.
-
-Use `@ExcludedProcedureNames` to leave specific procedure names out of the list. Separate the names with commas, for example `N'usp_DataInitializationHelper,usp_DataInitializationMaster'`. Spaces around each name are ignored. These exclusions apply to the exact names in every selected schema. Omit the parameter to exclude nothing beyond the executor itself.
-
-Each call goes through the matching procedures once, with no retries. It calls them without parameters, so any parameters must have defaults. If nothing matches, it finishes successfully without doing any work. It excludes `z.usp_ExecuteProcedures` itself.
-
-If a procedure raises an error, the executor rolls back any open transaction, tries to release its lock, and continues with the remaining procedures. After finishing the list, it reports the collected errors together in a message of up to 2,048 characters. A procedure's return code alone is not treated as an error.
-
-Run this from a job connection without an enclosing transaction; each called procedure manages its own transactions. The caller needs permission to see and execute the matching procedures and use the shared semaphore helpers. To prevent simultaneous execution across jobs, all participating jobs must call through `z.usp_ExecuteProcedures`.
+Call the dispatcher from a connection without an enclosing transaction. Called procedures manage their own transactions, and any parameters must have defaults. The caller needs access to the target databases and permission to see and execute the selected procedures. Install Schema Z in the dispatcher database and use compatibility level 130 or later for `string_split`. Target databases can use older compatibility levels and can run without an installation.
 
 ## z.usp_ForceNamingConvention
 

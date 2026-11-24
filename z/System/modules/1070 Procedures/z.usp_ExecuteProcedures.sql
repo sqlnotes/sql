@@ -5,61 +5,105 @@ Repository: https://github.com/sqlnotes/sql
 Source: https://github.com/sqlnotes/sql/blob/main/z/System/modules/1070%20Procedures/z.usp_ExecuteProcedures.sql
 Documentation: https://github.com/sqlnotes/sql/blob/main/z/System/docs/reference/procedures.md#zusp_executeprocedures
 
-Executes matching procedures once per scan, skipping procedures held by another worker.
+Lists matching procedures in selected databases before executing them, skipping procedures held by another worker.
 */
 create or alter procedure z.usp_ExecuteProcedures
 (
-	@SchemaName nvarchar(128),
-	@NamePattern nvarchar(1024),
-	@ExcludedProcedureNames nvarchar(max) = null
+	@SchemaNames nvarchar(max) = N'%',
+	@ProcedureNames nvarchar(max),
+	@ExcludedProcedureNames nvarchar(max) = null,
+	@DatabaseNames nvarchar(max) = null,
+	@ExcludedDatabaseNames nvarchar(max) = null,
+	@ExcludedSchemaNames nvarchar(max) = null
 )
 as
 begin
 	set nocount, xact_abort on;
+	-- A selected procedure can commit even when the caller enabled cursor closing.
 	set cursor_close_on_commit off;
-	declare	@ProcedureName nvarchar(517), @ObjectID int, @SemaphoreName nvarchar(200),
-			@Result int, @Messages nvarchar(max) = N'', @Message nvarchar(2048);
-	declare @ExcludedProcedures table (ProcedureName nvarchar(max));
-	insert @ExcludedProcedures(ProcedureName)
-		select trim(value)
-		from string_split(@ExcludedProcedureNames, N',');
+	declare	@DatabaseName sysname, @SchemaName sysname, @ProcedureName sysname, @ObjectID int,
+			@DatabaseExecutor nvarchar(300), @Proc nvarchar(776), @Messages nvarchar(max) = N'', @SemaphoreName nvarchar(200),
+			@SemaphoreSlot int;
+	declare @Procedures table (DatabaseName sysname not null, SchemaName sysname not null, ProcedureName sysname not null, ObjectID int not null);
+
+	-- Resolve schema and procedure patterns under each target database's catalog collation.
+	declare @ListSql nvarchar(max) = N'
+select	@DatabaseName DatabaseName, s.name SchemaName, p.name ProcedureName, p.object_id ObjectID
+from sys.procedures p
+	inner join sys.schemas s on s.schema_id = p.schema_id
+where not (s.name = N''z'' and p.name = N''usp_ExecuteProcedures'')
+	and exists (select 1 from #ExecuteProceduresFilters f where f.FilterType = ''IncludeSchema'' and s.name like f.Pattern collate catalog_default escape N''!'')
+	and exists (select 1 from #ExecuteProceduresFilters f where f.FilterType = ''IncludeProcedure'' and p.name like f.Pattern collate catalog_default escape N''!'')
+	and not exists (select 1 from #ExecuteProceduresFilters f where f.FilterType = ''ExcludeSchema'' and s.name like f.Pattern collate catalog_default escape N''!'')
+	and not exists (select 1 from #ExecuteProceduresFilters f where f.FilterType = ''ExcludeProcedure'' and p.name like f.Pattern collate catalog_default escape N''!'');';
+
+	begin try
+		select	f.FilterType, trim(p.value) collate database_default Pattern
+		into #ExecuteProceduresFilters
+		from (values
+			('IncludeDatabase', @DatabaseNames), ('ExcludeDatabase', @ExcludedDatabaseNames),
+			('IncludeSchema', isnull(@SchemaNames, N'%')),
+			('ExcludeSchema', @ExcludedSchemaNames), ('IncludeProcedure', @ProcedureNames), ('ExcludeProcedure', @ExcludedProcedureNames)
+		) f(FilterType, Patterns)
+			cross apply string_split(f.Patterns, N',') p
+		where trim(p.value) <> N'';
+
+		declare cDatabases cursor local forward_only static read_only for
+			select	d.name
+			from sys.databases d
+			where d.state = 0 and has_dbaccess(d.name) = 1
+				and ((@DatabaseNames is null and d.database_id = db_id())
+					or exists (select 1 from #ExecuteProceduresFilters f where f.FilterType = 'IncludeDatabase' and d.name collate database_default like f.Pattern escape N'!'))
+				and not exists (select 1 from #ExecuteProceduresFilters f where f.FilterType = 'ExcludeDatabase' and d.name collate database_default like f.Pattern escape N'!');
+		open cDatabases;
+		fetch next from cDatabases into @DatabaseName;
+		while @@fetch_status = 0
+		begin
+			select	@DatabaseExecutor = quotename(@DatabaseName) + N'.sys.sp_executesql';
+			insert @Procedures(DatabaseName, SchemaName, ProcedureName, ObjectID)
+				exec @DatabaseExecutor @ListSql, N'@DatabaseName sysname', @DatabaseName = @DatabaseName;
+			fetch next from cDatabases into @DatabaseName;
+		end;
+		close cDatabases;
+		deallocate cDatabases;
+	end try
+	begin catch
+		throw;
+	end catch;
 
 	declare cProcedures cursor local forward_only static read_only for
-		select	quotename(schema_name(p.schema_id)) + N'.' + quotename(p.name), p.object_id
-		from sys.procedures p
-		where (@SchemaName is null or p.schema_id = schema_id(@SchemaName))
-			and p.name like @NamePattern escape N'!'
-			and p.object_id <> @@procid
-			and not exists (select 1 from @ExcludedProcedures e where e.ProcedureName = p.name)
-		order by schema_name(p.schema_id), p.name;
+		select	p.DatabaseName, p.SchemaName, p.ProcedureName, p.ObjectID
+		from @Procedures p
+		order by p.DatabaseName, p.SchemaName, p.ProcedureName;
 	open cProcedures;
-	fetch next from cProcedures into @ProcedureName, @ObjectID;
+	fetch next from cProcedures into @DatabaseName, @SchemaName, @ProcedureName, @ObjectID;
 	while @@fetch_status = 0
 	begin
-		select	@SemaphoreName = N'z.ExecuteProcedures:' + convert(nvarchar(11), @ObjectID);
+		select	@Proc = quotename(@DatabaseName) + N'.' + quotename(@SchemaName) + N'.' + quotename(@ProcedureName), @SemaphoreSlot = 0;
 		begin try
-			exec @Result = z.usp_AcquireSemaphore @SemaphoreName = @SemaphoreName, @TotalCount = 1, @LockOwner = 'Session', @LockTimeout = 0;
-			if @Result > 0
-			begin
-				exec @ProcedureName;
-				exec @Result = z.usp_ReleaseSemaphore @SemaphoreName = @SemaphoreName, @SuppressException = 1, @LockOwner = 'Session';
-			end
+			-- The qualified name can now resolve to a replacement for the listed object.
+			select	@SemaphoreName = concat(N'z.ExecuteProcedures:',
+						case when db_id(@DatabaseName) = db_id() then N'' else @DatabaseName + N':' end,
+						isnull(object_id(@Proc), @ObjectID));
+			exec @SemaphoreSlot = z.usp_AcquireSemaphore @SemaphoreName = @SemaphoreName, @TotalCount = 1, @LockOwner = 'Session', @LockTimeout = 0;
+			if @SemaphoreSlot > 0
+				exec @Proc;
 		end try
 		begin catch
-			select	@Messages =		@Messages + nchar(13) + nchar(10) 
-								+ N'Exception while executing ' + @ProcedureName + N':' + nchar(13) + nchar(10) 
-								+ z.fn_GetFullErrorMessage() + nchar(13) + nchar(10);
+			select	@Messages = concat(@Messages, nchar(13), nchar(10), N'Exception while executing ', @Proc, N':', nchar(13), nchar(10),
+								z.fn_GetFullErrorMessage(), nchar(13), nchar(10));
 			if @@trancount > 0
 				rollback;
-			exec z.usp_ReleaseSemaphore @SemaphoreName = @SemaphoreName, @SuppressException = 1, @LockOwner = 'Session';
 		end catch;
-		fetch next from cProcedures into @ProcedureName, @ObjectID;
+		if @SemaphoreSlot > 0
+			exec z.usp_ReleaseSemaphore @SemaphoreName = @SemaphoreName, @SuppressException = 1, @Slot = @SemaphoreSlot, @LockOwner = 'Session';
+		fetch next from cProcedures into @DatabaseName, @SchemaName, @ProcedureName, @ObjectID;
 	end;
 	close cProcedures;
 	deallocate cProcedures;
-	if @Messages <> N''
+	while @Messages <> N''
 	begin
-		select	@Message = left(@Messages, 2048);
-		throw 50000, @Message, 1;
+		print left(@Messages, 2000);
+		select	@Messages = stuff(@Messages, 1, 2000, N'');
 	end;
 end;
