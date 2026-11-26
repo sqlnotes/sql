@@ -19,8 +19,6 @@ create or alter procedure z.usp_ExecuteProcedures
 as
 begin
 	set nocount, xact_abort on;
-	-- A selected procedure can commit even when the caller enabled cursor closing.
-	set cursor_close_on_commit off;
 	declare	@DatabaseName sysname, @SchemaName sysname, @ProcedureName sysname, @ObjectID int,
 			@DatabaseExecutor nvarchar(300), @Proc nvarchar(776), @Messages nvarchar(max) = N'', @SemaphoreName nvarchar(200),
 			@SemaphoreSlot int;
@@ -48,7 +46,7 @@ where not (s.name = N''z'' and p.name = N''usp_ExecuteProcedures'')
 			cross apply string_split(f.Patterns, N',') p
 		where trim(p.value) <> N'';
 
-		declare cDatabases cursor local forward_only static read_only for
+		declare cDatabases cursor local static for
 			select	d.name
 			from sys.databases d
 			where d.state = 0 and has_dbaccess(d.name) = 1
