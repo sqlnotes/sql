@@ -13,4 +13,4 @@ Creates a trace ready for configuration and returns its SQL Server trace ID thro
 @TraceID int = null output
 ```
 
-TraceID is the native SQL Server trace ID. Configuration and Start require the creator session/login; explicit Stop/Close selectors can target another creator when permissions allow. Native SQL Trace permissions are not granted by these procedures. See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md).
+TraceID is the native SQL Server trace ID. Configuration and Start require the creator session/login; explicit Stop/Close selectors can target another creator when permissions allow. Creation also runs abandoned-trace cleanup, which requires server session visibility (`VIEW SERVER STATE` on SQL Server 2019; `VIEW SERVER PERFORMANCE STATE` on SQL Server 2022+). Native SQL Trace permissions are not granted by these procedures. See [architecture](../architecture.md) and [troubleshooting](../troubleshooting.md).

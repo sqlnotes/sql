@@ -25,7 +25,7 @@ The returned row contains `ScheduleID`, the eight normalized schedule fields, an
 
 An omitted recurring start date becomes SQL Server's local date, and an omitted end date becomes `9999-12-31`. Repeating seconds are at least 10; repeating minutes and hours are at least 1. Equivalent normalized definitions receive the same MD5-derived `ScheduleID`.
 
-No writes or explicit transaction. Requires function access; schedule conversion does not validate a deployed Agent schedule. See subsystem troubleshooting for known conversion defects.
+No writes or explicit transaction. Requires function access; schedule conversion does not validate a deployed Agent schedule.
 
 This is the normalization helper, not the validation boundary. Direct calls can discard unrecognized tokens. Use z.fn_ValidateScheduleParameter for complete-input validation or z.fn_ToSQLAgentSchedule for validated native conversion. Agent Start produces the normalized frequency Agent Starts.
 

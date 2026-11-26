@@ -35,7 +35,6 @@ Find live diagnostic views, stored history, collectors and summaries below. Use 
 | `z.usp_CollectTrace` | [Reference](z.usp_CollectTrace.md) | [SQL](../../modules/1070%20Procedures/z.usp_CollectTrace.sql) |
 | `z.usp_TakeSnapshotActiveSessionsForBlockedProcessReport` | [Reference](z.usp_TakeSnapshotActiveSessionsForBlockedProcessReport.md) | [SQL](../../modules/1070%20Procedures/z.usp_TakeSnapshotActiveSessionsForBlockedProcessReport.sql) |
 | `z.usp_TakeSnapshotActiveSessionsForFileAutoGrow` | [Reference](z.usp_TakeSnapshotActiveSessionsForFileAutoGrow.md) | [SQL](../../modules/1070%20Procedures/z.usp_TakeSnapshotActiveSessionsForFileAutoGrow.sql) |
-
 | `z.usp_CreateErrorEventSession` | [Reference](extended-events.md#zusp_createerroreventsession) | [SQL](../../modules/1070%20Procedures/z.usp_CreateErrorEventSession.sql) |
 | `z.usp_CreateLongRunningQueryEventSession` | [Reference](extended-events.md#zusp_createlongrunningqueryeventsession) | [SQL](../../modules/1070%20Procedures/z.usp_CreateLongRunningQueryEventSession.sql) |
 | `z.usp_CollectErrorEvents` | [Reference](extended-events.md#zusp_collecterrorevents) | [SQL](../../modules/1070%20Procedures/z.usp_CollectErrorEvents.sql) |

@@ -146,7 +146,7 @@ An unmet condition blocks higher levels while other eligible tasks at the same l
 
 Use `z.TaskQueueLog` to trace what happened to a batch or task: when it was created, claimed, completed, retried or changed. Filter by `BatchID` and `ExecutionID` for one run, or by `ActionID` for one operation. The entries below explain which fields to use when diagnosing a failure.
 
-`z.TRI_TaskQueueBatch` and `z.TRI_TaskQueueTasks` write each changed row to [`z.TaskQueueLog`](../baseline/2020%20Tables/z.TaskQueueLog.sql) in the same transaction. NULL TaskID denotes a batch entry. For row changes, BeforeJson and AfterJson contain operational values including the executor payload and nulls, excluding the derived CompletionState. A restart records the batch's previous execution and the reset tasks' new execution under the same ActionID.
+`z.TRI_TaskQueueBatch` and `z.TRI_TaskQueueTasks` write each changed row to [`z.TaskQueueLog`](../baseline/2020%20Tables/z.TaskQueueLog.sql) in the same transaction. NULL TaskID denotes a batch entry. For row changes, BeforeJson and AfterJson contain operational values including the executor payload and nulls, excluding the derived CompletionState. A restart logs both the batch update and the reset tasks under the new ExecutionID and shared ActionID, retaining the previous ExecutionID in the batch row's BeforeJson.
 
 The worker logs the task claim and executor outcome under `ExecuteTask` with one ActionID per attempt. On executor failure, the finish entry includes `LastErrorNumber` and `LastErrorMessage` in AfterJson. Each retry gets a new ActionID.
 

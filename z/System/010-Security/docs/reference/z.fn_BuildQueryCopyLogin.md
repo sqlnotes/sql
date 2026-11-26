@@ -17,7 +17,7 @@ Produces SQL scripts to recreate SQL logins, Windows logins/groups and user-defi
 
 ## Results, permissions, and limits
 
-Returns `ServerPrincipalID`, `LoginName`, `LoginType` and `SQL`. Review the `SQL` column before executing it. SQL-login scripts contain password hashes and SIDs, so restrict access to the output. They include default language and password-policy settings, but omit default database and disabled state. Metadata and password-hash visibility determine how complete the output can be.
+Returns `ServerPrincipalID`, `LoginName`, `LoginType` and `SQL`. Review the `SQL` column before executing it. SQL-login scripts contain password hashes and preserve the source `SID` (omit or change `sid = ...` when creating a renamed copy on the same instance to avoid a duplicate-SID error), so restrict access to the output. They include default language and password-policy settings, but omit default database and disabled state. Metadata and password-hash visibility determine how complete the output can be.
 
 ## Dependencies
 

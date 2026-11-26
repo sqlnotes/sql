@@ -31,7 +31,7 @@ An omitted StartDate uses the SQL Server local date; EndDate remains unlimited. 
 
 ## Results, permissions, and limits
 
-No writes or explicit transaction. Requires function access; schedule conversion does not validate a deployed Agent schedule. See subsystem troubleshooting for known conversion defects.
+No writes or explicit transaction. Requires function access; schedule conversion does not validate a deployed Agent schedule.
 
 ## Dependencies
 

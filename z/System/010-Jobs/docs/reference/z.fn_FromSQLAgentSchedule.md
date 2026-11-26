@@ -27,7 +27,7 @@ Pass the ten native timing fields listed below, for example from `msdb.dbo.syssc
 
 Weekly schedules can contain several weekdays. The conversion preserves all selected days; native weekday bits are Sunday=1, Monday=2, Tuesday=4, Wednesday=8, Thursday=16, Friday=32 and Saturday=64.
 
-No writes or explicit transaction. Requires function access; schedule conversion does not validate a deployed Agent schedule. See subsystem troubleshooting for known conversion defects.
+No writes or explicit transaction. Requires function access; schedule conversion does not validate a deployed Agent schedule.
 
 ## Dependencies
 

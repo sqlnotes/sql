@@ -4,8 +4,8 @@
 
 Use these tools to keep a history of SQL errors and slow completed queries. The collectors read server-wide Extended Events sessions and save typed rows plus original XML in `z.ErrorEvent` and `z.LongRunningQueryEvent`. Call them periodically; reading the views or installing Monitoring alone does not collect history.
 
-These server-scoped sessions capture all databases. Error capture has no QRTZ
-exclusion. They are separate from the SQL Trace framework and system_health.
+These server-scoped sessions capture all databases without message-text exclusions.
+They are separate from the SQL Trace framework and system_health.
 Installing Monitoring defines procedures and tables; it does not create or start
 these server sessions. The error/long-query collectors call their matching creator
 to ensure the session exists and is running before reading its buffer.

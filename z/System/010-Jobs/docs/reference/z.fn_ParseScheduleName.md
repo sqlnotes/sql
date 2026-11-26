@@ -16,7 +16,7 @@ Reads the timing information encoded in a Schema Z schedule name and returns rea
 
 ## Results, permissions, and limits
 
-No writes or explicit transaction. Requires function access; schedule conversion does not validate a deployed Agent schedule. See subsystem troubleshooting for known conversion defects.
+No writes or explicit transaction. Requires function access; schedule conversion does not validate a deployed Agent schedule.
 
 ## Dependencies
 

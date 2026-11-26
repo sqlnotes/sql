@@ -151,7 +151,7 @@ and [64-bit fractions and raw/base types](https://learn.microsoft.com/en-us/dotn
 
 [Source](../../modules/1020%20Views/z.v_ObjectSpaceUsed.sql)
 
-Reports how much space each object has reserved, used for data and indexes, or left unused. Results include ObjectID, SchemaName, TableName, RowCount, ReservedKB, DataKB, IndexSize and Unused. All sizes are in KB, using 8 KB per page; RowCount comes from base-index rows. Memory-optimized tables are excluded, while internal XML/spatial allocations (types 202/204) are included.
+Reports how much space each object has reserved, used for data and indexes, or left unused. Results include ObjectID, SchemaName, TableName, RowCount, ReservedKB, DataKB, IndexSize and Unused. All sizes are in KB, using 8 KB per page; RowCount comes from base-index rows. Memory-optimized tables are excluded, while XML index and full-text freelist internal tables (types 202 and 204) are included.
 
 ## z.TraceBlockedProcessReport
 

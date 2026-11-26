@@ -2,7 +2,7 @@
 
 [Trace](../readme.md) | [Source](../../modules/1070%20Procedures/z.usp_TraceRemoveEvents.sql)
 
-Removes kinds of activity from a trace's planned capture. Supply complete event names in `@EventList`; `all` or NULL removes every configured event. Their selected columns are removed with them, while previously collected data is retained.
+Removes kinds of activity from a trace's planned capture. Supply complete event names in `@EventList`; `all` removes every configured event, while NULL removes none. Matching columns and event callbacks are removed with them, while previously collected data is retained.
 
 ```text
 @TraceName nvarchar(128) = null,

@@ -102,7 +102,7 @@ create or alter function z.fn_GetExpectedName
 returns nvarchar(128)
 ```
 
-Choose the object kind with `@Type`, supply its parent schema/table, and provide key columns or the referenced table where that kind requires them. The result is a name of up to 128 characters. Supported kinds include Index, UniqueKey, PrimaryKey, columnstore, ForeignKey, Default and XML indexes. An unsupported kind returns NULL; long generated names can truncate or collide.
+Choose the object kind with `@Type`, supply its parent schema/table, and provide key columns or the referenced table where that kind requires them. The result is a name of up to 128 characters. Accepted `@Type` values are `Index`, `UniqueKey`, `PrimaryKey`, `NONCLUSTERED COLUMNSTORE`, `CLUSTERED COLUMNSTORE`, `ForeignKey`, `Default`, `PRIMARY_XML`, `SECONDARY_XML_PATH`, `SECONDARY_XML_VALUE`, and `SECONDARY_XML_PROPERTY` (`ColumnStore` in the signature comment is shorthand and returns NULL). Any other value returns NULL; long generated names can truncate or collide.
 
 ## z.fn_GetFullErrorJson
 
