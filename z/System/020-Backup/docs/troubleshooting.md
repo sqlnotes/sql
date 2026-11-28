@@ -2,7 +2,7 @@
 
 [Subsystem](readme.md) | [Object reference](reference/readme.md)
 
-The sequential procedure processes its selected databases again on every call. If a database backup fails, it records the failure in `z.BackupRestoreHistory`, continues with the remaining selected databases, and raises a summary error at the end. Runtime native `BACKUP` and `RESTORE` failures caught in T-SQL report SQL Server error `3013` in `z.BackupRestoreHistory` (whereas option syntax failures record their direct SQL error such as `155`); inspect the SQL Server error log for underlying device or LSN details. For a parallel call, use `z.BackupRestoreHistory` and its retained TaskQueue batch and task rows to see individual outcomes. [Parallel backup](reference/z.usp_BackupDatabasesParallel.md)
+`z.usp_BackupDatabase` processes its selected databases on every call (`@Threads = 1` sequentially, or `@Threads > 1` concurrently via SQL Server Agent workers). If a database backup fails, the failure is recorded in `z.BackupRestoreHistory`, remaining selected databases continue, and a summary error is raised after completion. Runtime native `BACKUP` and `RESTORE` failures caught in T-SQL report SQL Server error `3013` in `z.BackupRestoreHistory` (whereas option syntax failures record their direct SQL error such as `155`); inspect the SQL Server error log for underlying device or LSN details. For multi-threaded runs, inspect `z.BackupRestoreHistory` for the shared run `BatchID` and run [z.usp_CleanupBackupRestoreObjects](reference/z.usp_CleanupBackupRestoreObjects.md) if an aborted parent session left behind temporary executor/worker procedures or idle Agent jobs. [Backup reference](reference/z.usp_BackupDatabase.md)
 
 The procedure does not prevalidate paths. Check native directory/backup errors and SQL Server service-account access. Filesystem destinations use local or UNC paths on Windows and local or mounted paths on Linux. Windows non-URL forward slashes are normalized to backslashes. A NULL folder falls back to InstanceDefaultBackupPath. Unknown or ineligible database selectors can produce no work. Offline databases and snapshots can fail at native BACKUP execution.
 
@@ -13,6 +13,13 @@ Filesystem retention (`@RetentionHours` on backup procedures or standalone [z.us
 Neither the backup procedure nor the cleanup helper uses application locks. Filesystem actions cannot be rolled back.
 
 The parameterless Full/Log wrappers contain a fixed UNC destination. The separate snapshot procedure has its own path-length and quoting limitations. Review each callable reference before execution.
+
+## Parallel backup (`@Threads > 1`) issues
+
+- **SQL Server Agent not running or invisible**: Multi-threaded execution checks Agent status first and fails with error `50000` before creating temporary procedures or jobs. Ensure SQL Server Agent is running and visible (`z.fn_IsSQLAgentRunning`) or use `@Threads = 1`.
+- **Worker sessions cannot read parent `CONTEXT_INFO`**: Each worker verifies that the parent's `CONTEXT_INFO` token still exists in `sys.dm_exec_requests`. If the temporary Agent job owner lacks `VIEW SERVER STATE` (SQL Server 2019) or `VIEW SERVER PERFORMANCE STATE` (SQL Server 2022+), workers skip their backups and drop themselves, causing the parent to report incomplete worker procedures (`50000`). Use a `sysadmin` caller so `z.usp_CreateServiceJob` assigns `sa` as the job owner (default `@SetJobOwnerToSA = 1`), or grant server-state visibility to the job owner.
+- **Worker job stopped manually and not auto-deleted**: If a temporary worker job stops running without Agent deleting it, the parent waits only after all remaining tracked jobs have started and none remain running (`z.fn_IsSQLJobRunning(JobID) = 1` is false for every tracked job) across 5 consecutive 1-second checks, then deletes those leftover jobs, drops remaining temporary procedures, and raises error `50000`.
+- **Parent session cancelled or terminated abruptly**: Queued worker procedures see the parent `CONTEXT_INFO` disappear from `sys.dm_exec_requests`, skip their backups, and drop themselves while in-flight backups finish and self-delete their jobs. If an unexpected client abort or server shutdown leaves idle temporary jobs or executor/worker procedures behind, execute [z.usp_CleanupBackupRestoreObjects](reference/z.usp_CleanupBackupRestoreObjects.md) outside any transaction (with server-state visibility) to remove them safely.
 
 ## Restore failures
 

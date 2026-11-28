@@ -2,13 +2,13 @@
 
 [Object index](readme.md) | [Subsystem](../readme.md)
 
-Use `z.BackupRestoreHistory` to inspect local execution outcomes from `z.usp_BackupDatabase`, `z.usp_BackupDatabasesParallel` and `z.usp_RestoreDatabase` without querying `msdb`. Use the read-only `msdb` and DMV views when you need full backup-set LSN metadata, external backups not run through these procedures, or live progress of an active native command.
+Use `z.BackupRestoreHistory` to inspect local execution outcomes from `z.usp_BackupDatabase` and `z.usp_RestoreDatabase` without querying `msdb`. Use the read-only `msdb` and DMV views when you need full backup-set LSN metadata, external backups not run through these procedures, or live progress of an active native command.
 
 ## z.BackupRestoreHistory
 
 [Source](../../baseline/2020%20Tables/z.BackupRestoreHistory.sql)
 
-Partition-managed execution log for backups and restores run through this subsystem. Each backup step (`FULL`, `DIFF`, `LOG`) and each executed restore step (`FULL`, `DIFF`, `LOG`, `FINALIZE`) or planning/inventory failure writes one row with a run `BatchID` (`uniqueidentifier` per sequential backup or restore call, or per worker task under `z.usp_BackupDatabasesParallel`, distinct from TaskQueue's `bigint` batch ID), UTC `StartTime`, `EndTime`, `DurationMs`, `Status` (`Succeeded` or `Failed`), `BackupFile`, `ErrorNumber`, `ErrorMessage`, and session context (`LoginName`, `ApplicationName`, `HostName`, `SessionID`). For backups, `IsCopyOnly` reflects `@CopyOnly = 1` and automatic read-only `COPY_ONLY` on `FULL` and `LOG` steps (top-level `COPY_ONLY` supplied in `@OtherBackupOptions` is stripped). `@ShowPlan = 1` previews do not write rows.
+Partition-managed execution log for backups and restores run through this subsystem. Each backup step (`FULL`, `DIFF`, `LOG`) and each executed restore step (`FULL`, `DIFF`, `LOG`, `FINALIZE`) or planning/inventory failure writes one row with a run `BatchID` (`uniqueidentifier` shared across all databases in a sequential or multi-threaded `z.usp_BackupDatabase` call, or per `z.usp_RestoreDatabase` call), UTC `StartTime`, `EndTime`, `DurationMs`, `Status` (`Succeeded` or `Failed`), `BackupFile`, `ErrorNumber`, `ErrorMessage`, and session context (`LoginName`, `ApplicationName`, `HostName`, `SessionID`). For backups, `IsCopyOnly` reflects `@CopyOnly = 1` and automatic read-only `COPY_ONLY` on `FULL` and `LOG` steps (top-level `COPY_ONLY` supplied in `@OtherBackupOptions` is stripped). `@ShowPlan = 1` previews do not write rows.
 
 `HistoryID` uses the shared UTC-prefixed sequence identifier (`datediff_big(second, '19000101', getutcdate()) * 268435456 | next value for z.SeqGeneralID`) clustered on `PS_SchemaZPartitionGeneric(HistoryID)` with `DATA_COMPRESSION = ROW` and no secondary indexes, keeping high-database-count logging lightweight and automatically truncated by [Partition](../../../010-Partition/docs/readme.md) maintenance.
 

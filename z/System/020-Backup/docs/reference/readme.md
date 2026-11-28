@@ -8,8 +8,8 @@ Choose a backup, restore, cleanup or inspection object below. Each reference exp
 | --- | --- | --- |
 | `z.usp_BackupDatabase_Full` | [Reference](z.usp_BackupDatabase_Full.md) | [SQL](../../modules/1070%20Procedures/z.usp_BackupDatabase_Full.sql) |
 | `z.usp_BackupDatabase_Log` | [Reference](z.usp_BackupDatabase_Log.md) | [SQL](../../modules/1070%20Procedures/z.usp_BackupDatabase_Log.sql) |
-| `z.usp_BackupDatabasesParallel` | [Reference](z.usp_BackupDatabasesParallel.md) | [SQL](../../modules/1070%20Procedures/z.usp_BackupDatabasesParallel.sql) |
 | `z.usp_BackupDatabase` | [Reference](z.usp_BackupDatabase.md) | [SQL](../../modules/1070%20Procedures/z.usp_BackupDatabase.sql) |
+| `z.usp_CleanupBackupRestoreObjects` | [Reference](z.usp_CleanupBackupRestoreObjects.md) | [SQL](../../modules/1070%20Procedures/z.usp_CleanupBackupRestoreObjects.sql) |
 | `z.usp_RestoreDatabase` | [Reference](z.usp_RestoreDatabase.md) | [SQL](../../modules/1070%20Procedures/z.usp_RestoreDatabase.sql) |
 | `z.usp_RestoreDatabaseTarget` | [Implementation helper](z.usp_RestoreDatabase.md) | [SQL](../../modules/1070%20Procedures/z.usp_RestoreDatabaseTarget.sql) |
 | `z.usp_RestoreDatabaseExecute` | [Implementation helper](z.usp_RestoreDatabase.md) | [SQL](../../modules/1070%20Procedures/z.usp_RestoreDatabaseExecute.sql) |

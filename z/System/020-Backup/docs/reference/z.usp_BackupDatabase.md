@@ -4,11 +4,11 @@
 
 ## Behavior and parameters
 
-Backs up the selected databases on the current SQL Server instance, one at a time, from smallest to largest data-file size. Choose a full, differential or log backup and a local folder, network share or supported storage URL. By default (`@RetentionHours = null`), it does not delete older files; specify `@RetentionHours` to clean up expired filesystem backups of the requested `@BackupType` after each database's backup completes.
+Backs up the selected databases on the current SQL Server instance sequentially (`@Threads = 1`, from smallest to largest data-file size) or concurrently (`@Threads > 1`, from largest to smallest data-file size via temporary SQL Server Agent workers). Choose a full, differential or log backup and a local folder, network share or supported storage URL. By default (`@RetentionHours = null`), it does not delete older files; specify `@RetentionHours` to clean up expired filesystem backups of the requested `@BackupType` after each database's backup completes.
 
-Use [parallel backup](z.usp_BackupDatabasesParallel.md) when several databases should back up concurrently. Independent calls to this procedure do not share work. Each database attempt is logged in [z.BackupRestoreHistory](backup-restore-history.md#zbackuprestorehistory); if a database fails, the procedure records the failure, continues processing the remaining databases, and raises a summary error at the end of the call.
+Independent calls to this procedure do not share work. Each database attempt is logged in [z.BackupRestoreHistory](backup-restore-history.md#zbackuprestorehistory); if a database fails, the procedure records the failure, continues processing the remaining databases, and raises a summary error at the end of the call.
 
-The main choices are `@Databases` for what to back up, `@BackupType` for the kind of backup, and `@BackupFolder` for the destination. Compression is enabled by default. The complete declaration below includes naming and native-option overrides.
+The main choices are `@Databases` for what to back up, `@BackupType` for the kind of backup, `@BackupFolder` for the destination, and `@Threads` for worker concurrency. Compression is enabled by default. The complete declaration below includes naming, retention, and native-option overrides.
 
 ```text
 @Databases nvarchar(max) = 'AllDatabases',
@@ -22,7 +22,8 @@ The main choices are `@Databases` for what to back up, `@BackupType` for the kin
 @CopyOnly bit = 0,
 @CreateServerInstanceFolder bit = 1,
 @CreateBackupTypeFolder bit = 1,
-@RetentionHours int = null
+@RetentionHours int = null,
+@Threads int = 1
 ```
 
 `@Databases` accepts the group keywords `AllDatabases`, `UserDatabases` and
@@ -34,7 +35,7 @@ error/recovery states and skips SIMPLE recovery for LOG.
 
 When upgrading a call that used the former exact-name argument, pass the name
 as a one-element JSON array in `@Databases` and remove the old argument.
-Review positional calls too and prefer named parameters, because `@CopyOnly`, `@CreateServerInstanceFolder`, `@CreateBackupTypeFolder` and `@RetentionHours` occupy positions 9 through 12.
+Review positional calls too and prefer named parameters, because `@CopyOnly`, `@CreateServerInstanceFolder`, `@CreateBackupTypeFolder`, `@RetentionHours` and `@Threads` occupy positions 9 through 13.
 
 Set `@CopyOnly = 1` to include `COPY_ONLY` for disk and URL backups. SQL Server
 applies it to FULL and LOG and ignores it for DIFFERENTIAL. Read-only databases
@@ -158,11 +159,20 @@ Supply a container/bucket URL with an optional object prefix as BackupFolder, no
 
 Use preconfigured SQL Server credentials and storage permissions. Azure block-blob backups on Linux require SAS credentials. S3-compatible backup requires SQL Server 2022 or later; its `s3://` scheme uses HTTPS underneath. The procedure does not create storage accounts, containers, buckets or credentials. See [Azure requirements](https://learn.microsoft.com/en-us/sql/relational-databases/backup-restore/sql-server-backup-to-url) and [S3 requirements](https://learn.microsoft.com/en-us/sql/relational-databases/backup-restore/sql-server-backup-to-url-s3-compatible-object-storage).
 
-## Execution and retention
+## Execution and concurrency
 
-Call with `IMPLICIT_TRANSACTIONS OFF` and no active transaction. Transaction
-validation runs with `XACT_ABORT ON`. For a bounded pool across selected databases, use
-[z.usp_BackupDatabasesParallel](z.usp_BackupDatabasesParallel.md). Independent
-sequential calls do not share assignments. Filesystem backups need SQL Server service-account destination access. The main procedure requires no application-lock or extended-property write permissions.
+Call with `IMPLICIT_TRANSACTIONS OFF` and no active transaction. Transaction validation runs with `XACT_ABORT ON`. Independent calls do not share assignments. Filesystem backups need SQL Server service-account destination access. Sequential calls require no application-lock or extended-property write permissions.
+
+When `@Threads` is `1` (or `NULL`), or when zero or one database matches `@Databases`, `z.usp_BackupDatabase` executes inline in the caller session (ordered from smallest to largest data-file size) without touching `CONTEXT_INFO` or SQL Server Agent. `@Threads <= 0` throws error `50000`.
+
+When `@Threads > 1` with multiple target databases:
+
+- **Prerequisites and permissions**: SQL Server Agent must be running and visible to the caller (`z.fn_IsSQLAgentRunning`), the caller needs permission to create/drop procedures in schema `z` and manage temporary Agent jobs via `010-Jobs`, the current database name must leave room for 128-character temporary job names (`z_(<db>)_BackupDatabase_<RunID>_<Thread>`), and worker job sessions need visibility into the parent request's `CONTEXT_INFO` in `sys.dm_exec_requests` (`VIEW SERVER STATE` on SQL Server 2019 or `VIEW SERVER PERFORMANCE STATE` on SQL Server 2022+; satisfied automatically when a `sysadmin` caller creates `sa`-owned jobs via default `@SetJobOwnerToSA = 1` in `z.usp_CreateServiceJob`).
+- **Worker orchestration**: The procedure sets a run-specific `CONTEXT_INFO` token (`z.BackupDatabase:<RunID>`) on the parent request (restoring the caller's original `CONTEXT_INFO` before returning), creates one temporary executor procedure (`z.usp_BackupDatabaseExecutor_<RunID>`) and one self-dropping per-database procedure (`z.usp_BackupDatabaseWorker_<RunID>_<NNNNN>`, ordered from largest to smallest data-file size) in schema `z`, and starts `min(@Threads, database count)` temporary self-deleting Agent jobs calling the executor procedure. The executor uses [z.usp_ExecuteProcedures](../../../docs/reference/procedures.md#zusp_executeprocedures) to claim and execute remaining per-database procedures one by one without duplicate execution. Each per-database procedure verifies the target database's `database_id`, `name`, `create_date`, and `ONLINE` state, shares the parent run `BatchID` via `SESSION_CONTEXT` when invoking `z.usp_BackupDatabase @Threads = 1` for that single database, swallows errors (recording a fallback `Failed` row in `z.BackupRestoreHistory` if the inner call failed before logging), and drops itself unconditionally.
+- **Job startup retries**: The parent polls tracked jobs every second and allows up to three start attempts per job, at least 10 seconds apart. A job that never starts is removed while remaining started workers continue draining the queue; if zero worker jobs start, temporary jobs and procedures are cleaned up and error `50000` is raised.
+- **Parent cancellation and stopped/undeleted worker jobs**: If the parent request is cancelled or its job is stopped, its `CONTEXT_INFO` marker disappears from `sys.dm_exec_requests`, causing queued per-database procedures to skip their backups and drop themselves while in-flight backups finish and self-delete their jobs. If all remaining tracked worker jobs have started and none are running (`z.fn_IsSQLJobRunning(JobID) = 1` is false for every remaining tracked job) across 5 consecutive 1-second checks (for example, if a worker job was stopped manually and not auto-deleted by Agent), the parent deletes those leftover jobs, drops remaining executor and worker procedures, and raises error `50000`.
+- **Completion and leftover cleanup**: On normal completion, the parent drops the executor procedure (and any unexecuted worker procedures), inspects `z.BackupRestoreHistory` under the shared `BatchID`, and throws summary error `50000` if any database failed or any worker procedure did not complete. If the parent connection is terminated unexpectedly before cleanup runs, run [z.usp_CleanupBackupRestoreObjects](z.usp_CleanupBackupRestoreObjects.md).
+
+## Retention
 
 Retention defaults to disabled (`@RetentionHours = null`). When `@RetentionHours` is set to a positive integer on a filesystem destination (`@IsUrl = 0`), the procedure calls [z.usp_CleanupDatabaseBackups](z.usp_CleanupDatabaseBackups.md) on that database's backup folder after its backup finishes, passing `@BackupType = @BackupType`, `@KeepLatestChain = 1` and `@UseBackupHeader = 0` so expired files of that backup type are removed best-effort while preserving the latest recovery chain: if an active `DIFF` exists for the latest regular `.bak` full, it retains that `.bak`, the latest `DIFF`, 1 predecessor log immediately before that `DIFF`, and subsequent logs (letting expired `.copyonly.bak` files age out); otherwise it retains the newest full (`.bak` or `.copyonly.bak`), 1 predecessor log immediately before that full, and subsequent logs. Zero or negative `@RetentionHours` values are rejected. Although cleanup issues never abort `z.usp_BackupDatabase` or mark `z.BackupRestoreHistory` failed, a locked expired file causes `master.sys.xp_delete_files` to emit error `22049` on the client stream; schedule standalone cleanup separately if concurrent readers lock expired files and a client-side `22049` message would fail the backup job step. For URL destinations, `@RetentionHours` is ignored—use storage lifecycle rules or provider tooling for cloud retention. You can also run `z.usp_CleanupDatabaseBackups` independently against any single-database or multi-database backup folder for custom retention schedules or `@KeepLatestChain = 0` / `@UseBackupHeader = 1` policies.

@@ -182,9 +182,9 @@ Executors in the same dispatcher database share one semaphore slot per target pr
 
 For example, thread 1 starts procedure 1. Thread 2 skips procedure 1, finishes procedure 2, and moves to procedure 3. When thread 1 finishes procedure 1, it reaches procedure 2 and runs it again because procedure 2 is no longer running. Procedure 2 has now executed twice.
 
-Use a single executor when each matching procedure should run once per call. Multiple executors are suitable only when repeated execution is acceptable. They can also run later procedures before earlier ones have finished in another thread.
+Use a single executor when each matching procedure should run once per call and remains installed. Multiple executors are suitable when repeated execution is acceptable or when each procedure drops itself before releasing its slot so later executors skip it. They can also run later procedures before earlier ones have finished in another thread.
 
-If discovery fails, the dispatcher raises the error and ends the call before executing any procedure. If a selected procedure raises a catchable error, the dispatcher rolls back any open transaction, releases the semaphore, and continues. It prints the collected execution errors after the scan. The dispatcher makes one attempt per selected procedure and ignores procedure return codes.
+If discovery fails, the dispatcher raises the error and ends the call before executing any procedure. If a listed procedure is dropped after discovery and before its execution slot is acquired, the dispatcher skips it without error. If a selected procedure raises a catchable error, the dispatcher rolls back any open transaction, releases the semaphore, and continues. It prints the collected execution errors after the scan. The dispatcher makes one attempt per selected procedure and ignores procedure return codes.
 
 Call the dispatcher from a connection without an enclosing transaction. Called procedures manage their own transactions, and any parameters must have defaults. The caller needs access to the target databases and permission to see and execute the selected procedures. Install Schema Z in the dispatcher database and use compatibility level 130 or later for `string_split`. Target databases can use older compatibility levels and can run without an installation.
 

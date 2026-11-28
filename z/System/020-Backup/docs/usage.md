@@ -43,7 +43,7 @@ exec z.usp_BackupDatabase @Databases = N'Application',
     @BackupFileNameFormat = N'{ServerName}${DatabaseName}_{yyyyMMdd}_{HHmmssfffffff}';
 ```
 
-Pass `@RetentionHours` on `z.usp_BackupDatabase` (or `z.usp_BackupDatabasesParallel`) to remove expired filesystem backups of that `@BackupType` automatically while keeping the latest recovery chain, or run [z.usp_CleanupDatabaseBackups](reference/z.usp_CleanupDatabaseBackups.md) directly:
+Pass `@RetentionHours` on `z.usp_BackupDatabase` to remove expired filesystem backups of that `@BackupType` automatically while keeping the latest recovery chain, or run [z.usp_CleanupDatabaseBackups](reference/z.usp_CleanupDatabaseBackups.md) directly:
 
 ```sql
 -- Automatic per-type retention during backup (keeps latest full/diff/log chain even if older than 48 hours):
@@ -139,14 +139,16 @@ The preview returns the same ordered command table that execution consumes.
 
 ## Parallel backups
 
+Pass `@Threads > 1` on `z.usp_BackupDatabase` to back up multiple databases concurrently through temporary SQL Server Agent worker jobs (`@Threads = 1` or single-database selections run inline):
+
 ```sql
-exec z.usp_BackupDatabasesParallel @Databases = N'UserDatabases',
-    @BackupType = N'Full', @BackupFolder = N'D:\Backups', @MaxConcurrentWorkers = 3;
+exec z.usp_BackupDatabase
+	@Databases = N'UserDatabases',
+	@BackupType = N'Full',
+	@BackupFolder = N'D:\Backups',
+	@Threads = 3;
 ```
 
-Waits for temporary Agent workers, attempts every selected database once and
-throws after completion if any task failed. Inspect retained TaskQueue results.
-Its temporary TaskQueue executors accept the standard `@Parameters nvarchar(max)`
-argument; each wrapper supplies its fixed backup inputs. Cleanup checks
-`z.v_TaskQueueRunningTasks` before dropping those temporary executors.
-See [parallel backup reference](reference/z.usp_BackupDatabasesParallel.md).
+The parent procedure creates one executor procedure and one self-dropping per-database procedure per selected database (queued largest-first), launches up to `@Threads` temporary Agent jobs (capped at the selected database count), waits until every job finishes, drops the executor procedure, and raises summary error `50000` if any database failed or remained incomplete. All database outcomes share one `BatchID` in `z.BackupRestoreHistory`. If the parent request is cancelled, remaining queued procedures skip their backups and drop themselves; if all remaining started worker jobs stop running without Agent auto-deleting them across 5 consecutive 1-second checks, the parent removes those leftover jobs and temporary procedures and raises error `50000`. If the parent session is terminated unexpectedly before cleanup runs, call [z.usp_CleanupBackupRestoreObjects](reference/z.usp_CleanupBackupRestoreObjects.md) on demand to remove leftover procedures and idle temporary jobs.
+
+See [z.usp_BackupDatabase reference](reference/z.usp_BackupDatabase.md).

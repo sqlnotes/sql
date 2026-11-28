@@ -92,7 +92,7 @@ One loop polls the tracked jobs with a one-second delay between passes. It reque
 
 Ten seconds after the third request, if the job still exists and no worker session has been seen, the launcher stops tracking it and attempts to delete it with its history and unused schedules. Successful launcher deletion does not count as a worker start. If the Agent call errors and the job is already missing, the launcher counts it as a start. If the job is still present, the launcher logs the removal error. The job can remain in Agent for manual cleanup.
 
-When the launcher finishes tracking jobs, it sets Completed and records `FinishedAtUTC` only if its batch is still Running with the same `ExecutionID` and `StartedAtUTC`. Stop, Resume or a newer launch can make that update a successful no-op. If no job counted as started and the guarded update succeeds, the launcher records the error in `LastErrorMessage`, commits, then logs and raises it. Completed means the launch ended. Tasks can remain Failed, Pending or waiting for a retry. Inspect task rows to decide whether the work succeeded. [Parallel backup](../../020-Backup/docs/reference/z.usp_BackupDatabasesParallel.md) requires every selected task to succeed.
+When the launcher finishes tracking jobs, it sets Completed and records `FinishedAtUTC` only if its batch is still Running with the same `ExecutionID` and `StartedAtUTC`. Stop, Resume or a newer launch can make that update a successful no-op. If no job counted as started and the guarded update succeeds, the launcher records the error in `LastErrorMessage`, commits, then logs and raises it. Completed means the launch ended. Tasks can remain Failed, Pending or waiting for a retry. Inspect task rows to decide whether the work succeeded.
 
 ## Worker and execution ownership
 
@@ -108,7 +108,7 @@ Recovery marks unlocked Running attempts Failed, keeps the recorded attempt coun
 
 ### Batch change lock
 
-`z.usp_TaskQueueLockBatchForChange @BatchID` acquires one transaction-owned slot on `z.TaskQueue.Batch:<BatchID>` with unlimited wait. Commit or rollback releases it. Without an active transaction the helper returns immediately. The same lock serializes lifecycle changes, worker claims, recovery, outcome recording and parallel-backup cleanup for one batch.
+`z.usp_TaskQueueLockBatchForChange @BatchID` acquires one transaction-owned slot on `z.TaskQueue.Batch:<BatchID>` with unlimited wait. Commit or rollback releases it. Without an active transaction the helper returns immediately. The same lock serializes lifecycle changes, worker claims, recovery and outcome recording for one batch.
 
 ### Task semaphore
 
