@@ -15,6 +15,7 @@ Choose a backup, restore, cleanup or inspection object below. Each reference exp
 | `z.usp_RestoreDatabaseExecute` | [Implementation helper](z.usp_RestoreDatabase.md) | [SQL](../../modules/1070%20Procedures/z.usp_RestoreDatabaseExecute.sql) |
 | `z.usp_CleanupDatabaseBackups` | [Reference](z.usp_CleanupDatabaseBackups.md) | [SQL](../../modules/1070%20Procedures/z.usp_CleanupDatabaseBackups.sql) |
 | `z.usp_CreateDatabaseSnapshot` | [Reference](z.usp_CreateDatabaseSnapshot.md) | [SQL](../../modules/1070%20Procedures/z.usp_CreateDatabaseSnapshot.sql) |
+| `z.BackupRestoreHistory` | [Reference](backup-restore-history.md#zbackuprestorehistory) | [SQL](../../baseline/2020%20Tables/z.BackupRestoreHistory.sql) |
 | `z.v_BackupRestore` | [Reference](supporting-objects.md#zv_backuprestore) | [SQL](../../modules/1020%20Views/z.v_BackupRestore.sql) |
 | `z.v_BackupHistory` | [Reference](backup-restore-history.md#zv_backuphistory) | [SQL](../../modules/1020%20Views/z.v_BackupHistory.sql) |
 | `z.v_RestoreHistory` | [Reference](backup-restore-history.md#zv_restorehistory) | [SQL](../../modules/1020%20Views/z.v_RestoreHistory.sql) |

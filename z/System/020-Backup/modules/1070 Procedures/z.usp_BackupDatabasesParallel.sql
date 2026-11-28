@@ -18,7 +18,11 @@ create or alter procedure z.usp_BackupDatabasesParallel
 	@BackupFileNameFormat nvarchar(4000) = N'{ServerName}${InstanceName}${DatabaseName}_{yyyyMMdd}_{HHmmssfffffff}',
 	@MaxConcurrentWorkers int = 3,
 	@BatchID bigint = null output,
-	@CopyOnly bit = 0
+	@CopyOnly bit = 0,
+	@FullBackupIfNeeded bit = 1,
+	@CreateServerInstanceFolder bit = 1,
+	@CreateBackupTypeFolder bit = 1,
+	@RetentionHours int = null
 )
 as
 begin
@@ -29,14 +33,16 @@ begin
 	if @MaxConcurrentWorkers is null or @MaxConcurrentWorkers <= 0
 		throw 50000, 'MaxConcurrentWorkers must be positive.', 1;
 
+	if @RetentionHours <= 0
+		throw 50000, 'RetentionHours must be positive or NULL.', 1;
+
 	select	@BackupType = upper(trim(@BackupType));
 
 	if @BackupType is null or @BackupType not in (N'FULL', N'DIFF', N'LOG')
 		throw 50000, 'BackupType must be Full, Diff or Log.', 1;
 
-	declare	@DatabaseName sysname, @DatabaseID int, @CreateDate datetime, @TaskID int,
-			@Wrapper sysname,
-			@BatchName nvarchar(128) = @@servername + N' - ' + @BackupType + N' - ' + convert(nvarchar(27), sysdatetime(), 121),
+	declare	@DatabaseName sysname, @DatabaseID int, @CreateDate datetime, @TaskID int, @Wrapper sysname,
+			@BatchName nvarchar(128) = isnull(@@servername, isnull(nullif(trim(@ServerName), N''), N'SQLServer')) + N' - ' + @BackupType + N' - ' + convert(nvarchar(27), sysdatetime(), 121),
 			@BackupArguments nvarchar(max), @DatabaseLiteral nvarchar(max), @DatabaseSelectorLiteral nvarchar(max), @IdentityPredicate nvarchar(max),
 			@SQL nvarchar(max), @ExecutorProcedure nvarchar(1035), @CleanupSQL nvarchar(max), @Error nvarchar(4000);
 
@@ -50,29 +56,34 @@ begin
 		select	@DatabasesCsv = @Databases;
 
 	insert @Targets (TaskID, DatabaseID, DatabaseName, CreateDate)
-		select	row_number() over (order by Size desc, d.name) , d.database_id, d.name, d.create_date
+		select	row_number() over (order by m.Size desc, d.name), d.database_id, d.name, d.create_date
 		from sys.databases d
-			cross apply(
-							select	sum(convert(bigint, m.size)) Size
-							from sys.master_files m
-							where m.database_id = d.database_id
-								and m.type_desc = 'ROWS'
-						) m
+			cross apply
+			(
+				select	sum(convert(bigint, m.size)) Size
+				from sys.master_files m
+				where m.database_id = d.database_id
+					and m.type_desc = 'ROWS'
+			) m
 		where d.state_desc not in ('RESTORING', 'RECOVERING', 'RECOVERY_PENDING', 'SUSPECT', 'EMERGENCY')
 			and d.name <> N'tempdb'
 			and m.Size is not null
 			and (
-					@Databases = N'AllDatabases'
-					or @Databases = N'UserDatabases' and d.name not in (N'master', N'model', N'msdb')
-					or @Databases = N'SystemDatabases' and d.name in (N'master', N'model', N'msdb')
-					or exists (select 1 from string_split(@DatabasesCsv, N',') s where trim(s.value) = d.name)
-					or exists (
-						select 1 from openjson(@DatabasesJson) j
-						where j.type = 1 and j.value = d.name and datalength(j.value) = datalength(d.name)
-					)
+				@Databases = N'AllDatabases'
+				or @Databases = N'UserDatabases' and d.name not in (N'master', N'model', N'msdb')
+				or @Databases = N'SystemDatabases' and d.name in (N'master', N'model', N'msdb')
+				or exists (select 1 from string_split(@DatabasesCsv, N',') s where trim(s.value) = d.name collate database_default)
+				or exists (
+					select	1
+					from openjson(@DatabasesJson) j
+					where j.type = 1
+						and j.value = d.name collate database_default
+						and datalength(j.value) = datalength(d.name)
 				)
+			);
 
-	if not exists (select 1 from @Targets) return;
+	if not exists (select 1 from @Targets)
+		return;
 
 	-- These literals become fixed arguments in each run-specific procedure.
 	select	@BackupArguments = convert(nvarchar(max), N', @BackupType = N''') + replace(@BackupType, N'''', N'''''') + N''''
@@ -81,7 +92,11 @@ begin
 			+ N', @OtherBackupOptions = ' + isnull(N'N''' + replace(@OtherBackupOptions, N'''', N'''''') + N'''', N'null')
 			+ N', @ServerName = ' + isnull(N'N''' + replace(@ServerName, N'''', N'''''') + N'''', N'null')
 			+ N', @BackupFileNameFormat = ' + isnull(N'N''' + replace(convert(nvarchar(max), @BackupFileNameFormat), N'''', N'''''') + N'''', N'null')
-			+ N', @CopyOnly = ' + isnull(convert(nvarchar(4), @CopyOnly), N'null') + N';';
+			+ N', @FullBackupIfNeeded = ' + isnull(convert(nvarchar(4), @FullBackupIfNeeded), N'null')
+			+ N', @CopyOnly = ' + isnull(convert(nvarchar(4), @CopyOnly), N'null')
+			+ N', @CreateServerInstanceFolder = ' + isnull(convert(nvarchar(4), @CreateServerInstanceFolder), N'null')
+			+ N', @CreateBackupTypeFolder = ' + isnull(convert(nvarchar(4), @CreateBackupTypeFolder), N'null')
+			+ N', @RetentionHours = ' + isnull(convert(nvarchar(11), @RetentionHours), N'null') + N';';
 
 	begin try
 		-- Publish only a complete task definition set.
@@ -89,7 +104,10 @@ begin
 		exec z.usp_TaskQueueCreateBatch @BatchID = @BatchID output, @BatchName = @BatchName,
 			@MaxConcurrentWorkers = @MaxConcurrentWorkers, @BatchType = N'Backup';
 
-		declare cTargets cursor local fast_forward for select TaskID, DatabaseID, DatabaseName, CreateDate from @Targets order by TaskID;
+		declare cTargets cursor local fast_forward for
+			select	TaskID, DatabaseID, DatabaseName, CreateDate
+			from @Targets
+			order by TaskID;
 		open cTargets;
 		fetch next from cTargets into @TaskID, @DatabaseID, @DatabaseName, @CreateDate;
 		while @@fetch_status = 0
@@ -137,7 +155,8 @@ end;';
 		order by TaskID desc;
 		if @@rowcount > 0 throw 50000, @Error, 1;
 		select	@CleanupSQL = N'drop procedure if exists ' + string_agg(convert(nvarchar(max), quotename(Wrapper)), N', ') + N';'
-			from @Targets where Wrapper is not null;
+		from @Targets
+		where Wrapper is not null;
 		exec(N'use tempdb; ' + @CleanupSQL);
 		commit;
 	end try

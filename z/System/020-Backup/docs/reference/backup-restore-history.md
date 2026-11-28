@@ -2,7 +2,31 @@
 
 [Object index](readme.md) | [Subsystem](../readme.md)
 
-These read-only views expose recorded history and active requests. They do not
+Use `z.BackupRestoreHistory` to inspect local execution outcomes from `z.usp_BackupDatabase`, `z.usp_BackupDatabasesParallel` and `z.usp_RestoreDatabase` without querying `msdb`. Use the read-only `msdb` and DMV views when you need full backup-set LSN metadata, external backups not run through these procedures, or live progress of an active native command.
+
+## z.BackupRestoreHistory
+
+[Source](../../baseline/2020%20Tables/z.BackupRestoreHistory.sql)
+
+Partition-managed execution log for backups and restores run through this subsystem. Each backup step (`FULL`, `DIFF`, `LOG`) and each executed restore step (`FULL`, `DIFF`, `LOG`, `FINALIZE`) or planning/inventory failure writes one row with a run `BatchID` (`uniqueidentifier` per sequential backup or restore call, or per worker task under `z.usp_BackupDatabasesParallel`, distinct from TaskQueue's `bigint` batch ID), UTC `StartTime`, `EndTime`, `DurationMs`, `Status` (`Succeeded` or `Failed`), `BackupFile`, `ErrorNumber`, `ErrorMessage`, and session context (`LoginName`, `ApplicationName`, `HostName`, `SessionID`). For backups, `IsCopyOnly` reflects `@CopyOnly = 1` and automatic read-only `COPY_ONLY` on `FULL` and `LOG` steps (top-level `COPY_ONLY` supplied in `@OtherBackupOptions` is stripped). `@ShowPlan = 1` previews do not write rows.
+
+`HistoryID` uses the shared UTC-prefixed sequence identifier (`datediff_big(second, '19000101', getutcdate()) * 268435456 | next value for z.SeqGeneralID`) clustered on `PS_SchemaZPartitionGeneric(HistoryID)` with `DATA_COMPRESSION = ROW` and no secondary indexes, keeping high-database-count logging lightweight and automatically truncated by [Partition](../../../010-Partition/docs/readme.md) maintenance.
+
+When runtime native `BACKUP` or `RESTORE` execution fails inside T-SQL `TRY...CATCH`, SQL Server exposes the terminating `3013` error to `ERROR_NUMBER()` and `ERROR_MESSAGE()` (`BACKUP DATABASE is terminating abnormally.`, etc.); check the SQL Server error log for underlying operating-system or media error messages. Compile or option-syntax failures (such as an invalid `@OtherBackupOptions` clause) record their direct SQL error (such as `155`), and procedure-level validation and planning errors record their specific `50000` message directly.
+
+```sql
+select top (100)
+	HistoryID, BatchID, Operation, DatabaseName, SourceDatabaseName,
+	BackupType, RecoveryType, IsCopyOnly, Status, DurationMs,
+	StartTime, EndTime, ErrorNumber, ErrorMessage, BackupFile,
+	LoginName, ApplicationName, HostName, SessionID
+from z.BackupRestoreHistory
+order by HistoryID desc;
+```
+
+## msdb and DMV views
+
+These read-only views expose recorded `msdb` history and active requests. They do not
 open backup media or certify that a restore chain is complete. History reflects
 the local instance's retained msdb records; backups copied from another server
 may have no record here. Cleaning msdb history removes those observations.

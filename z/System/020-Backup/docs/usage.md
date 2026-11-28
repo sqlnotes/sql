@@ -13,7 +13,7 @@ exec z.usp_BackupDatabase
 ```
 
 To back up a database named `Region,West`, pass `@Databases = N'["Region,West"]'`.
-For a copy-only full or log backup, set `@CopyOnly = 1`.
+For a copy-only full or log backup, set `@CopyOnly = 1`. To write directly to `<BackupFolder>\<Database>\` without `<Server>\<Instance>` or `FULL`/`DIFF`/`LOG` subfolders (for example, log shipping), pass `@CreateServerInstanceFolder = 0, @CreateBackupTypeFolder = 0`.
 
 ServerName controls the destination prefix only. Omit it or pass NULL to use @@servername. It does not connect to another server. Windows accepts slash-separated inputs through normalization; use a mounted filesystem path such as `/mnt/backup` on Linux.
 
@@ -32,7 +32,7 @@ exec z.usp_BackupDatabase
 	@ServerName = N'ProductionLabel';
 ```
 
-The procedure appends server/instance/database/type/timestamped-filename prefixes to these bases. S3 requires SQL Server 2022 or later. URLs use `/` on both operating systems and never create directories or delete old objects. See [destination requirements](reference/z.usp_BackupDatabase.md).
+The procedure appends server/instance/database/type/timestamped-filename prefixes to these bases (controlled by `@CreateServerInstanceFolder` and `@CreateBackupTypeFolder`). S3 requires SQL Server 2022 or later. URLs use `/` on both operating systems and never create directories or delete old objects. See [destination requirements](reference/z.usp_BackupDatabase.md).
 
 Default filenames include all three components separated by `$`, including
 MSSQLSERVER for a default instance. Override BackupFileNameFormat to omit a
@@ -43,17 +43,25 @@ exec z.usp_BackupDatabase @Databases = N'Application',
     @BackupFileNameFormat = N'{ServerName}${DatabaseName}_{yyyyMMdd}_{HHmmssfffffff}';
 ```
 
-Schedule filesystem retention independently:
+Pass `@RetentionHours` on `z.usp_BackupDatabase` (or `z.usp_BackupDatabasesParallel`) to remove expired filesystem backups of that `@BackupType` automatically while keeping the latest recovery chain, or run [z.usp_CleanupDatabaseBackups](reference/z.usp_CleanupDatabaseBackups.md) directly:
 
 ```sql
+-- Automatic per-type retention during backup (keeps latest full/diff/log chain even if older than 48 hours):
+exec z.usp_BackupDatabase
+	@Databases = N'Application',
+	@BackupType = N'Log',
+	@BackupFolder = N'D:\Backup',
+	@RetentionHours = 48;
+
+-- Standalone cleanup across a database folder or entire backup share:
 exec z.usp_CleanupDatabaseBackups
-	@DatabaseName = N'Application',
-	@DatabaseBackupFolder = N'D:\Backup\ProductionLabel\MSSQLSERVER\Application',
+	@BackupFolder = N'D:\Backup',
 	@RetentionHours = 48,
-	@ShowPlan = 1;
+	@BackupType = 'LOG',
+	@KeepLatestChain = 1;
 ```
 
-Use `@UseBackupHeader = 1` on the cleanup procedure for header-based cleanup. URL retention belongs to storage lifecycle policies or separate provider tooling. Inspect [cleanup rules](reference/z.usp_CleanupDatabaseBackups.md) before deletion. Read-only FULL and LOG backups automatically use COPY_ONLY. SQL Server ignores that option for DIFF backups.
+Use `@UseBackupHeader = 1` on standalone cleanup calls when backup filenames do not follow the standard convention. URL retention belongs to storage lifecycle policies or separate provider tooling. Inspect [cleanup rules](reference/z.usp_CleanupDatabaseBackups.md) for `@KeepLatestChain` and `@BackupType` behavior. Copy-only `FULL` and `LOG` backups use `.copyonly.bak` and `.copyonly.trn` extensions (including automatic `COPY_ONLY` for read-only databases); SQL Server ignores `COPY_ONLY` for `DIFF` backups.
 
 ## Restore a full backup, differential and logs
 
@@ -70,12 +78,14 @@ exec z.usp_RestoreDatabase
 ```
 
 Set ShowPlan = 0 to execute the selected sequence. The default leaves the database
-in NORECOVERY. A missing explicit target requires exactly one usable full-backed
-source family: several fulls of one database count once, and unrelated standalone
-logs/differentials do not add initialization candidates. Two full-backed families
-are ambiguous even when one source name matches the requested target.
+in NORECOVERY. A missing explicit target uses the unique full-backed source family
+(allowing rename) or, when several full-backed families exist in a multi-database
+folder, the unique family matching `@TargetDatabaseName`. Several fulls of one
+database count once, and unrelated standalone logs/differentials do not add
+initialization candidates. Two full-backed families remain ambiguous when neither
+matches `@TargetDatabaseName`.
 An existing compatible RESTORING/STANDBY target selects its native family and
-receives pending backups, ignoring unrelated sources. Explicit replacement of
+receives pending backups, ignoring unrelated sources and newer full backups. Explicit replacement of
 other existing destinations requires ReplaceExisting = 1, the default.
 
 Omit TargetDatabaseName to process each user database under its source name.

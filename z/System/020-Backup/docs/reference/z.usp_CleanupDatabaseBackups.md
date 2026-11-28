@@ -4,73 +4,53 @@
 
 ## Purpose and scope
 
-Removes old backup files from one database's FULL, DIFF and LOG folders while preserving the files selected by its retention rules. Start with `@ShowPlan = 1` to review what would be kept or deleted. This is a separate maintenance operation; taking a backup does not run cleanup automatically.
+Removes expired `.bak`, `.copyonly.bak`, `.diff`, `.trn` and `.copyonly.trn` backup files recursively under `@BackupFolder` on a best-effort basis without throwing T-SQL exceptions, consulting `sys.databases`, or returning result sets. If a file cannot be deleted (for example, because another process holds it open), `master.sys.xp_delete_files` emits extended-procedure error `22049` (severity 16) to the client stream while T-SQL leaves that file in place and continues deleting remaining eligible candidates.
 
-By default it recognizes managed backup filenames without opening backup headers. Set `@UseBackupHeader = 1` when filenames are irregular or you need the metadata-based dependency checks described below. Cleanup works from the supplied folders, not `msdb` history.
-
-The database-level folder must be an absolute Windows local/UNC path or an absolute Linux path. Mount Linux network shares before calling. Supply the parent of the three backup-type folders, not the overall backup destination root.
+`z.usp_BackupDatabase` calls this procedure automatically on each database's folder after backing up to disk when `@RetentionHours` is specified, using `@UseBackupHeader = 0` and `@KeepLatestChain = 1`. You can also schedule `z.usp_CleanupDatabaseBackups` directly against a single database folder, an instance folder, or a multi-database root/log-shipping share—including backups for remote or dropped databases—to apply separate retention windows for `FULL`, `DIFF` and `LOG` backups or to use `@UseBackupHeader = 1` on custom filenames.
 
 ## Parameters
 
-```text
-@DatabaseName sysname,
-@DatabaseBackupFolder nvarchar(max),
-@RetentionHours int,
-@ShowPlan bit = 0,
-@UseBackupHeader bit = 0
+```sql
+create or alter procedure z.usp_CleanupDatabaseBackups
+(
+	@BackupFolder nvarchar(4000),
+	@RetentionHours int,
+	@BackupType varchar(10) = null,
+	@KeepLatestChain bit = 1,
+	@UseBackupHeader bit = 0
+)
 ```
 
-Positive retention hours define a cutoff. `NULL` disables cleanup; zero and negative values are invalid. `ShowPlan = 1` returns the plan without deleting files.
+| Parameter | Description |
+| --- | --- |
+| `@BackupFolder` | Filesystem folder on Windows (drive or UNC) or Linux to clean recursively (a single database folder, an instance folder, or a multi-database root). Missing or inaccessible folders return quietly. |
+| `@RetentionHours` | Retention window in hours. `NULL` or nonpositive values perform no cleanup and return quietly. |
+| `@BackupType` | Optional filter (`FULL`, `DIFF`, `LOG`, or `NULL`/`ALL` for all types) so each backup type can use its own retention schedule. |
+| `@KeepLatestChain` | When `1` (default), preserves each database's latest recovery chain even if `@RetentionHours` is shorter. When an active `DIFF` exists against the latest regular `FULL`, the retained chain is that regular `FULL`, the latest `DIFF`, and required `LOG`s (`.trn` and `.copyonly.trn`); otherwise, it is the newest `FULL` (regular or `COPY_ONLY`) and its required `LOG`s. In filename mode (`@UseBackupHeader = 0`), it uses `.copyonly.*` extensions to distinguish copy-only backups and retains 1 predecessor `LOG` immediately before the chain anchor (`DIFF`, or `FULL` when no `DIFF` applies). When `0`, deletes expired files strictly by `@RetentionHours`. |
+| `@UseBackupHeader` | When `0` (default), never reads backup headers; decodes recognized filenames via [z.fn_DecodeBackupFileName](z.fn_DecodeBackupFileName.md) (`.bak`, `.copyonly.bak`, `.diff`, `.trn`, `.copyonly.trn` with database name and UTC timestamp) and leaves unrecognized filenames untouched. When `1`, reads single-set backup headers via [z.usp_ReadBackupHeader](z.usp_ReadBackupHeader.md) using server-local `BackupFinishDate`, `(ServerName, DatabaseName)` grouping, and LSN/GUID chain relationships (useful for custom filenames outside the standard convention). |
 
-The folder input is checked against the 4,000 UTF-16 code-unit internal path limit before conversion; longer inputs are rejected.
+## Retention and latest-chain rules
 
-Native backup paths have a smaller limit: the complete filename must fit within 259 UTF-16 code units. The backup procedure leaves unusable paths to native directory and backup operations. Filename mode preserves individual files with unsupported path lengths or wildcard/control characters. In header mode those files prevent cleanup for the whole inventory. Folder inputs reject wildcard/control characters, dot segments, repeated separators and Windows trailing-dot/space aliases.
+1. **Candidate selection**: Only `.bak`, `.copyonly.bak`, `.diff`, `.trn` and `.copyonly.trn` files under `@BackupFolder` whose timestamp is older than `@RetentionHours` (and whose type matches `@BackupType` when specified) become deletion candidates. Filename mode (`@UseBackupHeader = 0`) never reads backup headers; it groups files by container folder (merging `FULL`, `DIFF` and `LOG` subfolders with their parent database folder) and decoded database name, leaving unrecognized filenames untouched. Header mode (`@UseBackupHeader = 1`) groups by `(ServerName, DatabaseName)` from native backup headers and leaves unreadable headers and multi-set files untouched.
+2. **Latest-chain protection (`@KeepLatestChain = 1`)**: Independently for each database source discovered under `@BackupFolder`, cleanup preserves the latest chain even when timestamps are older than `@RetentionHours`:
+   - **Filename mode (`@UseBackupHeader = 0`)**: When at least one `DIFF` exists at or after the latest regular `.bak` full (or when a `DIFF` exists with no regular `.bak`), keeps that latest regular `.bak`, the latest `DIFF`, **1 predecessor `LOG` immediately before that `DIFF`** so start-time overlap never breaks point-in-time recovery, and all `LOG` backups (`.trn` and `.copyonly.trn`) at or after that `DIFF`, while allowing expired `.copyonly.bak` files to age out. When no active `DIFF` exists, keeps the newest `FULL` backup (`.bak` or `.copyonly.bak`), **1 predecessor `LOG` immediately before that `FULL`**, and all `LOG` backups at or after that `FULL`. Earlier `LOG` backups before that predecessor `LOG` can be deleted when older than `@RetentionHours`.
+   - **Header mode (`@UseBackupHeader = 1`)**: When at least one undamaged `DIFF` matches the latest non-copy-only `FULL` (`d.DifferentialBaseGUID = RegularFull.BackupSetGUID`), keeps that regular `FULL`, the latest matching `DIFF`, and all `LOG` backups on that `FamilyGUID` whose `LastLSN >= Diff.LastLSN`, allowing expired `COPY_ONLY` fulls to age out. When no active `DIFF` applies, keeps the newest `FULL` (regular or `COPY_ONLY`) and all `LOG` backups on that `FamilyGUID` whose `LastLSN >= Full.FirstLSN`. Earlier `LOG` backups between the latest `FULL` and latest `DIFF` that are older than `@RetentionHours` can still be deleted because the retained `DIFF` supersedes them.
+3. **Pure cutoff mode (`@KeepLatestChain = 0`)**: Deletes all recognized files of the selected `@BackupType` older than `@RetentionHours` across `@BackupFolder` without applying the latest-chain rule.
 
-## Default: filename-based cleanup
+## Examples
 
-Recognize the current and legacy conventions through
-[z.fn_DecodeBackupFileName](z.fn_DecodeBackupFileName.md), matching the standardized
-database-name hint and the FULL/DIFF/LOG folder type:
+```sql
+-- Apply separate retention windows across an entire backup share while keeping each database's latest recovery chain.
+exec z.usp_CleanupDatabaseBackups @BackupFolder = N'D:\Backup', @RetentionHours = 336, @BackupType = 'FULL';
+exec z.usp_CleanupDatabaseBackups @BackupFolder = N'D:\Backup', @RetentionHours = 72,  @BackupType = 'DIFF';
+exec z.usp_CleanupDatabaseBackups @BackupFolder = N'D:\Backup', @RetentionHours = 24,  @BackupType = 'LOG';
 
-```text
-FULL/Server$MSSQLSERVER$Database_yyyyMMdd_HHmmssfffffff.bak
-DIFF/Server$Instance$Database_yyyyMMdd_HHmmssfffffff.diff
-LOG/Database_yyyyMMdd_HHmmss_ffffff.trn
+-- Pure age-based cleanup on a single database folder regardless of the latest-chain rule.
+exec z.usp_CleanupDatabaseBackups @BackupFolder = N'D:\Backup\Sales', @RetentionHours = 168, @KeepLatestChain = 0;
 ```
 
-The default instance is included as MSSQLSERVER. Custom formats may omit it.
-Filename timestamps and the cutoff use UTC with datetime2(7) precision.
-Use header mode for inventories with older server-local filename timestamps.
-Malformed names, other database hints and custom layouts outside the parser's
-recognized shapes are preserved. Use header mode for those layouts.
+## Operational notes
 
-Keep the latest recognized full filename at or before the cutoff, all recognized backups at or after that timestamp, and the immediately preceding recognized log file. Without a recognized full anchor, preserve everything. Older recognized files can be deleted. Recheck inventory membership, sizes and modification times before deletion.
-
-If another database currently listed in `sys.databases` maps to the same sanitized filename prefix, preserve the whole inventory. For example, `A B` and `A_B` share a prefix. This guard includes offline databases, but cannot identify historical ownership after a conflicting database has been dropped.
-
-A legacy database name containing `$` can resemble a server-prefixed name.
-If the raw prefix matches another current database, preserve the whole inventory
-and use header mode. Names or ownership no longer visible in current catalogs
-cannot be proven from filenames alone; use header mode for ambiguous `$` layouts.
-
-This mode trusts managed filenames. It does not inspect database identity, copy-only flags, differential bases or LSNs, and does not prove a recoverable chain. Preserving an irregular file does not establish its dependencies. Use header mode when those checks are needed, including inventories containing copy-only backups or mixed database identities.
-
-## Optional: header-based cleanup
-
-With `UseBackupHeader = 1`, inspect all relevant backup-shaped files using native
-`RESTORE LABELONLY` and `RESTORE HEADERONLY`. This mode compares the header
-timestamps with a server-local cutoff.
-
-- Require understood, single-file, single-set, nonmirrored full, differential or log backups matching the current database lineage and recovery fork.
-- Keep the newest usable ordinary full backup completed at or before the cutoff. Without such an anchor, preserve the whole inventory.
-- Keep the anchor, newer backups and overlapping logs. Retained differential backups must have an identifiable retained full base.
-- An unreadable, unsupported or ambiguous relevant file blocks deletion across the database inventory. Other file types are outside cleanup.
-- Recheck all inventoried metadata and inventory membership before deletion, delete exact paths, and check native return codes and actual disappearance.
-
-Retention is conservative and may keep files longer than the requested hours. It does not establish that every point in the window is recoverable: missing log files, corruption, external backup consumers and backups elsewhere remain outside that proof. Header reads do not replace restore tests.
-
-## Coordination and failures
-
-This helper uses an exclusive session application lock on the managed database folder to coordinate cleanup calls. The backup procedure does not hold that lock while writing. Schedule cleanup separately from active backups. A competing cleanup call reports a busy-lock failure without deleting files. Call outside a transaction. Rejection with `XACT_ABORT ON` makes an active caller transaction uncommittable. Filesystem actions cannot be rolled back. Treat managed folders as trusted storage: application locks coordinate participating calls in the same SQL Server database, not arbitrary filesystem writers or other servers.
-
-Requires database catalog access, directory enumeration and file deletion rights. Header mode additionally requires backup metadata permissions; SQL Server 2019 through 2025 header layouts are handled explicitly, and unsupported layouts must not produce deletion candidates. Filename mode does not execute header or label reads.
+- Assumes SQL Server 2019 (15.x) or later, does not read `sys.databases` or `msdb`, and calls `master.sys.xp_delete_files` inside a `TRY...CATCH` per existing file.
+- Acquires no application locks/semaphores, returns no result sets, and returns quietly without errors or deletions on invalid/missing inputs or when called inside an active or implicit transaction. When an eligible file is locked by another process, `master.sys.xp_delete_files` still surfaces native error `22049` (severity 16) on the client stream even though T-SQL continues past the file without aborting.
+- Requires SQL Server service-account directory enumeration and file deletion permissions on `@BackupFolder`.

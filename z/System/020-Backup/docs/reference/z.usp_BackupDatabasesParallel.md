@@ -19,11 +19,15 @@ This example allows up to three backup workers and waits for them to finish. On 
 Accepts the same Databases, BackupType, BackupFolder, BackupCompression,
 OtherBackupOptions, ServerName and BackupFileNameFormat parameters/defaults as
 [z.usp_BackupDatabase](z.usp_BackupDatabase.md), followed by
-`@MaxConcurrentWorkers int = 3`, `@BatchID bigint = NULL OUTPUT` and
-`@CopyOnly bit = 0`. The wrapper forwards CopyOnly to the sequential backup.
+`@MaxConcurrentWorkers int = 3`, `@BatchID bigint = NULL OUTPUT`,
+`@CopyOnly bit = 0`, `@FullBackupIfNeeded bit = 1`,
+`@CreateServerInstanceFolder bit = 1`, `@CreateBackupTypeFolder bit = 1`
+and `@RetentionHours int = null`.
+The wrapper forwards CopyOnly, FullBackupIfNeeded, CreateServerInstanceFolder,
+CreateBackupTypeFolder and RetentionHours to the sequential backup.
 BatchID is an output for the newly generated batch; an input value is cleared.
-Batch names use `<@@servername> - <BackupType> - yyyy-MM-dd HH:mm:ss.fffffff`,
-using the actual SQL Server name, server local timestamp and normalized FULL,
+Batch names use `<ServerLabel> - <BackupType> - yyyy-MM-dd HH:mm:ss.fffffff`,
+using `@@servername` (falling back to non-blank `@ServerName` or `SQLServer` when `@@servername` is `NULL`), server local timestamp and normalized FULL,
 DIFF or LOG backup type. TaskName is the selected database name.
 
 Database selection is captured once without filtering by recovery model.
@@ -45,7 +49,7 @@ procedure. NULL values remain NULL and long option strings are preserved.
 The wrapper checks the captured database ID, name, creation date and online state
 before passing the captured name as a one-element JSON array in `@Databases`.
 This keeps a name containing a comma or spaces as a single target.
-Workers use the sequential procedure's default `@FullBackupIfNeeded = 1`.
+Workers forward `@FullBackupIfNeeded` (default `1`), the folder-layout flags (`@CreateServerInstanceFolder` and `@CreateBackupTypeFolder`, both default `1`) and `@RetentionHours` (default `null`) to the sequential procedure.
 A missing differential base makes the worker take a full backup instead of a
 differential. For an uninitialized log chain, it takes a full backup before the
 log backup. The sequential procedure skips log backups for SIMPLE databases.
@@ -60,7 +64,7 @@ an OUTPUT parameter. SQL Server OUTPUT values are not reliable after THROW; use
 the retained TaskQueue rows to investigate failures.
 
 On success, jobs and run-specific procedures are removed; batch/task rows and
-audit history remain. No retention cleanup is performed. On error, the backup
+audit history remain. Each worker's `z.usp_BackupDatabase` call also logs its step outcome to [z.BackupRestoreHistory](backup-restore-history.md#zbackuprestorehistory) using a per-worker `uniqueidentifier` `BatchID` (distinct from TaskQueue's `@BatchID bigint` output). Filesystem retention runs per database inside each worker only when `@RetentionHours` is specified. On error, the backup
 procedure rolls back an open transaction and rethrows; it does not explicitly
 drop wrappers, which follow global temporary procedure lifetime.
 Keep the creating connection alive; cancellation/disconnection may bypass cleanup.

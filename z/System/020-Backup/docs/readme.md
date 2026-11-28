@@ -20,10 +20,10 @@ Choose the operation that matches your task:
 | Back up databases one at a time | [Sequential backup](reference/z.usp_BackupDatabase.md) |
 | Back up several databases concurrently | [Parallel backup](reference/z.usp_BackupDatabasesParallel.md), with TaskQueue and SQL Server Agent workers |
 | Restore a database or keep a secondary up to date | [Restore](reference/z.usp_RestoreDatabase.md), with an optional preview of commands and file destinations |
-| Remove old backup files | [Filesystem cleanup](reference/z.usp_CleanupDatabaseBackups.md), separately from backup execution |
+| Remove old backup files | `@RetentionHours` on backup procedures, or standalone [filesystem cleanup](reference/z.usp_CleanupDatabaseBackups.md) |
 | Inspect media or recorded operations | [Header reader](reference/z.usp_ReadBackupHeader.md), [file-list reader](reference/z.usp_ReadBackupFileList.md), and [history/activity views](reference/backup-restore-history.md) |
 
-Use [sequential backup](reference/z.usp_BackupDatabase.md) to process one database at a time or [parallel backup](reference/z.usp_BackupDatabasesParallel.md) for bounded Agent workers. Destinations include filesystem folders, Azure Blob HTTPS URLs and S3-compatible URLs (SQL Server 2022+). The nullable ServerName parameter changes the server/instance destination prefix; NULL uses @@servername. The procedure creates filesystem directories when needed, uses object prefixes for URLs, and never deletes old backups. Retention is a separate operation through the [filesystem cleanup procedure](reference/z.usp_CleanupDatabaseBackups.md) or provider lifecycle rules for URL objects.
+Use [sequential backup](reference/z.usp_BackupDatabase.md) to process one database at a time or [parallel backup](reference/z.usp_BackupDatabasesParallel.md) for bounded Agent workers. Destinations include filesystem folders, Azure Blob HTTPS URLs and S3-compatible URLs (SQL Server 2022+). The nullable ServerName parameter changes the server/instance destination prefix; NULL uses @@servername. By default, backups use `<BackupFolder>/<Server>/<Instance>/<Database>/<BackupType>/`; set `@CreateServerInstanceFolder = 0` to omit `<Server>/<Instance>/` and `@CreateBackupTypeFolder = 0` to place all backup types directly in `<Database>/`. The procedure creates filesystem directories when needed and uses object prefixes for URLs. By default (`@RetentionHours = null`), old backups are not deleted; set `@RetentionHours` to remove expired filesystem backups of that backup type (preserving the latest recovery chain), use the [filesystem cleanup procedure](reference/z.usp_CleanupDatabaseBackups.md) directly, or use provider lifecycle rules for URL objects.
 
 Windows destinations can use absolute local or UNC paths. Linux destinations use absolute filesystem paths, including mounted network shares. The parameterless Full/Log wrappers contain a fixed UNC destination; inspect them before use.
 
@@ -32,8 +32,9 @@ specific HTTP(S)/S3 backup-object URL or a recursive filesystem folder. Mixed
 folders and appended backup files use the same source-selection rules. Omit the
 target to initialize missing user databases and continue matching restoring/standby
 databases under their source names; existing ONLINE/unavailable targets are skipped.
-An explicit missing target requires one usable full-backed source family and can
-rename that source. Logs are preferred when sufficient; a compatible differential
+An explicit missing target uses the unique full-backed source family (allowing
+rename) or the unique family matching `@TargetDatabaseName` in a multi-database folder.
+Logs are preferred when sufficient; a compatible differential
 is considered when needed to reach a later endpoint. URL inputs identify one
 object without remote folder discovery. Preview chains, file mappings and outcomes
 with ShowPlan = 1. The recovery default remains NORECOVERY; explicit replacement
@@ -45,10 +46,7 @@ this step. Preview shows access-mode actions without executing them.
 
 ## Inspect history and activity
 
-Inspect recorded backups with z.v_BackupHistory, restores with z.v_RestoreHistory,
-and active native commands with z.v_BackupRestoreRequests. See the
-[inspection reference](reference/backup-restore-history.md) for row counts,
-permissions and examples.
+Inspect subsystem execution history (including failed attempts) in `z.BackupRestoreHistory` without querying `msdb`, native backup sets with `z.v_BackupHistory`, native restores with `z.v_RestoreHistory`, and active native commands with `z.v_BackupRestoreRequests`. See the [inspection reference](reference/backup-restore-history.md) for retention, row counts, permissions and examples.
 
 ## Prerequisites
 

@@ -10,7 +10,8 @@ select * from z.fn_DecodeBackupFileName(N'SQL1$Sales_20261108_1430251234567.trn'
 
 The inline table-valued function accepts FileName nvarchar(4000) and returns zero
 rows for an unrecognized extension, timestamp or component layout. Recognized
-extensions are `.bak` (1), `.diff` (5) and `.trn` (2).
+extensions are `.bak` (1), `.copyonly.bak` (1, `IsCopyOnly = 1`), `.diff` (5),
+`.trn` (2) and `.copyonly.trn` (2, `IsCopyOnly = 1`).
 
 | Column | Meaning |
 | --- | --- |
@@ -20,12 +21,13 @@ extensions are `.bak` (1), `.diff` (5) and `.trn` (2).
 | BackupType | FULL = 1, DIFF = 5, LOG = 2 |
 | SourceServerName | Server label, or NULL for the legacy database-only convention |
 | SourceInstanceName | Instance label when present, otherwise NULL |
+| IsCopyOnly | `1` for `.copyonly.bak` and `.copyonly.trn`, otherwise `0` |
 
 Recognized examples:
 
 ```text
 Sales_20261108_143025_123456.bak
-SQL1$Sales_20261108_1430251234567.bak
+SQL1$Sales_20261108_1430251234567.copyonly.bak
 SQL1$Reporting$Sales_20261108_1430251234567.trn
 ```
 

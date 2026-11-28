@@ -84,19 +84,10 @@ name, are ambiguous and fail that source. If retained media no longer includes
 the old source name but another same-family continuation database exists,
 automatic creation fails conservatively; specify the intended target explicitly.
 
-With an explicit missing target, exactly one usable full-backed source family
-must exist. Multiple fulls of A count as one source. A full of A plus standalone
-logs/differentials of B also counts as one initialization source. Fulls of A and
-B are ambiguous and rejected, even when one source name matches the target.
-The same unique-source rule applies to explicit replacement. For initialization
-or replacement, the newest eligible full by completion time establishes the
-supported recovery branch. Evaluate full starting points and matching differentials
-on that branch to reach the greatest endpoint; prefer a log-only route on ties.
-An older regular full plus a differential can therefore win over a newer copy-only
-full when it restores farther. LSNs are never ranked across recovery branches. An existing
-RESTORING/STANDBY target instead selects its native family/fork; unrelated
-restorable databases do not make continuation ambiguous. Renamed targets work
-the same way. A log or differential alone cannot create a missing database.
+With an explicit missing or replaced target:
+- When a single usable full-backed source family exists, it is selected (allowing database rename). Multiple fulls of A count as one source, and standalone logs/differentials of B do not add initialization candidates.
+- When multiple usable full-backed source families exist (such as a multi-database backup root), the unique family whose source database name matches `@TargetDatabaseName` is selected. Fulls of A and B remain ambiguous when neither source name matches `@TargetDatabaseName` or when distinct families share that name.
+For initialization or replacement, the newest eligible full by completion time establishes the supported recovery branch. Evaluate full starting points and matching differentials on that branch to reach the greatest endpoint; prefer a log-only route on ties. An older regular full plus a differential can therefore win over a newer copy-only full when it restores farther. LSNs are never ranked across recovery branches. An existing RESTORING/STANDBY target instead selects its native family/fork and stops header discovery once logs (or a matching differential base) reach its current redo LSN, ignoring newer full backups; unrelated restorable databases do not make continuation ambiguous. Renamed targets work the same way. A log or differential alone cannot create a missing database.
 
 Plan the log-only route first, without executing any commands. Prefer it when it
 reaches the latest eligible endpoint. Consider a matching differential only when
@@ -123,18 +114,17 @@ positions, execution order, file mappings and destination guards. Independent
 sources retain separate outcomes; one source's failure does not stop other sources. The final outcomes identify DatabaseName, SourceDatabaseName,
 SourceFamilyGUID, Status, LastLSN, ErrorNumber, ErrorMessage and BackupPath.
 Statuses include Initialized, Advanced, AlreadyCurrent, Deferred, Skipped, Ignored
-and Failed; successful previews use Planned. After returning outcomes, execution
-throws an aggregate error if any source failed. Preview reports failures without
-executing restores. Explicit-target errors remain errors. This is a sequential
+and Failed; successful previews use Planned. During live execution (`@ShowPlan = 0`), each executed restore step and any planning, inventory or step failure is also recorded in [z.BackupRestoreHistory](backup-restore-history.md#zbackuprestorehistory). In automatic mode (`@TargetDatabaseName IS NULL`), execution returns the outcomes result set before throwing an aggregate error if any source failed; explicit-target failures record the error in `z.BackupRestoreHistory` and raise their specific error directly without returning an outcomes result set. Preview reports failures without
+executing restores or writing history rows. This is a sequential
 restore operation, not a transaction across databases.
 
 ## Destination state and replacement
 
 | Destination | Explicit target | Omitted target |
 | --- | --- | --- |
-| Missing | Initialize the unique full-backed source | Initialize each eligible source, defer those without a full |
+| Missing | Initialize the unique full-backed source (or the unique source matching `@TargetDatabaseName` in a multi-database folder) | Initialize each eligible source, defer those without a full |
 | RESTORING or standby | Continue native matching identity/progress | Continue native matching identity/progress |
-| Other state, ReplaceExisting = 1 | Replace from the unique full-backed source | Skip |
+| Other state, ReplaceExisting = 1 | Replace from the unique or name-matched full-backed source | Skip |
 | Other state, ReplaceExisting = 0 | Error | Skip |
 
 A RESTORING or STANDBY destination with available recovery identity is continued.
@@ -164,7 +154,7 @@ If native redo metadata is unavailable for a standby database, compatible retain
 history supplies the fallback position. Undo-file naming does not require history.
 An already-current standby performs no finalization.
 
-Run restore and preview outside a user transaction. Rejection with
+Run restore and preview with `IMPLICIT_TRANSACTIONS OFF` and outside a user transaction. Rejection with
 `XACT_ABORT ON` makes an active caller transaction uncommittable. System
 databases, snapshots and the database hosting the procedure cannot be restore
 targets. DropConnections defaults to 1.
@@ -252,10 +242,12 @@ exec z.usp_RestoreDatabase
 	@ShowPlan = 1;
 ```
 
-The supplied text is appended unchanged to the media command's WITH options.
-The procedure does not parse, validate or deduplicate it. SQL Server decides
-option validity on execution; duplicates may be accepted by the engine.
-Use ShowPlan to inspect
+Top-level procedure-managed clauses (`RECOVERY`, `NORECOVERY`, `STANDBY`, `REPLACE`,
+`FILE` and `MOVE`) are stripped from OtherRestoreOptions so procedure parameters
+and planned file moves remain authoritative. All remaining top-level clauses
+(including other duplicates and unknown options) are appended verbatim to the
+media command's WITH options; stripping every clause omits extras cleanly.
+SQL Server decides option validity on execution. Use ShowPlan to inspect
 the generated commands. Extras do not apply to HEADERONLY/FILELISTONLY/LABELONLY
 or the separate final RECOVERY/STANDBY command.
 
